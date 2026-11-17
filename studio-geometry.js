@@ -33,6 +33,18 @@ export function disposeGroup(group){group.traverse(node=>{node.geometry?.dispose
 export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
  const owned=[];const hold=solid=>(owned.push(solid),solid);
  const convert=part=>{
+  if(part.kind==='extrude'){
+   // Fabricate from the planar contours rather than welding the display triangulation.
+   const contours=[part.outline,...(part.holes||[])].map(loop=>loop.map(([x,z])=>[x,-z]));
+   const section=new wasm.CrossSection(contours,'EvenOdd');
+   try{
+    let solid=hold(section.extrude(part.height));
+    solid=hold(solid.rotate([-90,0,0]));
+    if(part.rotation)solid=hold(solid.rotate(part.rotation.map(angle=>angle*180/Math.PI)));
+    if(part.position)solid=hold(solid.translate(part.position));
+    return solid;
+   }finally{section.delete();}
+  }
   const geometry=recipeGeometry(THREE,part);
   try{
    const positions=new Float32Array(geometry.attributes.position.array);

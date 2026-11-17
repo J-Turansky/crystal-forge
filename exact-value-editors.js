@@ -14,7 +14,7 @@ export function validateExactValue(key,text,min,max,{legacy=true}={}){
 }
 export function installExactValueEditors(root=document){
  let active=null;
- function cancel(){if(!active)return;const {output,input}=active;output.hidden=false;input.remove();active=null;}
+ function cancel(){if(!active)return;const {output,input}=active;active=null;output.hidden=false;input.remove();}
  function enhance(){
   for(const output of root.querySelectorAll('output[data-out],output[data-value-for]')){
    if(output.dataset.exactReady)continue;
