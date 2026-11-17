@@ -22,8 +22,15 @@ jobs:
       - uses: actions/configure-pages@v5
         with:
           enablement: true
+      - name: Stage release assets
+        run: |
+          mkdir -p "_site/releases/$GITHUB_SHA"
+          git archive HEAD | tar -x -C _site
+          cp _site/*.js _site/*.css "_site/releases/$GITHUB_SHA/"
+          sed "s|<head>|<head><base href=\"./releases/$GITHUB_SHA/\"><meta name=\"studio-release\" content=\"$GITHUB_SHA\">|" index.html > _site/index.html
+          touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
