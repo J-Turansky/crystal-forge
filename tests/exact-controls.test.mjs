@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {displayedNumber,sliderNumber,validateExactValue} from '../exact-value-editors.js';
+import {describeControl} from '../tooltips.js';
+assert.equal(displayedNumber('crystalSize',2.4),240);
+assert.equal(sliderNumber('crystalSize',235),2.35);
+assert.equal(sliderNumber('bottomScale',-30),.7);
+assert.deepEqual(validateExactValue('height','63.25',40,360),{valid:true,value:63.25});
+assert.equal(validateExactValue('height','999',40,360).valid,false);
+assert.equal(validateExactValue('height','',40,360).valid,false);
+assert.equal(validateExactValue('height','Infinity',40,360).valid,false);
+assert.equal(validateExactValue('crystalSize','235',.5,4).value,2.35);
+const control=id=>({id,dataset:{},matches:()=>true,closest:()=>null,getAttribute:()=>null,textContent:id});
+assert.match(describeControl(control('placeTabBtn'))[1],/bolts or cable ties/);
+assert.match(describeControl(control('resetTabsBtn'))[1],/manually positioned/);
+assert.equal(describeControl(control('unknown-control')),null);
+console.log('Exact values: display units, decimals, bounds and useful action explanations passed.');

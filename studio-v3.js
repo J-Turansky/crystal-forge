@@ -1,4 +1,9 @@
 import * as THREE from 'three';
+import {installExactValueEditors} from './exact-value-editors.js';
+import {installCollapsibleSections} from './collapsible-sections.js';
+import {migrateLegacyStorage} from './studio-migration.js';
+import {installSensoryStudio} from './sensory-studio.js';
+import {routingSummary,renderFeedback,installConciseHelp} from './routing-feedback.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {TransformControls} from 'three/addons/controls/TransformControls.js';
 import {generateFormation,crystalGeometry,crystalOrientation,baseGeometry,baseAccentSpecs,baseSurfaceHeight,crystalRootOffset,exportSTL} from './geometry-v3.js';
@@ -27,6 +32,8 @@ import {assessPrintQuality,printChecklistText} from './print-quality.js';
 import {assessOpticalAccess,opticalAuditCSV} from './optical-audit.js';
 
 const $=id=>document.getElementById(id);
+let studioBridge=null;
+const studioBootstrap=(()=>{try{return migrateLegacyStorage(localStorage);}catch(error){console.error('Studio migration paused; original Crystal data is intact.',error);return null;}})();
 installResizablePanels();
 const defaults={
   title:'Untitled cluster',batchSelectionIds:[],count:16,height:155,width:130,crystalSize:1,widthRandomness:0,studioBrightness:.85,seed:42,pattern:'Central Spire',spacing:42,leanMode:'Organic / natural',leanAmount:35,angleRandomness:32,
@@ -82,6 +89,7 @@ function snapshot(){
 function persist(){
  try{localStorage.setItem('crystal-forge-v3',JSON.stringify({settings:s,crystals,selectedId}))}catch(e){console.warn(e)}
  cloudVault?.schedule();
+ studioBridge?.onCrystalChange();
 }
 function restore(str){
  try{const v=JSON.parse(str);s={...defaults,...v.settings};mergePixelLibrary();crystals=safeArray(v.crystals);selectedId=v.selectedId||null;syncForm();rebuild();persist()}catch(e){console.error(e)}
@@ -200,7 +208,7 @@ function download(blob,name){
  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
  setTimeout(()=>URL.revokeObjectURL(url),1500);
 }
-function setStatus(t){$('status').textContent=t}
+function setStatus(t){const node=$('status');node.classList.remove('issue-box');delete node.dataset.severity;node.setAttribute('role','status');node.textContent=t;}
 
 let manufacturingMesh=null,manufacturingReport=null,preparedSource=null;
 function sourceHash(){return manufacturingFingerprint(s,crystals)}
@@ -252,6 +260,7 @@ function setFloating(enabled){
  persist();
 }
 function disposeManufacturing(){
+ if($('prepareStatus')){$('prepareStatus').classList.remove('issue-box');delete $('prepareStatus').dataset.severity;}
  cancelActivePreparation('Preparation cancelled because model changed');
  clearHardwareAnnotations(); if(manufacturingMesh){
   scene.remove(manufacturingMesh);
@@ -1112,6 +1121,7 @@ function cancelActivePreparation(reason='Preparation cancelled'){
  if(reject)reject(new Error(reason));
 }
 async function buildManufacturing(){
+ $('prepareStatus').classList.remove('issue-box');delete $('prepareStatus').dataset.severity;
  if($('prepareBtn').disabled)return;
  const btn=$('prepareBtn'),cancelBtn=$('cancelPrepareBtn'),source=sourceHash();
  // Reuse the cached manifold result unless the editable model changed.
@@ -1155,7 +1165,7 @@ async function buildManufacturing(){
      activePreparationWorker=null;activePreparationReject=null;resolve(data);
     }else if(data.type==='error'){
      activePreparationWorker=null;activePreparationReject=null;worker.terminate();persistentFabricationWorker=null;
-     reject(new Error(data.message||'Unspecified worker error'));
+     reject(Object.assign(new Error(data.message||'Unspecified worker error'),{debugDetails:data.details}));
     }
    };
    worker.onerror=event=>{
@@ -1188,7 +1198,13 @@ async function buildManufacturing(){
   setStatus('Prepared '+result.report.triangleCount.toLocaleString()+' triangles · editor remained responsive');
  }catch(error){
   console.error('Preparation',error);
-  $('prepareStatus').textContent=error.message;setStatus(error.message);
+  const plan=planHardware(crystals,s),routing=routingSummary(plan,s);
+  const issue=routing.severity==='error'?routing:{severity:'error',title:'The print mesh could not be prepared.',body:String(error.message).split('\n')[0],details:[]};
+  const technical=error.debugDetails||error.stack;
+  renderFeedback($('prepareStatus'),{...issue,details:[...(issue.details||[]),...(technical?[technical]:[])]},{focus:()=>{
+   document.querySelector('[data-tab="build"]').click();const box=$('wireRouteStatus');for(let p=box?.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS')p.open=true;box?.scrollIntoView({block:'nearest'});
+  }});
+  renderFeedback($('status'),{severity:'error',title:issue.title,body:'See the highlighted explanation in the settings panel.'});
  }finally{
   if(activePreparationWorker)cancelActivePreparation('Preparation finished');
   btn.disabled=false;btn.textContent='▣ Prepare print mesh (Boolean union)';cancelBtn.hidden=true;
@@ -1493,4 +1509,38 @@ for(const kind of ['pointerover','focusin','change'])
   const el=e.target.closest?.('button,input,select');if(el)showDescription(el);
  });
 toggleDescriptionsUI();
+installExactValueEditors();
+installCollapsibleSections();
+installConciseHelp();
+if(studioBootstrap&&!new URLSearchParams(location.search).has('legacy'))studioBridge=installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstrap:studioBootstrap,adapter:{
+ capture:()=>({settings:clone(s),crystals:clone(crystals),selectedId}),
+ bounds:()=>{const size=modelBounds().getSize(new THREE.Vector3());return {width:size.x,depth:size.z,height:size.y};},
+ status:setStatus,download,vault:()=>cloudVault,
+ createCrystals:parameters=>({crystals:generateFormation({...defaults,...parameters}),selectedId:null}),
+ previewGroup:()=>{const group=new THREE.Group();for(const mesh of [...crystalMeshes,...(baseMesh?[baseMesh]:[]),...baseAccents])group.add(mesh.clone());return group;},
+ detach:()=>{
+  clearTimeout(rebuildTimer);cameraTween=null;hardwareUI?.cancel();cancelActivePreparation('Switched model');gizmo.detach();clearHardwareAnnotations();
+  const value={meshes:crystalMeshes,base:baseMesh,accents:baseAccents,pixels:pixelGroup,manufacturingMesh,manufacturingReport,preparedSource,
+   history:[...history],historyIndex,camera:camera.position.toArray(),target:orbit.target.toArray()};
+  for(const mesh of [...crystalMeshes,...(baseMesh?[baseMesh]:[]),...baseAccents,pixelGroup,...(manufacturingMesh?[manufacturingMesh]:[])])scene.remove(mesh);
+  crystalMeshes=[];baseMesh=null;baseAccents=[];manufacturingMesh=null;manufacturingReport=null;preparedSource=null;selectedMesh=null;
+  pixelGroup=new THREE.Group();scene.add(pixelGroup);hardwareUI?.refresh();return value;
+ },
+ activate:(model,cached)=>{
+  cameraTween=null;clearTimeout(rebuildTimer);s={...defaults,...clone(model.parameters)};crystals=clone(model.editableState.crystals||[]);selectedId=model.editableState.selectedId||null;
+  history.splice(0);historyIndex=-1;
+  if(cached){
+   scene.remove(pixelGroup);crystalMeshes=cached.meshes;baseMesh=cached.base;baseAccents=cached.accents;pixelGroup=cached.pixels;
+   manufacturingMesh=cached.manufacturingMesh;manufacturingReport=cached.manufacturingReport;preparedSource=cached.preparedSource;
+   for(const mesh of [...crystalMeshes,...(baseMesh?[baseMesh]:[]),...baseAccents,pixelGroup,...(manufacturingMesh?[manufacturingMesh]:[])])scene.add(mesh);
+   history.push(...cached.history);historyIndex=cached.historyIndex;camera.position.fromArray(cached.camera);orbit.target.fromArray(cached.target);camera.lookAt(orbit.target);
+   syncForm();renderTree();renderInfo();selectCrystal(selectedId,false);hardwareUI?.refresh();
+  }else{rebuild();history.push(JSON.stringify({settings:s,crystals,selectedId}));historyIndex=0;}
+  setStatus('Ready — Crystal Clusters');
+ },
+ release:cached=>{for(const mesh of [...cached.meshes,...(cached.base?[cached.base]:[]),...cached.accents,cached.pixels,...(cached.manufacturingMesh?[cached.manufacturingMesh]:[])]){
+  mesh.traverse(node=>{node.geometry?.dispose();node.material?.dispose();});scene.remove(mesh);
+ }}
+}});
+
 

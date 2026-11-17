@@ -37,6 +37,6 @@ self.onmessage=async(event)=>{
   self.postMessage({type:'complete',positions,report},
    [positions.buffer,report.mesh.points.buffer,report.mesh.triangles.buffer]);
  }catch(error){
-  self.postMessage({type:'error',message:error?.stack||error?.message||String(error)});
+  self.postMessage({type:'error',message:error?.message||String(error),details:error?.stack||null});
  }finally{busy=false}
 };

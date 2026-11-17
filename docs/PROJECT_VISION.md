@@ -1,5 +1,10 @@
 # Project vision — why Crystal Forge exists
 
+## Sensory Model Studio v0.16.0 — active draft work
+
+The user approved the full seven-generator expansion, global Print Centre, local-first visual library, copy/linked models, private-vault evolution and actual dual-material exports. [Full brief](SENSORY_MODEL_STUDIO_V016_BRIEF.md). **Implementation is incomplete.** [Current acceptance and module map](SENSORY_MODEL_STUDIO_V016_ACCEPTANCE.md) distinguishes source modules, integration still needed and unrun tests. Keep all remaining stages in the same draft PR; do not mark this checkpoint as the finished v0.16.0 release.
+
+
 **Evidence:** earlier design conversations on 10 November 2026, the current project discussion, repository source, README and changelog. When a point is an interpretation rather than a direct request, it is labelled accordingly.
 
 ## Creative origin — confirmed user intention

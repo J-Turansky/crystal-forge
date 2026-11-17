@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
-const url=process.env.CRYSTAL_FORGE_URL||'http://127.0.0.1:4321';
+const rootURL=process.env.CRYSTAL_FORGE_URL||'http://127.0.0.1:4321';
+const url=rootURL+(rootURL.includes('?')?'&':'?')+'legacy=1';
 const browser=await chromium.launch({
  headless:true,
  executablePath:process.env.CRYSTAL_FORGE_BROWSER_EXECUTABLE||undefined,
@@ -9,6 +10,9 @@ const browser=await chromium.launch({
 const logs=[];
 const context=await browser.newContext({viewport:{width:1440,height:950},deviceScaleFactor:2,acceptDownloads:true});
 const page=await context.newPage();
+// This legacy interaction fixture expands controls for its long sequence of
+// existing Crystal tests. Studio browser tests separately verify closed defaults.
+await page.addInitScript(()=>{new MutationObserver(()=>document.querySelectorAll('details.collapsible-section:not([open])').forEach(d=>d.open=true)).observe(document,{childList:true,subtree:true});});
 page.on('pageerror',e=>logs.push('PAGE ERROR '+e.message));
 page.on('console',m=>{if(m.type()==='error')logs.push('CONSOLE ERROR '+m.text())});
 try{
@@ -555,3 +559,4 @@ try{
  if(logs.length)console.log('Browser logs:',logs.join('\n').slice(0,3000));
  throw e;
 }finally{await browser.close()}
+

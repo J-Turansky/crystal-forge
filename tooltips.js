@@ -140,11 +140,16 @@ const SETTINGS={
   "Choose one shared LED, multiple LEDs or no lighting. Actual channels need inspecting in Cura."
  ],
  "pixelProfileId": ["Pixel profile","Choose a seed, bullet, gumdrop or saved custom profile. Dimensions change the actual manufacturing cut."],
- "wireMode": ["One or two wire grooves","Parallel mode cuts two separate real grooves with a shared direction. Each selected pixel has a rotation angle controlling the paired outlets."],
+ "wireMode": ["Physical cable layout","Pixel string connects the base edge to the first pixel, then each pixel in order, then the last pixel to an output edge. Each pixel has two opposite cable ports. Legacy options are retained only for older saved projects."],
+ "pixelStringSpacing": ["Available pixel-to-pixel cable length","The maximum distance your real cable can cover from the centre of one pixel to the next, following the curved groove. Choose 25, 50 or 100 mm, or type your measured length. A shorter route is allowed; a longer route blocks printing."],
+ "wireMinBendRadius": ["Minimum cable bend radius","Sets how gently the cable must turn. A larger number makes wider curves and can require more room. Use a value your real cable can bend around without strain; do not lower it just to silence a routing warning."],
+ "wireInputTailLength": ["First pixel’s input cable length","The available cable from the first pixel centre to the opening at the base edge. The curved route must fit inside this distance. Zero retains the old unlimited-length setting; enter your measured tail length to enforce a limit."],
+ "wireOutputTailLength": ["Last pixel’s output cable length","The available cable from the last pixel centre to the output opening at the base edge. This is separate from the cable between pixels. Enter the real tail length to prevent an opening being placed too far away."],
+ "pixelSnapMaxMove": ["Maximum movement during exact-length snapping","Limits how far the snap tool may shift each pixel while trying to match the selected cable length. The first pixel stays anchored. A short but valid cable route does not need to be stretched just because exact-length snapping cannot move it."],
  "wirePairSpacing": ["Parallel wire separation","Centre-to-centre distance of the two grooves. It must exceed groove width with extra printed material between tracks."],
  "pickWireExitBtn": ["Pick paired cable exit","Click near the base perimeter to choose the exit centre for both wires. Their relative spacing and heading remain coupled to the pixel rotation."],
- "placeTabBtn": ["Directly edit edge tabs","Click to add a tab; Shift-drag an existing tab to move it, or delete it in the hardware list."],
- "resetTabsBtn": ["Reset edge tab placement","Switch back to the automatic equally spaced tab layout."],
+ "placeTabBtn": ["Place a fixing tab on the base edge","Adds a small semicircular tab with holes for bolts or cable ties. Click the base edge to place a tab, or Shift-drag an existing tab around the edge. The tab becomes part of the printed model; test its strength before using it to support anything."],
+ "resetTabsBtn": ["Space fixing tabs evenly","Replaces your manually positioned fixing tabs with a fresh, evenly spaced arrangement around the base. Hole size and tab thickness stay as set below."],
  "wireChannels": ["Carve underside wire grooves","When enabled, cut actual shallow channels joining multiple accepted LED sockets. Not continuous optical channels or guaranteed strain relief."],
  "wireExit": ["Cable exit","Attempt to route one groove to the nearest safe perimeter edge; may be skipped if the wall is too thin."],
  "wireWidth": ["Wire channel width","Width of each open-bottom cable groove. Measure actual cable insulation and keep material around nearby holes."],
@@ -428,6 +433,7 @@ function lookup(el){
  if(el.dataset.tooltipTitle&&el.dataset.tooltipBody)return [el.dataset.tooltipTitle,el.dataset.tooltipBody];
  if(el.dataset.state&&SETTINGS[el.dataset.state])return SETTINGS[el.dataset.state];
  if(el.id&&BUTTONS[el.id])return BUTTONS[el.id];
+ if(el.id&&SETTINGS[el.id])return SETTINGS[el.id];
  if(el.id&&OTHER[el.id])return OTHER[el.id];
  if(el.dataset.tab)return TABS[el.dataset.tab];
  if(el.dataset.view)return VIEWS[el.dataset.view];
@@ -441,8 +447,6 @@ function lookup(el){
  const heading=titleFrom(el);
  const native=el.getAttribute('title');
  if(native)return [heading,native];
- if(el.matches('button'))return [heading,'Activate this control.'];
- if(el.matches('input,select'))return [heading,'Adjust this setting; some edits require preparing a new print mesh.'];
  return null;
 }
 const MOUNT_EXPLANATIONS={
@@ -452,7 +456,7 @@ const MOUNT_EXPLANATIONS={
  'Threaded insert M3':'Blind pockets for M3 inserts. Match dimensions to the exact heat-set or press-fit insert.',
  'Custom dual holes':'Two holes at the chosen size, spacing and depth subject to base material clearance.',
  'Edge fixing tabs':'Semicircular perimeter ears with configurable through-holes for ties or bolts. Physical tensile/load testing required.',
- 'Detachable plate':'Concept only. No mating detachable plate is generated yet.',
+ 'Detachable plate':'Makes matching M3 insert pockets in the base and a separate printable plate with through-holes. Test your actual inserts, bolts and printed plate before mounting.',
  'Ceiling mount':'Nominal fixing features, not a load-rated suspension system. Use certified hardware and independent safety retention.'
 };
 export function describeControl(el){
@@ -477,15 +481,17 @@ export function installTooltips(doc=document){
   const width=Math.min(300,viewportWidth-22);node.style.maxWidth=width+'px';
   const box=node.getBoundingClientRect();
   let x=rect.left+rect.width/2-box.width/2;
+  const panel=target.closest('.left,.right,.sms-controls');
+  if(panel){const bounds=panel.getBoundingClientRect();if(bounds.right+box.width+22<viewportWidth)x=bounds.right+11;else if(bounds.left-box.width-11>0)x=bounds.left-box.width-11;}
   x=Math.max(11,Math.min(viewportWidth-box.width-11,x));
-  let y=rect.bottom+11;
+  let y=panel?rect.top:rect.bottom+11;
   if(y+box.height>viewportHeight-9)y=rect.top-box.height-11;
   y=Math.max(9,Math.min(viewportHeight-box.height-9,y));
   node.style.left=Math.round(x)+'px';node.style.top=Math.round(y)+'px';
  };
  const show=()=>{
   timer=0;if(!enabled||!valid(target))return;
-  const content=lookup(target);if(!content)return;
+  const content=describeControl(target);if(!content)return;
   heading.textContent=content[0];description.textContent=content[1];
   node.hidden=false;target.setAttribute('aria-describedby','controlTooltip');position();
  };
@@ -513,3 +519,4 @@ export function installTooltips(doc=document){
  window.addEventListener('resize',()=>{if(target)position()});
  return {hide,enable(value){enabled=!!value;if(!enabled)hide()},get enabled(){return enabled}};
 }
+

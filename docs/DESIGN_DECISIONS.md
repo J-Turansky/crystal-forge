@@ -1,5 +1,10 @@
 # Architectural and product decisions (ADR log)
 
+## Sensory Model Studio v0.16.0 — active draft work
+
+The user approved the full seven-generator expansion, global Print Centre, local-first visual library, copy/linked models, private-vault evolution and actual dual-material exports. [Full brief](SENSORY_MODEL_STUDIO_V016_BRIEF.md). **Implementation is incomplete.** [Current acceptance and module map](SENSORY_MODEL_STUDIO_V016_ACCEPTANCE.md) distinguishes source modules, integration still needed and unrun tests. Keep all remaining stages in the same draft PR; do not mark this checkpoint as the finished v0.16.0 release.
+
+
 ## Reading this log
 
 Each decision has **evidence class**: *explicit user requirement*, *jointly adopted design direction*, *implementation choice visible in code* or *new proposed guidance*. A date denotes only what the available conversation and commit history support, not a fabricated meeting. **Accepted** means a chosen design direction; **implemented** means corresponding tracked code exists; **validated** is always qualified to tests. New guidance here must not be mistaken for historical user approval.

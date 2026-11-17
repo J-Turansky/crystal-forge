@@ -1,5 +1,13 @@
 # Crystal Forge — Changelog
 
+## Unreleased — Sensory Model Studio v0.16.0 in progress
+
+- Add model/project document operations, pinned library revisions, print-job ownership guards and additive legacy migration modules.
+- Add tactile tile reference geometry, two material partitions, a Manifold preparation adapter and aligned STL / multi-object 3MF export modules.
+- Add regression tests and preserve the complete development brief plus an explicit outstanding acceptance matrix.
+- These modules are not yet connected to the production editor. The seven-generator application, full shared UI and sync remain incomplete; the running app remains v0.15.1.
+
+
 ## v0.15.1 — PR14 measured physical cable-length snapping (draft)
 
 - **One-click fine positioning:** Build → underside wiring now has "Snap internal pixels to cable length" and a configurable 5 mm default maximum correction per pixel.

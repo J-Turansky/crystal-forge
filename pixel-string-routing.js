@@ -163,13 +163,15 @@ export function planPixelStringRoutes(crystals,s,hardware){
    if(!points)continue;
    const full=input?[outside,...points]:[...points,outside];
    const allowed=input?Number(s.wireInputTailLength)||null:Number(s.wireOutputTailLength)||null;
-   if(!add(kind,input?null:index,input?index:null,full,p,null,allowed))continue;
+   // Count from the pixel centre to the perimeter. The extra cutter length
+   // beyond the perimeter opens the groove, but consumes no cable in the model.
+   if(!add(kind,input?null:index,input?index:null,full,p,null,allowed,gap(p,port)-gap(outside,end)))continue;
    if(input){plan.entryAdded=true;plan.entryPoint=end}else{plan.exitAdded=true;plan.exitPoint=end}
    return true;
   }
   return false;
  };
- if(!edgeRoute('input',0))plan.messages.push('P1 IN: no safe tangent route to the perimeter.');
+ if(s.wireInputEnabled!==false&&!edgeRoute('input',0))plan.messages.push('P1 IN: no safe tangent route to the perimeter.');
  for(let i=0;i<pixels.length-1;i++){
   const a=pixels[i],b=pixels[i+1],start=pixelStringPort(a,'output'),end=pixelStringPort(b,'input');
   const points=curve(start,end,axisOut(a),axisOut(b),a,b);
@@ -178,8 +180,8 @@ export function planPixelStringRoutes(crystals,s,hardware){
    gap(a,start)+gap(b,end)))
    plan.messages.push('P'+(i+1)+' → P'+(i+2)+': cable cannot meet tangent/bend, mounting or roof clearance constraints.');
  }
- if(!edgeRoute('output',pixels.length-1))plan.messages.push('P'+pixels.length+' OUT: no safe tangent route to the perimeter.');
- plan.unrouted=(pixels.length+1)-plan.connections.length;
+ if(s.wireOutputEnabled!==false&&!edgeRoute('output',pixels.length-1))plan.messages.push('P'+pixels.length+' OUT: no safe tangent route to the perimeter.');
+ plan.unrouted=(pixels.length-1+(s.wireInputEnabled!==false?1:0)+(s.wireOutputEnabled!==false?1:0))-plan.connections.length;
  plan.previewRoutes=all; // show over-length runs in RED even when export is blocked
  plan.lengthMm=all.reduce((sum,r)=>sum+r.lengthMm,0);
  if(plan.unrouted||plan.overLengthCount){
@@ -191,3 +193,4 @@ export function planPixelStringRoutes(crystals,s,hardware){
  plan.messages.push('Validated physical P1→P'+pixels.length+' cable-string path; verify your measured cable and real print.');
  return plan;
 }
+
