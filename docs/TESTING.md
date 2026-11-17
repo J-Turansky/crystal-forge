@@ -1,5 +1,10 @@
 # Crystal Forge — verification strategy and commands
 
+## Sensory Model Studio v0.16.0 — active draft work
+
+The user approved the full seven-generator expansion, global Print Centre, local-first visual library, copy/linked models, private-vault evolution and actual dual-material exports. [Full brief](SENSORY_MODEL_STUDIO_V016_BRIEF.md). **Implementation is incomplete.** [Current acceptance and module map](SENSORY_MODEL_STUDIO_V016_ACCEPTANCE.md) distinguishes source modules, integration still needed and unrun tests. Keep all remaining stages in the same draft PR; do not mark this checkpoint as the finished v0.16.0 release.
+
+
 **Principle:** do not equate source review, a syntax pass, a Manifold pass, a headless browser run, and a real Cura/physical print. Each answers different questions. Report **exact commit SHA**, commands, environment and relevant artifacts. This document distinguishes existing checks from manual gates.
 
 ## 1. Test matrix

@@ -1,5 +1,10 @@
 # Crystal Forge — feature specifications
 
+## Sensory Model Studio v0.16.0 — active draft work
+
+The user approved the full seven-generator expansion, global Print Centre, local-first visual library, copy/linked models, private-vault evolution and actual dual-material exports. [Full brief](SENSORY_MODEL_STUDIO_V016_BRIEF.md). **Implementation is incomplete.** [Current acceptance and module map](SENSORY_MODEL_STUDIO_V016_ACCEPTANCE.md) distinguishes source modules, integration still needed and unrun tests. Keep all remaining stages in the same draft PR; do not mark this checkpoint as the finished v0.16.0 release.
+
+
 **Scope:** requirements recovered from the design conversation and inspected v0.7.0 source. **Status vocabulary:** *implemented (tested representative cases)*, *implemented (partially tested)*, *experimental*, *requested / incomplete*, *proposal*, *not yet verified physically*. An implemented UI control is not proof of its physical effect. Acceptance tests are future contracts, not claims that each has been run.
 
 ## F01 — Formation generator and creative variation

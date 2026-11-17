@@ -1,5 +1,10 @@
 # PR14 / v0.15.1 — physical pixel-spacing snap (draft)
 
+## Sensory Model Studio v0.16.0 — active draft work
+
+The user approved the full seven-generator expansion, global Print Centre, local-first visual library, copy/linked models, private-vault evolution and actual dual-material exports. [Full brief](SENSORY_MODEL_STUDIO_V016_BRIEF.md). **Implementation is incomplete.** [Current acceptance and module map](SENSORY_MODEL_STUDIO_V016_ACCEPTANCE.md) distinguishes source modules, integration still needed and unrun tests. Keep all remaining stages in the same draft PR; do not mark this checkpoint as the finished v0.16.0 release.
+
+
 **User request:** once LEDs are positioned within a few millimetres of the installed pixel-wire pitch, snap the *real curved centre-to-centre route* to 25, 50, 100 or custom mm rather than letting the wire hang short/overlong. P1 is anchored; only P1→P2→...→Pn internal links are length-matched. The first IN and final OUT tails have independent lengths.
 
 **Implementation:** Build adds a one-click Snap button with an adjustable 5 mm default maximum displacement per pixel; tests candidate positions against the authoritative hardware planner (Bezier geometry, boundaries, holes, mounting positions, prior accepted runs and existing valid entry/exit paths). Links too distant or unsafe are skipped and explained. The result is a single undoable/savable edit, not automatic repositioning on every mouse drag. [Acceptance guide](PR14_PIXEL_SPACING_ACCEPTANCE.md).

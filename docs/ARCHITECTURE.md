@@ -1,5 +1,10 @@
 # Architecture — implementation as inspected (10 November 2026)
 
+## Sensory Model Studio v0.16.0 — active draft work
+
+The user approved the full seven-generator expansion, global Print Centre, local-first visual library, copy/linked models, private-vault evolution and actual dual-material exports. [Full brief](SENSORY_MODEL_STUDIO_V016_BRIEF.md). **Implementation is incomplete.** [Current acceptance and module map](SENSORY_MODEL_STUDIO_V016_ACCEPTANCE.md) distinguishes source modules, integration still needed and unrun tests. Keep all remaining stages in the same draft PR; do not mark this checkpoint as the finished v0.16.0 release.
+
+
 This document describes the current **tracked source** on the audited main branch, not an imagined future architecture. Source files are plain browser ESM; the older `app.js` is not referenced by the live page.
 
 ## File map
