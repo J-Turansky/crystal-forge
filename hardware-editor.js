@@ -5,6 +5,8 @@ import {snapHardwarePoint,snapHardwareCoordinate} from './design-workflows.js';
 import {nearestEdgePosition} from './edge-tabs.js';
 import {ensureHardwareIds,movePixelInString,hardwareName} from './hardware-identity.js';
 import {snapPixelsToWireLength} from './pixel-spacing-snap.js';
+import {setPixelEdgeMode,pixelEdgeMode,solvePixelMove,repairPixelRouting} from './pixel-motion.js';
+import {routingSummary,renderFeedback} from './routing-feedback.js';
 
 export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,getBaseMesh,getSettings,getCrystals,getManufacturingVisible=()=>false,onEdit,onStatus}){
  const $=id=>document.getElementById(id),guides=new THREE.Group();
@@ -22,6 +24,26 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
  const ray=new THREE.Raycaster(),cursorNDC=new THREE.Vector2();
  const ground=new THREE.Plane(new THREE.Vector3(0,1,0),0);
  let placing=null,pointerStart=null,lastCursor=null,draggingHole=null,selectedHardware=null,markerDrag=null;
+ let edgeDrag=null,guideWorker=null,guideSerial=0;
+ const movementGuides=new THREE.Group();movementGuides.name='Cable-constrained movement guide';scene.add(movementGuides);
+ const wireKeys=['manualPixelHoles','pixelPlacement','pixelCount','wireEntryX','wireEntryZ','wireOutputX','wireOutputZ','wireChannels','wireMode','cutSockets','constrainPixelMotion','wireInputEnabled','wireOutputEnabled','wireInputTailLength','wireOutputTailLength'];
+ const copy=value=>JSON.parse(JSON.stringify(value));
+ function applyWireDraft(draft){const target=getSettings();for(const key of wireKeys){if(Object.hasOwn(draft,key))target[key]=copy(draft[key]);else delete target[key];}}
+ function clearMovementGuide(){for(const child of [...movementGuides.children]){movementGuides.remove(child);child.geometry.dispose();child.material.dispose();}}
+ function requestMovementGuide(selection){
+  guideWorker?.terminate();guideWorker=null;clearMovementGuide();
+  if(!getSettings().constrainPixelMotion||!window.Worker)return;
+  const serial=++guideSerial;guideWorker=new Worker(new URL('./pixel-motion-worker.js',import.meta.url),{type:'module'});
+  guideWorker.onmessage=({data})=>{guideWorker?.terminate();guideWorker=null;if(data.serial!==guideSerial||!data.guide)return;
+   const samples=data.guide.samples;
+   for(let i=1;i<samples.length;i++)if(samples[i-1].valid&&samples[i].valid){
+    const geometry=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(samples[i-1].x,1.3,samples[i-1].z),new THREE.Vector3(samples[i].x,1.3,samples[i].z)]);
+    const line=new THREE.Line(geometry,new THREE.LineBasicMaterial({color:selection.edgeKind==='input'?0x00a6a6:selection.edgeKind==='output'?0xe86b0a:0x18be70,depthTest:false,transparent:true,opacity:.95}));line.renderOrder=210;movementGuides.add(line);
+   }
+  };
+  guideWorker.onerror=()=>{guideWorker?.terminate();guideWorker=null;};
+  guideWorker.postMessage({serial,crystals:getCrystals(),settings:copy(getSettings()),selection});
+ }
  const markerLayer=document.createElement('div');
  markerLayer.className='hardware-marker-layer';
  renderer.domElement.parentElement.appendChild(markerLayer);
@@ -34,7 +56,7 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
  let contextPoint=null;
  const clearContext=()=>{contextMenu.hidden=true;contextPoint=null};
  const numeric=v=>Number(v).toFixed(1);
- const isBuild=()=>!!document.querySelector('[data-tab="build"].active');
+ const isBuild=()=>!!document.querySelector('[data-tab="build"].active')&&!document.body.classList.contains('sms-generic-mode');
  const getPlan=()=>planHardware(getCrystals(),getSettings());
  function clear(preserveHardwareMarkers=false){
   for(const m of [...guides.children]){guides.remove(m);m.traverse(node=>{
@@ -52,11 +74,16 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
  }
  function showSelection(kind,id,index,scroll=true){
   selectedHardware={kind,id,index};
+  if(kind==='pixel'&&getSettings().pixelPlacement!=='manual'){
+   const state=getSettings(),plan=getPlan();state.manualPixelHoles=plan.sockets.map(p=>({id:p.id,x:p.x,z:p.z,profileId:p.profileId,wireAngle:p.wireAngle??0}));state.pixelPlacement='manual';state.pixelCount=state.manualPixelHoles.length;onEdit();
+  }
   refresh();
   if(scroll){
    const card=[...document.querySelectorAll('[data-hw-card-kind]')].find(el=>el.dataset.hwCardKind===kind&&el.dataset.hwCardId===id);
+   for(let parent=card?.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
    card?.scrollIntoView({block:'nearest',behavior:'smooth'});
   }
+  if(kind==='pixel')requestMovementGuide({pixelId:id});
   onStatus('Selected '+hardwareName(kind,index)+' · edit it in the Build panel');
  }
  function addMarker(kind,p,index,invalid=false){
@@ -88,6 +115,7 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
  function positionMarkers(){
   const build=isBuild(),rect=renderer.domElement.getBoundingClientRect();
   markerLayer.hidden=!build||!!placing;
+  movementGuides.visible=build&&!placing&&!getManufacturingVisible();
   if(build&&!placing&&rect.width&&rect.height)for(const {button,p} of markerObjects){
    const pt=new THREE.Vector3(p.x,.8,p.z).project(camera);
    const visible=pt.z>-1&&pt.z<1&&Math.abs(pt.x)<1.2&&Math.abs(pt.y)<1.2;
@@ -109,8 +137,10 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
    plan.tabHoles.forEach((p,i)=>addMarker('tab',p,i));
    for(const p of plan.invalidManualPixels||[])addMarker('pixel',{...p,id:'invalid-pixel-'+p.index},p.index,true);
    for(const p of plan.invalidManualMounts||[])addMarker('mount',{...p,id:'invalid-mount-'+p.index},p.index,true);
+   for(const [kind,point] of [['input',plan.wirePlan?.entryPoint],['output',plan.wirePlan?.exitPoint]])if(point)addEdgeMarker(kind,point);
   }else{
    for(const item of markerObjects){
+    if(item.button.dataset.edgeWire){const point=item.button.dataset.edgeWire==='input'?plan.wirePlan?.entryPoint:plan.wirePlan?.exitPoint;if(point)item.p=point;continue;}
     const kind=item.button.dataset.hwKind,id=item.button.dataset.hwId;
     const arr=kind==='pixel'?plan.sockets:kind==='mount'?plan.mounts:plan.tabHoles;
     const fresh=arr.find(p=>String(p.id)===id);
@@ -195,6 +225,25 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
   // P/M/T selection markers remain available independently.
   guides.visible=isBuild()&&!getManufacturingVisible();
  }
+ function addEdgeMarker(kind,p){
+  const button=document.createElement('button');button.type='button';button.className='hardware-marker hardware-edge-marker edge-'+kind;
+  button.textContent=kind==='input'?'IN':'OUT';button.dataset.edgeWire=kind;
+  button.dataset.tooltipTitle=kind==='input'?'Input cable opening':'Output cable opening';
+  button.dataset.tooltipBody='Drag this '+kind+' opening along the base edge. Only positions within the chosen curved cable length and clear of other hardware can be applied. The coloured edge line shows sampled available positions.';
+  button.setAttribute('aria-label','Move '+kind+' edge wire opening');
+  button.onclick=e=>{e.stopPropagation();requestMovementGuide({edgeKind:kind});};
+  button.onpointerdown=e=>{if(e.button!==0||placing)return;e.preventDefault();e.stopPropagation();
+   const state=getSettings();edgeDrag={kind,original:copy(state),startX:e.clientX,startY:e.clientY,moved:false,lastValid:null,lastPreview:0,endingValid:false};requestMovementGuide({edgeKind:kind});
+  };
+  button.onkeydown=e=>{
+   const delta={ArrowLeft:-1,ArrowUp:-1,ArrowRight:1,ArrowDown:1}[e.key];if(!delta)return;e.preventDefault();
+   const poly=getPlan().polygon,near=nearestEdgePosition(poly,p),step=(e.shiftKey?5:1)/Math.max(1,poly.reduce((n,a,i)=>n+Math.hypot(a.x-poly[(i+1)%poly.length].x,a.z-poly[(i+1)%poly.length].z),0));
+   const u=(near.u+delta*step+1)%1;let travelled=0;const total=poly.reduce((n,a,i)=>n+Math.hypot(a.x-poly[(i+1)%poly.length].x,a.z-poly[(i+1)%poly.length].z),0);
+   let point=p;for(let i=0;i<poly.length;i++){const a=poly[i],b=poly[(i+1)%poly.length],length=Math.hypot(a.x-b.x,a.z-b.z);if(u*total<=travelled+length){const t=(u*total-travelled)/(length||1);point={x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t};break;}travelled+=length;}
+   const solved=solvePixelMove(getCrystals(),getSettings(),{edgeKind:kind,edgePoint:point});if(solved.valid){applyWireDraft(solved.settings);onEdit();requestMovementGuide({edgeKind:kind});}else onStatus('Edge movement blocked: '+solved.reason);
+  };
+  markerLayer.append(button);markerObjects.push({button,p});
+ }
  function refresh(){
   const s=getSettings();
   ensureHardwareIds(s);
@@ -210,6 +259,9 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
       routing.routes.length?routing.routes.length+' legacy groove segment(s) · '+routing.lengthMm.toFixed(1)+' mm. Switch to Pixel string to route opposed IN/OUT tails.':
        routing.messages.join(' ')||'No safe cable groove planned.';
    $('wireRouteStatus').classList.toggle('warning',!!routing?.enabled&&!routing.ready&&routing.mode==='string');
+   if(routing?.mode==='string')renderFeedback($('wireRouteStatus'),routingSummary(plan,s),{fix:routing.enabled&&!routing.ready?tryRepair:null,focus:routing.enabled&&!routing.ready?()=>{
+    const index=routing.entryAdded?Math.max(0,plan.sockets.length-1):0,pixel=plan.sockets[index];if(pixel)showSelection('pixel',pixel.id,index);
+   }:null});
   }
   if($('wireRouteDetails')){
    const details=routing?.connections||[];
@@ -218,6 +270,7 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
     ': '+c.lengthMm.toFixed(1)+' mm'+(c.allowedMm!=null?' / '+c.allowedMm.toFixed(1)+' mm'+(c.overLength?' — TOO LONG':' — OK'):'')
    ).join('  ·  ');
    $('wireRouteDetails').classList.toggle('warning',!!routing?.overLengthCount);
+   if(!$('wireRouteDetails').closest('details.wire-measurements')){const details=document.createElement('details');details.className='wire-measurements';const summary=document.createElement('summary');summary.textContent='Cable measurements';$('wireRouteDetails').before(details);details.append(summary,$('wireRouteDetails'));}
   }
   if($('hardwareGuideSummary'))$('hardwareGuideSummary').textContent=
    plan.sockets.length+' LED hole(s) · '+(plan.mounts.length+plan.tabHoles.length)+' mounting hole(s) · '+plan.tabs.length+' edge tab(s) · '+
@@ -254,7 +307,12 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
  '<div class="control"><label>Pixel rotation (degrees)</label><input type="number" min="-180" max="180" step="5" data-wire-angle="'+i+'" value="'+Number(p.wireAngle??0)+'"></div>'+
  '<div class="grid2"><div class="control"><label>Exit centre X (mm)</label><input data-wire-end-x="'+i+'" type="number" step=".5" value="'+(p.wireEndX??'')+'" placeholder="Automatic"></div>'+
  '<div class="control"><label>Exit centre Z (mm)</label><input data-wire-end-z="'+i+'" type="number" step=".5" value="'+(p.wireEndZ??'')+'" placeholder="Automatic"></div></div>'+
- '<p class="note">This angle rotates the opposed cable IN/OUT ports. For string mode, perimeter entry/exit is controlled above; legacy paired mode uses old per-pixel exit fields.</p></div>':'';
+ '<p class="note">IN and OUT always remain opposite. With constrained movement on, the pixel turns automatically to keep its cable routes within the chosen lengths.</p>'+
+ (s.wireMode==='string'?'<label>Pixel edge wire<select data-pixel-edge="'+i+'" data-tooltip-title="Connect this pixel to the base edge" data-tooltip-body="Choose Input to make this pixel first in the string, or Output to make it last. Both is available for a one-pixel string. A coloured perimeter handle appears for each safe edge connection; drag it along the edge.">'+
+ ['none','input','output','both'].map(mode=>'<option value="'+mode+'" '+(pixelEdgeMode(plan,s,i)===mode?'selected':'')+' '+(mode==='both'&&items.length>1?'disabled':'')+'>'+({none:'None',input:'Input edge wire — becomes P1',output:'Output edge wire — becomes last',both:'Both input and output'}[mode])+'</option>').join('')+'</select></label>'+
+ (i===0?'<label>Input edge cable length (mm)<input type="number" min="5" max="1000" step=".1" data-edge-length="input" value="'+(Number(s.wireInputTailLength)||Number(s.pixelStringSpacing)||50)+'"></label>':'')+
+ (i===items.length-1?'<label>Output edge cable length (mm)<input type="number" min="5" max="1000" step=".1" data-edge-length="output" value="'+(Number(s.wireOutputTailLength)||Number(s.pixelStringSpacing)||50)+'"></label>':'')+
+ '<p class="note">Teal IN and orange OUT handles sit on the base edge. Select a pixel for its green sampled movement outline, or an edge handle for its coloured available edge segments. Every drag is rechecked against the actual curved route.</p>':'')+'</div>':'';
     html.push('<div class="hardware-edit-item'+(selectedHardware?.id===p.id&&selectedHardware.kind===kind?' selected':'')+'" data-hw-card-kind="'+kind+'" data-hw-card-id="'+itemId+'" '+(kind==='pixel'?'draggable="true"':'')+'>'+
      '<div class="hardware-edit-heading"><button type="button" data-select-kind="'+kind+'" data-select-id="'+itemId+'" data-select-index="'+i+'">'+itemName+(bad?' · INVALID':'')+'</button>'+actions+'</div>'+
      '<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:end;margin:8px 0">'+
@@ -273,6 +331,17 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
    }
   }
   list.innerHTML=html.join('')||'<p class="note">Use Place / move to make existing automatic holes editable, or add new holes by clicking the model.</p>';
+  list.querySelectorAll('[data-pixel-edge]').forEach(select=>select.onchange=()=>{
+   const p=s.manualPixelHoles[Number(select.dataset.pixelEdge)],result=setPixelEdgeMode(getCrystals(),s,p.id,select.value);
+   if(result.valid){applyWireDraft(result.settings);onEdit();requestMovementGuide({pixelId:p.id});onStatus('Edge wire configured. Drag the teal IN or orange OUT handle around the perimeter.');}
+   else{onStatus(result.reason);refresh();}
+  });
+  list.querySelectorAll('[data-edge-length]').forEach(input=>input.onchange=()=>{
+   const value=Number(input.value);if(!Number.isFinite(value)||value<5||value>1000){onStatus('Edge cable length must be 5–1000 mm.');refresh();return;}
+   const draft=copy(s);draft[input.dataset.edgeLength==='input'?'wireInputTailLength':'wireOutputTailLength']=value;draft.constrainPixelMotion=true;
+   const result=solvePixelMove(getCrystals(),draft,{});
+   if(result.valid){applyWireDraft(result.settings);onEdit();}else{onStatus(result.reason);refresh();}
+  });
   list.querySelectorAll('[data-select-kind]').forEach(btn=>btn.onclick=()=>showSelection(btn.dataset.selectKind,btn.dataset.selectId,Number(btn.dataset.selectIndex),false));
   const reorder=(from,to)=>{if(movePixelInString(s,from,to)){onEdit();onStatus('Changed string order · the cable route now follows the updated P1 → P2 order')}};
   list.querySelectorAll('[data-set-start]').forEach(btn=>btn.onclick=()=>{
@@ -307,7 +376,9 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
    const key=input.dataset.holeKind==='pixel'?'manualPixelHoles':'manualMountHoles';
    const item=s[key]?.[Number(input.dataset.holeIndex)],value=Number(input.value);
    if(!item||!Number.isFinite(value))return;
-   item[input.dataset.holeAxis]=snapHardwareCoordinate(value,s.hardwareSnap,s.hardwareSnapStep);onEdit();
+   const coordinate=snapHardwareCoordinate(value,s.hardwareSnap,s.hardwareSnapStep);
+   if(key==='manualPixelHoles'&&s.constrainPixelMotion){const result=solvePixelMove(getCrystals(),s,{pixelId:item.id,point:{x:item.x,z:item.z,[input.dataset.holeAxis]:coordinate}});if(result.valid){applyWireDraft(result.settings);onEdit();}else{onStatus('Movement blocked: '+result.reason);refresh();}return;}
+   item[input.dataset.holeAxis]=coordinate;onEdit();
   });
   list.querySelectorAll('[data-hole-profile]').forEach(select=>select.onchange=()=>{
    const item=s.manualPixelHoles?.[Number(select.dataset.holeProfile)];
@@ -339,6 +410,14 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
    if(key==='manualPixelHoles'&&s.lightingMode==='multi')s.pixelCount=s[key].length;
    onEdit();
   });
+ }
+ async function tryRepair(){
+  const state=getSettings(),before=JSON.stringify(state);onStatus('Checking socket rotations and safe edge openings…');
+  await new Promise(resolve=>requestAnimationFrame(resolve));
+  const result=repairPixelRouting(getCrystals(),state);
+  if(JSON.stringify(getSettings())!==before){onStatus('The model changed during routing. Try again on the current layout.');return;}
+  if(result.valid){applyWireDraft(result.settings);onEdit();onStatus('Routing fixed. Pixel positions, fixings and measured cable lengths were kept. Prepare the print mesh again.');}
+  else{renderFeedback($('wireRouteStatus'),{severity:'error',title:'The route needs a manual adjustment.',body:result.reason,details:getPlan().wirePlan?.messages||[]});onStatus('Routing needs a manual adjustment. Review the red box in Build.');}
  }
  function placementValid(kind,pos,replaceIndex=null){
   const s=getSettings();
@@ -472,9 +551,11 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
   const status=summary+' P1 stays fixed; IN/OUT tails do not use the pixel spacing. '+
    (skipped.length?'Needs manual positioning: '+skipped.join(' | '):
     'All accessible internal runs are now within the snap tolerance.');
-  $('wireSnapStatus').textContent=status;
-  $('wireSnapStatus').classList.toggle('warning',!!skipped.length||!!snap.reason&&snap.aligned!==snap.total);
-  onStatus(status.slice(0,400));
+  const validRoute=getPlan().wirePlan?.ready;
+  renderFeedback($('wireSnapStatus'),{severity:validRoute?'info':'error',title:snap.changed?'Pixel spacing adjusted.':validRoute?'No movement was needed for valid cable lengths.':'The layout still needs a routing adjustment.',
+   body:snap.changed?'The permitted small adjustments have been applied.':validRoute?'Your cables already fit within the selected length. Exact-length snapping left these pixels in place.':'Try automatic routing, then move any remaining problem pixels closer together.',details:[status]},
+   {fix:!validRoute?tryRepair:null});
+  onStatus(snap.changed?'Pixel spacing adjusted.':validRoute?'Your cables fit. No pixels were moved.':'Routing needs attention. See the red box in Build.');
  };
  $('reversePixelStringBtn').onclick=()=>{
   const cfg=getSettings(),plan=getPlan();
@@ -491,6 +572,21 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
  // A second click-and-hold on a selected marker moves the actual socket.
  // Preserve orbit on empty canvas and commit only once the pointer is released.
  document.addEventListener('pointermove',e=>{
+  if(!edgeDrag)return;if(Math.hypot(e.clientX-edgeDrag.startX,e.clientY-edgeDrag.startY)<4&&!edgeDrag.moved)return;
+  e.preventDefault();const now=performance.now();if(now-edgeDrag.lastPreview<70)return;edgeDrag.lastPreview=now;
+  const data=findPoint(e);if(!data)return;edgeDrag.moved=true;orbit.enabled=false;
+  const draft=copy(getSettings());draft.constrainPixelMotion=true;if(!draft.wireInputTailLength)draft.wireInputTailLength=draft.pixelStringSpacing||50;if(!draft.wireOutputTailLength)draft.wireOutputTailLength=draft.pixelStringSpacing||50;
+  const result=solvePixelMove(getCrystals(),draft,{edgeKind:edgeDrag.kind,edgePoint:data.pos});edgeDrag.endingValid=result.valid;
+  if(result.valid){applyWireDraft(result.settings);edgeDrag.lastValid=copy(result.settings);draw(result.plan,true);onStatus('Edge opening is within the curved cable length. Release to apply.');}
+  else onStatus('Edge movement blocked by cable length, bend or clearance. Release here cancels the move.');
+ },true);
+ document.addEventListener('pointerup',()=>{
+  if(!edgeDrag)return;const drag=edgeDrag;edgeDrag=null;orbit.enabled=!placing&&!gizmo.dragging;
+  if(!drag.moved)return;applyWireDraft(drag.endingValid&&drag.lastValid?drag.lastValid:drag.original);onEdit();requestMovementGuide({edgeKind:drag.kind});
+  onStatus(drag.endingValid?'Moved '+drag.kind+' perimeter opening; pixel rotation and curved length checked.':'Invalid release: original edge opening restored.');
+ },true);
+ document.addEventListener('pointercancel',()=>{if(edgeDrag){const drag=edgeDrag;edgeDrag=null;applyWireDraft(drag.original);orbit.enabled=!placing&&!gizmo.dragging;onEdit();}},true);
+ document.addEventListener('pointermove',e=>{
   if(!markerDrag)return;
   if(Math.hypot(e.clientX-markerDrag.startX,e.clientY-markerDrag.startY)<5&&!markerDrag.moved)return;
   const data=findPoint(e);
@@ -501,15 +597,18 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
   const old=state[key][i];
   if(!markerDrag.moved){
    markerDrag.original={x:old.x,z:old.z};
+   if(markerDrag.kind==='pixel'&&state.constrainPixelMotion)markerDrag.originalWire=copy(state);
    markerDrag.moved=true;orbit.enabled=false;
   }
-  const valid=data.insideBase&&placementValid(markerDrag.kind,data.pos,i);
+  const solved=markerDrag.kind==='pixel'&&state.constrainPixelMotion?solvePixelMove(getCrystals(),state,{pixelId:markerDrag.id,point:data.pos}):null;
+  const valid=data.insideBase&&(solved?solved.valid:placementValid(markerDrag.kind,data.pos,i));
   markerDrag.endingValid=valid;
   const side=camera.position.y<data.y?-1:1;
   preview.position.set(data.pos.x,data.y+side*.8,data.pos.z);
   preview.scale.setScalar(Math.max(2,markerDrag.kind==='pixel'?resolvePixelProfile(state).maxDiameter/2:3));
   preview.visible=true;rim.material.color.setHex(valid?0x32dbb3:0xff536b);disc.material.color.copy(rim.material.color);
   if(valid){
+   if(solved?.valid)applyWireDraft(solved.settings);
    old.x=data.pos.x;old.z=data.pos.z;markerDrag.lastValid={...data.pos};
    const now=performance.now();
    if(now-markerDrag.lastPreview>90){
@@ -530,9 +629,10 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
   if(index>=0){
    const p=state[drag.key][index];
    if(!drag.endingValid||!drag.lastValid){
-    p.x=drag.original.x;p.z=drag.original.z;
+    if(drag.originalWire)applyWireDraft(drag.originalWire);else{p.x=drag.original.x;p.z=drag.original.z;}
    }
    onEdit();
+   if(drag.kind==='pixel')requestMovementGuide({pixelId:drag.id});
    onStatus(drag.endingValid&&drag.lastValid?'Moved '+hardwareName(drag.kind,index)+' · routes recalculated':'Invalid release: original hole restored');
   }
  },true);
@@ -540,7 +640,7 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
   if(!markerDrag)return;
   const drag=markerDrag;markerDrag=null;preview.visible=false;orbit.enabled=!placing&&!gizmo.dragging;
   const state=getSettings(),p=state[drag.key]?.find(x=>x.id===drag.id);
-  if(p&&drag.original){p.x=drag.original.x;p.z=drag.original.z;onEdit()}
+  if(p&&drag.original){if(drag.originalWire)applyWireDraft(drag.originalWire);else{p.x=drag.original.x;p.z=drag.original.z;}onEdit()}
  },true);
  canvas.addEventListener('pointermove',e=>updateCursor(e),true);
  canvas.addEventListener('pointerleave',()=>{preview.visible=false;lastCursor=null},true);
@@ -652,6 +752,7 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
   e.preventDefault();
   const step=e.shiftKey?5:1,old=cfg[key][i],point={...old,
    x:Math.round((old.x+delta[0]*step)*10)/10,z:Math.round((old.z+delta[1]*step)*10)/10};
+  if(kind==='pixel'&&cfg.constrainPixelMotion){const result=solvePixelMove(getCrystals(),cfg,{pixelId:id,point});if(result.valid){applyWireDraft(result.settings);onEdit();requestMovementGuide({pixelId:id});}else onStatus('Hardware nudge blocked by cable length or clearance.');return;}
   if(!placementValid(kind,point,i)){
    onStatus('Hardware nudge blocked: the hole would collide or leave the base.');
    return;
@@ -683,3 +784,4 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
 
  return {refresh,cancel};
 }
+

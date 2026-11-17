@@ -1,0 +1,141 @@
+import {generateTile,tactileTileGenerator} from './tactile-tile-generator.js';
+import {createGeneratorRegistry} from './studio-generator-registry.js';
+import {circle,heightField} from './studio-geometry.js';
+const numeric=(key,label,value,min,max,unit='mm',step=.5)=>({key,label,type:'number',default:value,min,max,step,unit});
+const choice=(key,label,value,options)=>({key,label,type:'select',default:value,options});
+const boolean=(key,label,value=false)=>({key,label,type:'boolean',default:value});
+const common=[numeric('seed','Repeatable seed',42,0,2147483647,'',1),boolean('dualMaterial','Two material regions')];
+const lightingWarning='Optical diffusion, heat, LED fit and printed roof support require physical checks.';
+const box=(size,position=[0,size[1]/2,0])=>({kind:'box',size,position});
+const cylinder=(radius,height,position=[0,height/2,0])=>({kind:'cylinder',radius,height,position});
+const sphere=(radii,position=[0,radii[1],0])=>({kind:'sphere',radii,position});
+const extrusion=(outline,height,position=[0,0,0],holes=[])=>({kind:'extrude',outline,height,position,holes});
+function define(typeId,displayName,category,schema,presets,recipe,capabilities={}){
+ const parameterSchema=[...schema,...common],defaultParameters=Object.fromEntries(parameterSchema.map(p=>[p.key,p.default]));
+ const generator={typeId,typeVersion:1,displayName,category,parameterSchema,defaultParameters,
+  presets:presets.map(([id,name,parameters])=>({id,name,parameters:{...defaultParameters,...parameters}})),
+  capabilities:{supportsBase:true,supportsMounting:true,supportsLEDs:false,supportsTactileSurfaces:false,supportsMechanisms:false,supportsDualMaterial:true,supportsPartSplitting:false,...capabilities},
+  validateParameters(input){const p={...defaultParameters,...input},errors=[];
+   for(const s of parameterSchema){const v=p[s.key];if(s.type==='number'&&(!Number.isFinite(v)||v<s.min||v>s.max))errors.push(s.label+' must be '+s.min+'–'+s.max+' '+s.unit+'.');if(s.type==='select'&&!s.options.includes(v))errors.push('Choose a supported '+s.label+'.');if(s.type==='boolean'&&typeof v!=='boolean')errors.push(s.label+' must be on or off.');}
+   if(!Number.isInteger(p.seed))errors.push('Seed must be a whole number.');
+   return {valid:!errors.length,errors,parameters:p};},
+  recipe(input){const c=this.validateParameters(input);if(!c.valid)throw Error(c.errors.join(' '));return {...recipe(c.parameters),dualMaterial:c.parameters.dualMaterial};},
+  generatePreview(input){return this.recipe(input);},generateManufacturingGeometry(input){return this.recipe(input);},
+  estimateBounds(input){return this.recipe(input).bounds;},
+  migrateParameters(version,data){if(version!==1)throw Error('Generator migration required.');return {...data};}
+ };return generator;
+}
+export function gearOutline(p){
+ const n=Math.round(p.teeth),alpha=p.pressureAngle*Math.PI/180,m=p.mode==='Mechanical'?p.module:p.diameter/(n+2);
+ const pitch=m*n/2,base=pitch*Math.cos(alpha),outer=m*(n+2)/2,root=Math.max(m,pitch-1.25*m),half=Math.PI/(2*n),inv=a=>Math.tan(a)-a;
+ const flank=r=>half+inv(alpha)-(r>base?inv(Math.acos(base/r)):0);
+ const points=[];
+ for(let i=0;i<n;i++){
+  const centre=i*Math.PI*2/n;
+  const polar=(r,a)=>points.push([r*Math.cos(a),r*Math.sin(a)]);
+  const start=centre-Math.PI/n,end=centre+Math.PI/n;
+  polar(root,start);polar(root,centre-flank(Math.max(base,root)));
+  for(let j=0;j<=6;j++){const r=Math.max(root,base)+(outer-Math.max(root,base))*j/6;polar(r,centre-flank(r));}
+  for(let j=1;j<=4;j++)polar(outer,centre-flank(outer)+2*flank(outer)*j/4);
+  for(let j=5;j>=0;j--){const r=Math.max(root,base)+(outer-Math.max(root,base))*j/6;polar(r,centre+flank(r));}
+  polar(root,centre+flank(Math.max(root,base)));polar(root,end);
+ }
+ // Consecutive root vertices are shared between neighbouring teeth.
+ return points.filter((v,i)=>i===0||Math.hypot(v[0]-points[i-1][0],v[1]-points[i-1][1])>1e-7).filter((v,i,arr)=>i!==arr.length-1||Math.hypot(v[0]-arr[0][0],v[1]-arr[0][1])>1e-7);
+}
+export const gearGenerator=define('gears','Cogs & Gears','Mechanical',[
+ choice('mode','Purpose','Decorative',['Decorative','Mechanical']),numeric('teeth','Tooth count',20,8,80,'',1),numeric('diameter','Decorative outer diameter',80,25,180),numeric('thickness','Body thickness',8,3,25),numeric('module','Mechanical module',3,1,5),numeric('pressureAngle','Pressure angle',20,14.5,30,'degrees'),numeric('bore','Measured shaft bore',8,0,30),numeric('hub','Hub diameter',20,10,45),numeric('spokes','Spoke cutouts',0,0,8,'',1)
+],[['weather','Weather wheel',{}],['tactile','Large tactile cog',{teeth:12,diameter:100,thickness:10}],['mechanical','Module 2 mechanical',{mode:'Mechanical',teeth:24,module:2,bore:6}]],p=>{
+ const outline=gearOutline(p),diameter=p.mode==='Mechanical'?(Math.round(p.teeth)+2)*p.module:p.diameter;
+ if(p.bore>=Math.min(p.hub,diameter*.45))throw Error('Bore must leave at least a hub wall.');
+ if(p.mode==='Mechanical'&&p.teeth<Math.ceil(2/Math.sin(p.pressureAngle*Math.PI/180)**2))throw Error('This tooth count risks involute undercut. Increase teeth or pressure angle.');
+ const holes=p.bore? [circle(p.bore/2)]:[];
+ const count=Math.round(p.spokes),radius=diameter*.24,holeRadius=Math.min(diameter*.065,Math.max(1,(diameter*.4-p.hub/2)/2));
+ if(count&&radius-holeRadius>Math.max(p.hub/2,p.bore/2+2))for(let i=0;i<count;i++)holes.push(circle(holeRadius,32,Math.cos(i/count*Math.PI*2)*radius,Math.sin(i/count*Math.PI*2)*radius));
+ return {positive:[extrusion(outline,p.thickness,[0,0,0],holes)],secondary:[extrusion(outline,.8,[0,p.thickness-.8,0],holes)],negative:[],bounds:{width:diameter,depth:diameter,height:p.thickness},warnings:['Pinch points and moving parts require guarding and physical checks. Mechanical meshing still requires a mating-gear test.']};
+},{supportsMechanisms:true});
+export const waveGenerator=define('waves','Waves & Organic Forms','Organic',[
+ numeric('width','Length',110,30,200),numeric('depth','Width',65,20,160),numeric('thickness','Minimum base thickness',4,2,15),numeric('amplitude','Wave height',12,1,40),numeric('frequency','Wave count',2,0.5,6,'',.1),numeric('phase','Phase',0,0,360,'degrees'),numeric('direction','Direction',0,0,360,'degrees'),numeric('variation','Organic variation',.25,0,1,'',.05)
+],[['river','Flowing river',{}],['wind','Wind surface',{frequency:1,amplitude:20,direction:30}],['ripples','Soft overlapping ripples',{frequency:4,amplitude:6,variation:.6}]],p=>{
+ const a=p.direction*Math.PI/180,phase=p.phase*Math.PI/180;
+ const top=(x,z)=>p.thickness+p.amplitude*(1+Math.sin((x*Math.cos(a)+z*Math.sin(a))/p.width*p.frequency*Math.PI*2+phase+Math.sin(z/p.depth*Math.PI*2+p.seed*.01)*p.variation))/2;
+ const mesh=heightField(p.width,p.depth,top);
+ return {positive:[{kind:'mesh',mesh}],secondary:[box([p.width,.8,p.depth],[0,.4,0])],negative:[],bounds:{width:p.width,depth:p.depth,height:p.thickness+p.amplitude},warnings:['Review the wave slopes in Cura; the flat underside is the intended bed face.']};
+});
+export const capGenerator=define('control-caps','Buttons & Control Caps','Controls',[
+ choice('outline','Cap profile','Round',['Round','Square','Oval']),choice('top','Top shape','Domed',['Flat','Domed','Concave','Stepped']),numeric('diameter','Cap width',40,20,100),numeric('depth','Oval depth',30,20,100),numeric('height','Overall height',14,6,35),numeric('shaft','Measured switch shaft diameter',6,0,20),numeric('socketDepth','Socket depth',7,2,20),numeric('tolerance','Diametral fit clearance',.25,0,1,'mm',.05),choice('symbol','Raised symbol','Plus',['None','Plus','Minus','Dot'])
+],[['weather','Weather control',{}],['arcade','Arcade cover',{diameter:55,height:16,shaft:12}],['plain','Non-electronic tactile cap',{shaft:0,symbol:'Dot',top:'Flat'}]],p=>{
+ const d=p.outline==='Oval'?p.depth:p.diameter,r=p.diameter/2;
+ if(p.socketDepth>p.height-2&&p.shaft>0)throw Error('Socket must leave a 2 mm minimum top wall.');
+ if(p.shaft+p.tolerance>Math.min(p.diameter,d)-6)throw Error('Socket leaves too little side wall.');
+ const outline=p.outline==='Square'?[[-r,-r],[r,-r],[r,r],[-r,r]]:circle(r).map(([x,z])=>[x,z*d/p.diameter]);
+ const positive=[extrusion(outline,p.height)],secondary=[];
+ if(p.top==='Domed')positive.push(sphere([r,p.height*.3,d/2],[0,p.height*.8,0]));
+ if(p.top==='Stepped')positive.push(cylinder(r*.72,2,[0,p.height+1,0]));
+ const negative=p.shaft?[cylinder((p.shaft+p.tolerance)/2,p.socketDepth+.1,[0,p.socketDepth/2-.05,0])]:[];
+ if(p.top==='Concave')negative.push(sphere([r*.8,r*.65,r*.8],[0,p.height+r*.57,0]));
+ const y=p.top==='Domed'?p.height*1.07:p.top==='Stepped'?p.height+1:p.top==='Concave'?p.height-r*.08:p.height-.2;
+ const marker=p.diameter*.38;
+ if(p.symbol==='Dot')secondary.push(cylinder(marker/4,2,[0,y,0]));
+ if(p.symbol==='Plus'||p.symbol==='Minus')secondary.push(box([marker,2,marker*.2],[0,y,0]));
+ if(p.symbol==='Plus')secondary.push(box([marker*.2,2,marker],[0,y,0]));
+ if(!secondary.length)secondary.push(extrusion(outline,1,[0,0,0]));
+ return {positive,secondary,negative,bounds:{width:p.diameter,depth:d,height:p.height*1.15+2},warnings:['Adapter dimensions are nominal: measure the real switch, print a fit coupon and test operation. This is a cap, not a printed click mechanism.']};
+},{supportsMechanisms:true});
+export const pebbleGenerator=define('light-pods','Glowing Pebbles & Light Pods','Lighting',[
+ numeric('width','Width',70,30,150),numeric('depth','Depth',55,25,140),numeric('height','Height',35,18,90),numeric('wall','Wall thickness',2.4,1.2,8,'mm',.2),numeric('facets','Circumference facets',32,12,64,'',4),boolean('illuminated','Accessible illumination cavity',true),numeric('opening','Underside access diameter',24,12,55),numeric('cable','Cable exit diameter',5,3,10)
+],[['river','River pebble',{}],['mineral','Faceted mineral pod',{facets:12,width:60,depth:50,height:45}],['solid','Solid tactile pebble',{illuminated:false,width:55,height:28}]],p=>{
+ const radii=[p.width/2,p.height/2,p.depth/2],centre=[0,p.height*.43,0];
+ if(p.wall>=Math.min(...radii)-3)throw Error('Wall thickness leaves no usable inner volume.');
+ if(p.illuminated&&p.opening>Math.min(p.width,p.depth)-p.wall*2-2)throw Error('Access opening leaves too little wall.');
+ const outer={...sphere(radii,centre),segments:Math.round(p.facets)};
+ const negative=[box([p.width+2,p.height,p.depth+2],[0,-p.height/2,0])];
+ if(p.illuminated){negative.push(sphere(radii.map(r=>r-p.wall),centre),cylinder(p.opening/2,p.height/2,[0,p.height/4-1,0]),{...cylinder(p.cable/2,p.depth),rotation:[Math.PI/2,0,0],position:[0,p.cable/2,p.depth/2]});}
+ return {positive:[outer],secondary:[{...outer,radii:[radii[0]+.1,radii[1],radii[2]+.1]}],negative,
+  // A thin opaque foot is an actual second body partition, rather than an identical overlapping shell.
+  materialBand:{height:Math.max(3,p.wall)},bounds:{width:p.width,depth:p.depth,height:p.height*.93},warnings:p.illuminated?[lightingWarning,'Inspect access opening, cable exit and curved roof in Cura.']:['Non-illuminated solid variant.']};
+},{supportsLEDs:true});
+// Characters lie flat as extruded, connected silhouettes with broad features.
+export const characterGenerator=define('characters','Characters & Silhouettes','Characters',[
+ choice('character','Character','Goat',['Goat','Sheep','Cloud','Boat','Sun','Pickaxe']),numeric('width','Silhouette width',90,35,160),numeric('height','Silhouette height',65,25,140),numeric('depth','Relief depth',8,3,20),numeric('head','Head proportion',1,.65,1.3,'',.05),numeric('legs','Leg length',1,.5,1.3,'',.05)
+],[['goat','Goat Farm goat',{}],['sheep','Woolly sheep',{character:'Sheep'}],['cloud','Weather cloud',{character:'Cloud'}],['boat','River boat',{character:'Boat'}],['sun','Weather sunshine',{character:'Sun'}],['mine','Mining pickaxe',{character:'Pickaxe'}]],p=>{
+ const w=p.width,h=p.height,t=p.depth,positive=[],secondary=[];
+ const ellipse=(rx,rz,x,z,depth=t,y=0)=>extrusion(circle(1,48).map(([a,b])=>[a*rx+x,b*rz+z]),depth,[0,y,0]);
+ if(p.character==='Goat'||p.character==='Sheep'){
+  positive.push(ellipse(w*.33,h*.25,-w*.08,0),ellipse(w*.16*p.head,h*.19*p.head,w*.29,-h*.16));
+  for(const x of [-w*.25,w*.05])positive.push(box([w*.12,t,h*.36*p.legs],[x,t/2,h*.23]));
+  if(p.character==='Goat')for(const x of [w*.22,w*.36])positive.push(extrusion([[x-w*.035,-h*.23],[x+w*.045,-h*.23],[x+w*.015,-h*.43]],t));
+  else for(let i=0;i<6;i++)positive.push(ellipse(w*.11,h*.12,-w*.33+i*w*.105,-h*.15));
+  secondary.push(ellipse(w*.035,h*.035,w*.34,-h*.20,1.2,t-.3));
+ }else if(p.character==='Cloud'){
+  positive.push(box([w*.65,t,h*.36],[0,t/2,h*.13]));for(const [x,z,r]of[[-.28,0,.20],[0,-.15,.28],[.28,0,.20]])positive.push(ellipse(w*r,h*r,x*w,z*h));
+  secondary.push(ellipse(w*.12,h*.10,0,-h*.15,1.2,t-.3));
+ }else if(p.character==='Boat'){
+  positive.push(extrusion([[-w*.48,h*.08],[w*.48,h*.08],[w*.30,h*.34],[-w*.30,h*.34]],t),box([w*.06,t,h*.65],[0,t/2,-h*.05]));
+  secondary.push(extrusion([[w*.02,-h*.4],[w*.38,h*.04],[w*.02,h*.04]],t));
+ }else if(p.character==='Sun'){
+  positive.push(ellipse(w*.30,h*.30,0,0));for(let i=0;i<8;i++){const a=i/8*Math.PI*2;positive.push(ellipse(w*.10,h*.10,Math.cos(a)*w*.30,Math.sin(a)*h*.30));}
+  secondary.push(ellipse(w*.17,h*.17,0,0,1.2,t-.3));
+ }else{
+  positive.push(box([w*.12,t,h*.8],[0,t/2,h*.05]),extrusion([[-w*.47,-h*.25],[0,-h*.42],[w*.47,-h*.25],[w*.4,-h*.12],[0,-h*.26],[-w*.4,-h*.12]],t));
+  secondary.push(box([w*.12,1.2,h*.3],[0,t+.3,h*.18]));
+ }
+ return {positive,secondary,negative:[],bounds:{width:w,depth:h,height:t+1.2},warnings:['Broad joined features reduce fragility; inspect printed horns, ears, legs and edges before participant use.']};
+});
+export const tileGenerator={...tactileTileGenerator,parameterSchema:tactileTileGenerator.parameterSchema.map(s=>({...s,label:s.label||s.key.replace(/[A-Z]/g,c=>' '+c.toLowerCase()),step:s.key==='seed'?1:s.key==='randomness'?.05:.5})),
+ recipe(input){const r=generateTile(input);return {positive:[{kind:'mesh',mesh:r.combined}],secondary:r.bodies.length===2?[{kind:'mesh',mesh:r.bodies[1].mesh}]:[],negative:[],dualMaterial:r.parameters.dualMaterial,bounds:this.estimateBounds(input),warnings:['Tactile feel, cleanability and edge comfort require a printed sample.']};}};
+export const generators=[tileGenerator,gearGenerator,waveGenerator,capGenerator,characterGenerator,pebbleGenerator];
+export function makeCatalogue(crystalAdapter){const registry=createGeneratorRegistry();for(const g of [crystalAdapter,...generators].filter(Boolean))registry.register(g);return registry;}
+export function applyBuildModules(recipe,build={},capabilities={}){
+ const r={...recipe,positive:[...recipe.positive],negative:[...(recipe.negative||[])],secondary:[...(recipe.secondary||[])],warnings:[...(recipe.warnings||[])]};
+ const b=r.bounds;
+ if(r.materialBand){r.secondary=[box([b.width+2,r.materialBand.height,b.depth+2])];}
+ if(build.mounting&&capabilities.supportsMounting){
+  const spacing=Math.min(build.spacing||b.width*.55,b.width*.65),diameter=build.holeDiameter||3.4;
+  if(diameter<2||diameter>8||spacing<diameter*3)throw Error('Mounting hole spacing or diameter is unsafe.');
+  for(const x of [-spacing/2,spacing/2])r.negative.push(cylinder(diameter/2,b.height+4,[x,b.height/2,0]));
+  r.warnings.push('Through mounting holes are un-rated; test actual mounting loads.');
+ }
+ if(build.base&&capabilities.supportsBase){const thickness=Number(build.baseThickness||3);if(thickness<2||thickness>15)throw Error('Base thickness must be 2–15 mm.');r.positive.push(box([b.width+6,thickness,b.depth+6]));r.bounds={...b,width:b.width+6,depth:b.depth+6};}
+ return r;
+}
