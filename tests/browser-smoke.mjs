@@ -271,13 +271,13 @@ try{
   'Private cloud vault history and restore controls are present');
  console.log('PR10 named multi-project save/open and active-project rollback verified');
  assert(await page.locator('#cloudRepo').count(),'Private GitHub cloud vault panel is available');
- await page.locator('.cloud-sync-panel summary').click();
+ await page.locator('.cloud-sync-panel > summary').click();
  const backupDownload=page.waitForEvent('download');
  await page.locator('#cloudBackup').click();
  const backup=await backupDownload;
  assert(backup.suggestedFilename().includes('complete-backup'),'Complete user data backup is downloadable');
  assert((await page.locator('#cloudStatus').innerText()).includes('Not connected'),'Cloud auth is opt-in');
- await page.locator('.cloud-sync-panel summary').click();
+ await page.locator('.cloud-sync-panel > summary').click();
  await page.locator('[data-state="familyMix"]').selectOption('Mixed');
  assert(await page.locator('#familyWeightsControls').isVisible(),'Mixed families expose six weighted sliders');
  await page.locator('[data-family-weight="Fantasy"]').evaluate(el=>{el.value='9';el.dispatchEvent(new Event('input',{bubbles:true}))});

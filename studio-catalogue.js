@@ -44,15 +44,46 @@ export function gearOutline(p){
  return points.filter((v,i)=>i===0||Math.hypot(v[0]-points[i-1][0],v[1]-points[i-1][1])>1e-7).filter((v,i,arr)=>i!==arr.length-1||Math.hypot(v[0]-arr[0][0],v[1]-arr[0][1])>1e-7);
 }
 export const gearGenerator=define('gears','Cogs & Gears','Mechanical',[
- choice('mode','Purpose','Decorative',['Decorative','Mechanical']),numeric('teeth','Tooth count',20,8,80,'',1),numeric('diameter','Decorative outer diameter',80,25,180),numeric('thickness','Body thickness',8,3,25),numeric('module','Mechanical module',3,1,5),numeric('pressureAngle','Pressure angle',20,14.5,30,'degrees'),numeric('bore','Measured shaft bore',8,0,30),numeric('hub','Hub diameter',20,10,45),numeric('spokes','Spoke cutouts',0,0,8,'',1)
-],[['weather','Weather wheel',{}],['tactile','Large tactile cog',{teeth:12,diameter:100,thickness:10}],['mechanical','Module 2 mechanical',{mode:'Mechanical',teeth:24,module:2,bore:6}]],p=>{
- const outline=gearOutline(p),diameter=p.mode==='Mechanical'?(Math.round(p.teeth)+2)*p.module:p.diameter;
+ choice('mode','Purpose','Decorative',['Decorative','Mechanical']),numeric('teeth','Tooth count',20,8,80,'',1),numeric('diameter','Decorative outer diameter',80,25,180),numeric('thickness','Body thickness',8,3,25),numeric('module','Mechanical module',3,1,5),numeric('pressureAngle','Pressure angle',20,14.5,30,'degrees'),numeric('bore','Measured shaft bore',8,0,30),numeric('hub','Hub diameter',20,10,45),numeric('spokes','Spoke cutouts',0,0,8,'',1),choice('wheelStyle','Decorative rim','Involute',['Involute','Rounded lobes','Angular teeth','Cam','Pulley']),numeric('toothDepth','Decorative tooth depth',20,5,30,'%',1),choice('holeStyle','Spoke window shape','Round',['Round','Oval','Diamond']),numeric('extraHoles','Extra fixing holes',0,0,6,'',1),choice('inlayStyle','Colour region','Face',['Face','Hub ring'])
+],[['weather','Weather wheel',{}],['tactile','Large tactile cog',{teeth:12,diameter:100,thickness:10}],['pulley','Grooved pulley',{wheelStyle:'Pulley',spokes:5}],['flower','Rounded flower cog',{wheelStyle:'Rounded lobes',teeth:9,spokes:5,holeStyle:'Oval'}],['cam','Eccentric cam',{wheelStyle:'Cam',inlayStyle:'Hub ring'}],['mechanical','Module 2 mechanical',{mode:'Mechanical',teeth:24,module:2,bore:6}]],p=>{
+ const diameter=p.mode==='Mechanical'?(Math.round(p.teeth)+2)*p.module:p.diameter;
+ const radiusOuter=diameter/2;
+ const decorative=p.mode!=='Mechanical';
+ const outline=!decorative||p.wheelStyle==='Involute'?gearOutline(p):circle(radiusOuter,Math.max(120,Math.round(p.teeth)*12)).map(([x,z])=>{
+  const angle=Math.atan2(z,x),wave=(1+Math.cos(angle*Math.round(p.teeth)))/2;
+  const shape=p.wheelStyle==='Rounded lobes'?wave:p.wheelStyle==='Angular teeth'?Math.pow(wave,.35):1;
+  const scale=p.wheelStyle==='Cam'?.79+.21*Math.cos(angle):1-(1-shape)*p.toothDepth/100;
+  return [x*scale,z*scale];
+ });
  if(p.bore>=Math.min(p.hub,diameter*.45))throw Error('Bore must leave at least a hub wall.');
  if(p.mode==='Mechanical'&&p.teeth<Math.ceil(2/Math.sin(p.pressureAngle*Math.PI/180)**2))throw Error('This tooth count risks involute undercut. Increase teeth or pressure angle.');
  const holes=p.bore? [circle(p.bore/2)]:[];
  const count=Math.round(p.spokes),radius=diameter*.24,holeRadius=Math.min(diameter*.065,Math.max(1,(diameter*.4-p.hub/2)/2));
- if(count&&radius-holeRadius>Math.max(p.hub/2,p.bore/2+2))for(let i=0;i<count;i++)holes.push(circle(holeRadius,32,Math.cos(i/count*Math.PI*2)*radius,Math.sin(i/count*Math.PI*2)*radius));
- return {positive:[extrusion(outline,p.thickness,[0,0,0],holes)],secondary:[extrusion(outline,.8,[0,p.thickness-.8,0],holes)],negative:[],bounds:{width:diameter,depth:diameter,height:p.thickness},warnings:['Pinch points and moving parts require guarding and physical checks. Mechanical meshing still requires a mating-gear test.']};
+ if(count&&radius-holeRadius>Math.max(p.hub/2,p.bore/2+2))for(let i=0;i<count;i++){
+  const angle=i/count*Math.PI*2,cx=Math.cos(angle)*radius,cz=Math.sin(angle)*radius;
+  const form=decorative?p.holeStyle:'Round';
+  holes.push(circle(holeRadius,form==='Diamond'?4:32).map(([x,z])=>{
+   const radial=x,side=form==='Oval'?z*.55:z;
+   return [cx+radial*Math.cos(angle)-side*Math.sin(angle),cz+radial*Math.sin(angle)+side*Math.cos(angle)];
+  }));
+ }
+ const extra=decorative?Math.round(p.extraHoles):0;
+ for(let i=0;i<extra;i++){
+  const angle=i/extra*Math.PI*2,candidate=circle(1.4,24,Math.cos(angle)*radiusOuter*.58,Math.sin(angle)*radiusOuter*.58);
+  if(holes.some(h=>h.some(a=>candidate.some(b=>Math.hypot(a[0]-b[0],a[1]-b[1])<1.6))))throw Error('Extra fixing holes are too close to the bore or spoke windows.');
+  if(p.wheelStyle==='Cam')throw Error('Choose a concentric rim for evenly spaced extra fixing holes.');
+  holes.push(candidate);
+ }
+ const positive=[extrusion(outline,p.thickness,[0,0,0],holes)];
+ if(decorative&&p.wheelStyle==='Pulley'){
+  const inset=outline.map(([x,z])=>[x*.78,z*.78]),lip=Math.min(2,p.thickness*.28);
+  positive.splice(0,1,extrusion(outline,lip,[0,0,0],holes),extrusion(inset,p.thickness-2*lip,[0,lip,0],holes),extrusion(outline,lip,[0,p.thickness-lip,0],holes));
+ }
+ const hubRadius=Math.min(radiusOuter*.27,p.hub/2);
+ const inlay=decorative&&p.inlayStyle==='Hub ring';
+ if(inlay&&p.bore/2>=hubRadius-1.5)throw Error('The hub ring needs more space around the bore.');
+ const secondary=[extrusion(inlay?circle(hubRadius):outline,.8,[0,p.thickness-.8,0],inlay?(p.bore?[circle(p.bore/2)]:[circle(hubRadius*.55)]):holes)];
+ return {positive,secondary,negative:[],bounds:{width:diameter,depth:diameter,height:p.thickness},warnings:['Pinch points and moving parts require guarding and physical checks. Mechanical meshing still requires a mating-gear test.']};
 },{supportsMechanisms:true});
 export const waveGenerator=define('waves','Waves & Organic Forms','Organic',[
  numeric('width','Length',110,30,200),numeric('depth','Width',65,20,160),numeric('thickness','Minimum base thickness',4,2,15),numeric('amplitude','Wave height',12,1,40),numeric('frequency','Wave count',2,0.5,6,'',.1),numeric('phase','Phase',0,0,360,'degrees'),numeric('direction','Direction',0,0,360,'degrees'),numeric('variation','Organic variation',.25,0,1,'',.05)
@@ -123,7 +154,7 @@ export const characterGenerator=define('characters','Characters & Silhouettes','
  return {positive,secondary,negative:[],bounds:{width:w,depth:h,height:t+1.2},warnings:['Broad joined features reduce fragility; inspect printed horns, ears, legs and edges before participant use.']};
 });
 export const tileGenerator={...tactileTileGenerator,parameterSchema:tactileTileGenerator.parameterSchema.map(s=>({...s,label:s.label||s.key.replace(/[A-Z]/g,c=>' '+c.toLowerCase()),step:s.key==='seed'?1:s.key==='randomness'?.05:.5})),
- recipe(input){const r=generateTile(input);return {positive:[{kind:'mesh',mesh:r.combined}],secondary:r.bodies.length===2?[{kind:'mesh',mesh:r.bodies[1].mesh}]:[],negative:[],dualMaterial:r.parameters.dualMaterial,bounds:this.estimateBounds(input),warnings:['Tactile feel, cleanability and edge comfort require a printed sample.']};}};
+ recipe(input){const r=generateTile(input);return {positive:[{kind:'mesh',mesh:r.bodies[0].mesh}],partitioned:r.parameters.dualMaterial,secondary:r.bodies.length===2?[{kind:'mesh',mesh:r.bodies[1].mesh}]:[],negative:[],dualMaterial:r.parameters.dualMaterial,bounds:this.estimateBounds(input),warnings:['Tactile feel, cleanability and edge comfort require a printed sample.']};}};
 export const generators=[tileGenerator,gearGenerator,waveGenerator,capGenerator,characterGenerator,pebbleGenerator];
 export function makeCatalogue(crystalAdapter){const registry=createGeneratorRegistry();for(const g of [crystalAdapter,...generators].filter(Boolean))registry.register(g);return registry;}
 export function applyBuildModules(recipe,build={},capabilities={}){

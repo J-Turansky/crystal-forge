@@ -22,7 +22,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  const link=document.createElement('link');link.rel='stylesheet';link.href='./sensory-studio.css';document.head.append(link);
  const bar=document.createElement('nav');bar.className='studio-modelbar';bar.setAttribute('aria-label','Project and model workspaces');
  bar.innerHTML='<input id="smsProjectTitle" class="sms-project-input project-title" aria-label="Project name"><button id="smsLibrary">Library</button><div id="smsTabs" class="studio-modeltabs" role="tablist" aria-label="Open models"></div><button id="smsNew" aria-label="Add a model">＋ New model</button><button id="smsPrint">Print Centre</button><span id="smsSaveState" role="status"></span>';
- document.querySelector('.topbar').after(bar);
+ document.querySelector('.topbar').before(bar);
  const panel=document.createElement('div');panel.id='smsEditor';panel.className='sms-controls';panel.hidden=true;document.querySelector('.left').prepend(panel);
  const overlay=document.createElement('div');overlay.className='sms-overlay';overlay.hidden=true;overlay.id='smsOverlay';document.querySelector('.viewarea').style.position='relative';document.querySelector('.viewarea').append(overlay);
  const picker=document.createElement('dialog');picker.id='smsPicker';picker.innerHTML='<h2>Create a model</h2><p>Choose an object to start shaping.</p><div class="sms-grid"></div><form method="dialog"><button>Close</button></form>';document.body.append(picker);
@@ -109,8 +109,17 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   }catch{return null;}
  }
  function renderTabs(){
+  const type=mode==='model'?active()?.generator.typeId:null;
+  document.body.dataset.modelTheme=type||'workspace';
+  document.body.classList.add('sms-workspace');
+  for(const button of document.querySelectorAll('.topbar [data-tab]')){
+   const step=button.dataset.tab;
+   button.textContent={design:'1 · Design',build:'2 · Build',print:'3 · Print Centre'}[step];
+   const selected=mode==='print'?step==='print':mode==='model'&&step===(type==='crystals'?document.querySelector('.topbar [data-tab].active')?.dataset.tab:stage);
+   if(selected)button.setAttribute('aria-current','step');else button.removeAttribute('aria-current');
+  }
   const root=$('smsTabs');root.replaceChildren();
-  for(const id of project.tabs){const model=findModel(project,id),button=document.createElement('button');button.role='tab';button.id='model-tab-'+id;button.setAttribute('aria-selected',String(currentId===id&&mode==='model'));button.tabIndex=currentId===id?0:-1;
+  for(const id of project.tabs){const model=findModel(project,id),button=document.createElement('button');button.role='tab';button.dataset.modelTheme=model.generator.typeId;button.id='model-tab-'+id;button.setAttribute('aria-selected',String(currentId===id&&mode==='model'));button.tabIndex=currentId===id?0:-1;
    button.textContent=model.name+(project.printJobs.some(j=>j.modelId===id&&j.status==='preparing')?' ⏳':'');button.draggable=true;
    const close=document.createElement('span');close.textContent='×';close.className='close-tab';close.setAttribute('aria-hidden','true');button.append(close);
    button.onclick=e=>{if(e.target===close){closeModel(id);return;}switchModel(id);};
@@ -138,20 +147,38 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   return '<div class="sms-model-control"><label>'+label+'<output data-value-for="'+key+'">'+esc(value)+' '+esc(schema.unit||'')+'</output></label><input type="range" data-model-param="'+key+'" min="'+schema.min+'" max="'+schema.max+'" step="'+(schema.step||.1)+'" value="'+value+'"></div>';
  }
  function details(title,descriptor,html){return '<details class="sms-panel-details"><summary>'+esc(title)+'<small>'+esc(descriptor)+'</small></summary><div>'+html+'</div></details>';}
+ function designSections(generator,model){
+  const groups=[
+   ['Form and silhouette','Choose the outline, teeth or surface pattern.',/mode|outline|pattern|character|top|symbol|style/i],
+   ['Size and proportions','Set the overall size and depth.',/width|height|depth|thickness|diameter|head|legs/i],
+   ['Edges and surface feel','Change the relief, curves and edge profile.',/corner|relief|density|variation|amplitude|frequency|orientation|phase|facets|direction|round|tooth/i],
+   ['Holes and fittings','Make space for shafts, spokes or other hardware.',/shaft|bore|hub|spokes|socket|tolerance|opening|cable|hole/i],
+   ['Light and materials','Choose material regions and lighting options.',/dualMaterial|illuminated|wall|inlay/i]
+  ];
+  const remaining=new Set(generator.parameterSchema);
+  const output=groups.map(([title,description,pattern])=>{
+   const controls=[...remaining].filter(field=>pattern.test(field.key));
+   controls.forEach(field=>remaining.delete(field));
+   return controls.length?details(title,description,controls.map(field=>control(field,model.parameters)).join('')):'';
+  });
+  if(remaining.size)output.push(details('Fine adjustments','Adjust the seed or other generator settings.',[...remaining].map(field=>control(field,model.parameters)).join('')));
+  return output.join('');
+ }
  function renderEditor(){
   if(mode!=='model'||!active())return;const model=active(),g=registry.get(model.generator.typeId);
   if(model.generator.typeId==='crystals'){panel.hidden=true;return;}
   panel.hidden=false;
+  $('footerStats').textContent=g.displayName;
   const update=availableLinkedUpdate(model,state.library);
   panel.innerHTML='<h2>'+esc(g.displayName)+'</h2><label>Name<input id="smsModelName" value="'+esc(model.name)+'"></label>'+
-   '<div class="sms-actions"><button id="smsDesign">Design</button><button id="smsBuild">Build</button><button id="smsSend">Send to Print Centre</button></div>'+
+   '<div class="sms-actions">'+(stage==='design'?'<button id="smsBuild" class="primary">Next → Build</button>':'<button id="smsDesign">← Design</button><button id="smsSend" class="primary">Next → Queue for print</button>')+'</div>'+
    (model.link?'<p class="sms-descriptor">Linked to library revision '+model.link.revision+'.</p><button id="smsBreak">Make an independent variant</button>'+(update?'<button id="smsAccept">Accept library revision '+update.revision+'</button>':''):'')+
    '<div class="sms-actions"><button id="smsUndo">Undo</button><button id="smsRedo">Redo</button><button id="smsDuplicate">Duplicate</button><button id="smsSaveModel">Save to Library</button></div>'+
-   (stage==='design'?'<label>Starting point<select id="smsPreset"><option value="">Choose a preset…</option>'+g.presets.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('')+'</select></label>'+details('Shape and surface','Change the shape and how it feels.',g.parameterSchema.map(s=>control(s,model.parameters)).join('')):
-    details('Base and mounting','Add a base or holes for fixings.',(g.capabilities.supportsBase?'<label><input type="checkbox" data-build="base" '+(model.build.base?'checked':'')+'> Integrated flat base</label><label>Base thickness (mm)<input type="number" data-build="baseThickness" value="'+(model.build.baseThickness||3)+'" min="2" max="15"></label>':'')+(g.capabilities.supportsMounting?'<label><input type="checkbox" data-build="mounting" '+(model.build.mounting?'checked':'')+'> Two through mounting holes</label><label>Hole diameter (mm)<input type="number" data-build="holeDiameter" value="'+(model.build.holeDiameter||3.4)+'" min="2" max="8" step=".1"></label>':'')+'<p class="sms-descriptor">Check real fixings and loads before installation.</p>'))+
+   (stage==='design'?'<label>Starting point<select id="smsPreset"><option value="">Choose a preset…</option>'+g.presets.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('')+'</select></label>'+designSections(g,model):
+    (g.capabilities.supportsBase?details('Base and backing','Add a flat backing and set its thickness.','<label><input type="checkbox" data-build="base" '+(model.build.base?'checked':'')+'> Integrated flat base</label><label>Base thickness (mm)<input type="number" data-build="baseThickness" value="'+(model.build.baseThickness||3)+'" min="2" max="15"></label>'):'')+(g.capabilities.supportsMounting?details('Mounting holes','Add through holes for your fixings.','<label><input type="checkbox" data-build="mounting" '+(model.build.mounting?'checked':'')+'> Two through mounting holes</label><label>Hole diameter (mm)<input type="number" data-build="holeDiameter" value="'+(model.build.holeDiameter||3.4)+'" min="2" max="8" step=".1"></label>'):'')+(g.capabilities.supportsLEDs?details('Lighting and cable access','Set the cavity and opening in Design.','<p>Use the Light and materials and Holes and fittings sections to size the cavity and cable exit.</p>'):''))+
    '<div id="smsModelError" class="sms-descriptor" role="status"></div>';
   $('smsModelName').onchange=e=>commit({name:e.target.value.trim()||g.displayName});
-  $('smsDesign').onclick=()=>{stage='design';renderEditor();};$('smsBuild').onclick=()=>{stage='build';renderEditor();};$('smsSend').onclick=()=>send(model.id);
+  if($('smsDesign'))$('smsDesign').onclick=()=>{stage='design';renderTabs();renderEditor();};if($('smsBuild'))$('smsBuild').onclick=()=>{stage='build';renderTabs();renderEditor();};if($('smsSend'))$('smsSend').onclick=()=>send(model.id);
   $('smsDuplicate').onclick=()=>{const duplicate=duplicateModel(project,model.id);switchModel(duplicate.id);};$('smsSaveModel').onclick=()=>saveModel(model);
   $('smsUndo').onclick=()=>undo(-1);$('smsRedo').onclick=()=>undo(1);
   if($('smsBreak'))$('smsBreak').onclick=()=>{breakLink(project,model.id);renderEditor();save();};
@@ -296,8 +323,9 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  document.addEventListener('click',e=>{
   const button=e.target.closest('[data-tab]');if(!button)return;
+  queueMicrotask(renderTabs);
   if(button.dataset.tab==='print'){e.preventDefault();e.stopImmediatePropagation();showPrint();}
-  else if(active()?.generator.typeId!=='crystals'){e.preventDefault();e.stopImmediatePropagation();stage=button.dataset.tab;mode='model';overlay.hidden=true;renderEditor();}
+  else if(active()?.generator.typeId!=='crystals'){e.preventDefault();e.stopImmediatePropagation();stage=button.dataset.tab;mode='model';overlay.hidden=true;renderTabs();renderEditor();}
   else if(mode!=='model'){mode='model';overlay.hidden=true;document.body.classList.remove('sms-sidebar-mode');panel.hidden=true;renderTabs();}
  },true);
  document.addEventListener('keydown',e=>{

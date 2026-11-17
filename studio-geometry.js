@@ -46,13 +46,16 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
  const union=parts=>{if(!parts.length)throw Error('No model body.');let result=convert(parts[0]);for(const part of parts.slice(1))result=hold(result.add(convert(part)));return result;};
  try{
   onProgress('Joining physical bodies');let total=union(recipe.positive);
-  if(recipe.secondary?.length)total=hold(total.add(union(recipe.secondary)));
+  if(recipe.secondary?.length&&!recipe.partitioned)total=hold(total.add(union(recipe.secondary)));
   for(const part of recipe.negative||[])total=hold(total.subtract(convert(part)));
   if(total.status()!=='NoError'||total.isEmpty()||total.volume()<=0)throw Error('Manufacturing produced no valid material.');
   let regions=[{role:'primary',solid:total}];
   if(recipe.dualMaterial&&recipe.secondary?.length){
-   let secondary=hold(union(recipe.secondary).intersect(total));
-   const primary=hold(total.subtract(secondary));regions=[{role:'primary',solid:primary},{role:'secondary',solid:secondary}];
+   let secondary=union(recipe.secondary);
+   if(recipe.partitioned){
+    for(const part of recipe.negative||[])secondary=hold(secondary.subtract(convert(part)));
+   }else secondary=hold(secondary.intersect(total));
+   const primary=recipe.partitioned?total:hold(total.subtract(secondary));regions=[{role:'primary',solid:primary},{role:'secondary',solid:secondary}];
   }
   const bodies=regions.map(({role,solid})=>{
    if(solid.status()!=='NoError'||solid.isEmpty()||solid.volume()<=0)throw Error(role+' material is empty or invalid.');
