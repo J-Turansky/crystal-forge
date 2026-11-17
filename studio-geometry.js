@@ -62,8 +62,8 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
   for(const part of recipe.negative||[])total=hold(total.subtract(convert(part)));
   if(total.status()!=='NoError'||total.isEmpty()||total.volume()<=0)throw Error('Manufacturing produced no valid material.');
   let regions=[{role:'primary',solid:total}];
-  if(recipe.dualMaterial&&recipe.secondary?.length){
-   let secondary=union(recipe.secondary);
+  if(recipe.dualMaterial&&(recipe.materialBand||recipe.secondary?.length)){
+   let secondary=recipe.materialBand?convert(recipe.materialBand):union(recipe.secondary);
    if(recipe.partitioned){
     for(const part of recipe.negative||[])secondary=hold(secondary.subtract(convert(part)));
    }else secondary=hold(secondary.intersect(total));
