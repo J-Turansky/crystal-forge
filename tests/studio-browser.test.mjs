@@ -24,7 +24,7 @@ try{
  const luminance=s=>rgb(s).reduce((sum,n,i)=>sum+n*[.2126,.7152,.0722][i],0);
  const lum=[luminance(colours.bg),luminance(colours.fg)].sort((a,b)=>a-b);assert((lum[1]+.05)/(lum[0]+.05)>=4.5,'Private sync explanatory text meets 4.5:1 contrast.');
  await add('tactile-tiles');const first=await page.evaluate(()=>window.__sensoryStudio.currentModel.id);
- await page.locator('#smsEditor details summary').first().click();await exact('width',92.5);
+ await page.getByText('Size and proportions',{exact:true}).click();await exact('width',92.5);
  await add('tactile-tiles');const second=await page.evaluate(()=>window.__sensoryStudio.currentModel.id);
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.width),80);
  await page.locator('#model-tab-'+first).click();assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.width),92.5);
@@ -37,11 +37,11 @@ try{
  await page.locator('#model-tab-'+first+' .close-tab').click();assert(await page.evaluate(id=>window.__sensoryStudio.project.models.some(m=>m.id===id),first));
  await page.locator('#smsLibrary').click();await page.locator('#smsProjectModels .sms-tile').filter({hasText:'Tactile Texture Tiles'}).first().getByRole('button',{name:'Open',exact:true}).click();
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.id),first);
- await page.locator('#smsSend').click();await page.locator('[data-job-prepare]').first().click();
+ await page.locator('#smsBuild').click();await page.locator('#smsSend').click();await page.locator('[data-job-prepare]').first().click();
  await page.waitForFunction(()=>window.__sensoryStudio.project.printJobs[0]?.status==='prepared',null,{timeout:150000});
  const downloadPromise=page.waitForEvent('download');await page.locator('[data-job-3mf]').first().click();const download=await downloadPromise;
  await fs.mkdir('qa',{recursive:true});await download.saveAs('qa/studio-tactile.3mf');const bytes=await fs.readFile('qa/studio-tactile.3mf');assert.equal(bytes.readUInt32LE(0),0x04034b50);
- await page.locator('#model-tab-'+first).click();await page.locator('#smsEditor details summary').first().click();await exact('width',98);
+ await page.locator('#model-tab-'+first).click();await page.getByText('Size and proportions',{exact:true}).click();await exact('width',98);
  await page.locator('#smsPrint').click();assert.equal(await page.locator('[data-job-3mf]').first().isDisabled(),true,'Editing invalidates the old job export.');
  await page.evaluate(()=>window.__sensoryStudio.saveImmediately());const before=await page.evaluate(()=>window.__sensoryStudio.project.models.map(m=>[m.id,m.parameters]));
  await page.reload();await page.waitForFunction(()=>window.__sensoryStudio);assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.project.models.map(m=>[m.id,m.parameters])),before);
