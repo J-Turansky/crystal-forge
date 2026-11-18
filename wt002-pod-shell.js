@@ -22,6 +22,11 @@ export function createPodShell({width, depth, height, facets, shellForm, surface
     form = .12 + .9 * (1 / Math.cos(offset) - 1);
    }
    if (shellForm === 'Layered dome') form = .14 * (1 + Math.cos(latitude * 7));
+   if(shellForm==='Beacon'){
+    const flutes=.5+.5*Math.cos(6*a);
+    const shoulder=Math.exp(-((latitude-.24)**2)/.12);
+    form=.29*shoulder*(.28+.72*flutes)+.11*(.5+.5*Math.cos(latitude*9));
+   }
    const texture = surface === 'Ribs' ? (1 + Math.cos(a * 12)) / 2
     : surface === 'Scallops' ? ((1 + Math.cos(a * 8 + latitude * 6)) / 2) ** 2 : 0;
    const scale = radius * (1 + fade * (form + relief * texture));

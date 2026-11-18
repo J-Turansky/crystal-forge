@@ -1,5 +1,10 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.13 — Creative catalogue and native pixel routing
+
+- Create contour and quilt tiles, forked window gears and fluted beacon pods.
+- Opt into verified underside serial cable channels for supported solid tiles and decorative gears.
+
 ## v0.16.0-dev.12 — Rename saved projects in Library
 
 - Rename a saved project from its Library card without opening it.

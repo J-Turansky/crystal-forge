@@ -1,3 +1,4 @@
+import {planNativePixelString} from './studio-native-routing.js';
 import {layeredCharacter} from './studio-character-relief.js';
 import {createPodShell} from './wt002-pod-shell.js';
 import {addPixelHoleCuts,checkedPixelBore} from './studio-pixel-builder.js';
@@ -72,8 +73,11 @@ function creativeGearWindows(p, outline) {
  // Keep finite webs between openings at the narrowest radius.
  const half=sector-Math.asin(Math.min(.99,p.webWidth/(2*root)));
  if(span<3||half<.055)throw Error('Openwork needs more room. Reduce the hub, rim or spoke count, or enlarge the wheel.');
- return Array.from({length:count},(_,index)=>{
-  const centre=index*2*sector;
+ const paired=p.webStyle==='Forked';
+ if(paired&&half<.19)throw Error('Forked windows need more room. Reduce the spoke count or enlarge the gear.');
+ return Array.from({length:count*(paired?2:1)},(_,index)=>{
+  const branch=paired?(index%2===0?-1:1):0;
+  const centre=(paired?Math.floor(index/2):index)*2*sector;
   return Array.from({length:48},(_,step)=>{
    const a=step*Math.PI/24,t=(1+Math.cos(a))/2;
    let radius=root+span*t,side=Math.sin(a),sweep=0;
@@ -85,15 +89,15 @@ function creativeGearWindows(p, outline) {
     radius=root+span*(1+power(Math.cos(a)))/2;
     side=power(side);
    }
-   const angle=centre+side*half*.78+sweep;
+   const angle=paired?centre+branch*half*(.48+.13*t)+side*half*.27:centre+side*half*.78+sweep;
    return [radius*Math.cos(angle),radius*Math.sin(angle)];
   });
  });
 }
 
 export const gearGenerator=define('gears','Cogs & Gears','Mechanical',[
- choice('mode','Purpose','Decorative',['Decorative','Mechanical']),numeric('teeth','Tooth count',20,8,80,'',1),numeric('diameter','Decorative outer diameter',80,25,180),numeric('thickness','Body thickness',8,3,25),numeric('module','Mechanical module',3,1,5),numeric('pressureAngle','Pressure angle',20,14.5,30,'degrees'),numeric('bore','Measured shaft bore',8,0,30),numeric('hub','Hub diameter',20,10,45),numeric('spokes','Spoke cutouts',0,0,8,'',1),choice('wheelStyle','Decorative rim','Involute',['Involute','Rounded lobes','Angular teeth','Cam','Pulley','Crown','Rotor','Scallop','Petal']),numeric('toothDepth','Decorative tooth depth',20,5,30,'%',1),choice('holeStyle','Spoke window shape','Round',['Round','Oval','Diamond']),numeric('extraHoles','Extra fixing holes',0,0,6,'',1),choice('inlayStyle','Colour region','Face',['Face','Hub ring']),choice('webStyle','Body structure','Legacy',['Legacy','Solid','Sector','Sweep','Teardrop','Lens']),numeric('rimWidth','Minimum rim width',4,2,16),numeric('webWidth','Minimum spoke web',3,2,12),choice('reliefStyle','Raised details','None',['None','Hub collar','Rim rail','Hub and rim']),numeric('reliefHeight','Relief height',2,1,5)
-],[['weather','Weather wheel',{}],['tactile','Large tactile cog',{teeth:12,diameter:100,thickness:10}],['pulley','Grooved pulley',{wheelStyle:'Pulley',spokes:5}],['flower','Rounded flower cog',{wheelStyle:'Rounded lobes',teeth:9,spokes:5,holeStyle:'Oval'}],['cam','Eccentric cam',{wheelStyle:'Cam',inlayStyle:'Hub ring'}],['crown-open','Openwork crown',{wheelStyle:'Crown',webStyle:'Sector',teeth:12,spokes:5,diameter:100,reliefStyle:'Rim rail'}],['turbine','Swept turbine',{wheelStyle:'Rotor',webStyle:'Sweep',teeth:11,spokes:7,diameter:100,reliefStyle:'Hub collar'}],['petal-web','Petal rosette',{wheelStyle:'Petal',webStyle:'Teardrop',teeth:9,spokes:5,diameter:100}],['scallop-lace','Scalloped lace wheel',{wheelStyle:'Scallop',webStyle:'Lens',teeth:13,spokes:7,diameter:105}],['solid-crown','Solid crown with raised hub',{wheelStyle:'Crown',webStyle:'Solid',teeth:8,diameter:92,reliefStyle:'Hub collar'}],['rail-pulley','Layered pulley wheel',{wheelStyle:'Pulley',webStyle:'Sector',spokes:4,diameter:100,reliefStyle:'Hub and rim'}],['mechanical','Module 2 mechanical',{mode:'Mechanical',teeth:24,module:2,bore:6}]],p=>{
+ choice('mode','Purpose','Decorative',['Decorative','Mechanical']),numeric('teeth','Tooth count',20,8,80,'',1),numeric('diameter','Decorative outer diameter',80,25,180),numeric('thickness','Body thickness',8,3,25),numeric('module','Mechanical module',3,1,5),numeric('pressureAngle','Pressure angle',20,14.5,30,'degrees'),numeric('bore','Measured shaft bore',8,0,30),numeric('hub','Hub diameter',20,10,45),numeric('spokes','Spoke cutouts',0,0,8,'',1),choice('wheelStyle','Decorative rim','Involute',['Involute','Rounded lobes','Angular teeth','Cam','Pulley','Crown','Rotor','Scallop','Petal']),numeric('toothDepth','Decorative tooth depth',20,5,30,'%',1),choice('holeStyle','Spoke window shape','Round',['Round','Oval','Diamond']),numeric('extraHoles','Extra fixing holes',0,0,6,'',1),choice('inlayStyle','Colour region','Face',['Face','Hub ring']),choice('webStyle','Body structure','Legacy',['Legacy','Solid','Sector','Sweep','Teardrop','Lens','Forked']),numeric('rimWidth','Minimum rim width',4,2,16),numeric('webWidth','Minimum spoke web',3,2,12),choice('reliefStyle','Raised details','None',['None','Hub collar','Rim rail','Hub and rim']),numeric('reliefHeight','Relief height',2,1,5)
+],[['weather','Weather wheel',{}],['tactile','Large tactile cog',{teeth:12,diameter:100,thickness:10}],['pulley','Grooved pulley',{wheelStyle:'Pulley',spokes:5}],['flower','Rounded flower cog',{wheelStyle:'Rounded lobes',teeth:9,spokes:5,holeStyle:'Oval'}],['cam','Eccentric cam',{wheelStyle:'Cam',inlayStyle:'Hub ring'}],['crown-open','Openwork crown',{wheelStyle:'Crown',webStyle:'Sector',teeth:12,spokes:5,diameter:100,reliefStyle:'Rim rail'}],['turbine','Swept turbine',{wheelStyle:'Rotor',webStyle:'Sweep',teeth:11,spokes:7,diameter:100,reliefStyle:'Hub collar'}],['petal-web','Petal rosette',{wheelStyle:'Petal',webStyle:'Teardrop',teeth:9,spokes:5,diameter:100}],['scallop-lace','Scalloped lace wheel',{wheelStyle:'Scallop',webStyle:'Lens',teeth:13,spokes:7,diameter:105}],['solid-crown','Solid crown with raised hub',{wheelStyle:'Crown',webStyle:'Solid',teeth:8,diameter:92,reliefStyle:'Hub collar'}],['rail-pulley','Layered pulley wheel',{wheelStyle:'Pulley',webStyle:'Sector',spokes:4,diameter:100,reliefStyle:'Hub and rim'}],['forked-sun','Forked sun wheel',{wheelStyle:'Rounded lobes',webStyle:'Forked',spokes:4,teeth:12,diameter:105,bore:0}],['forked-rotor','Forked rotor wheel',{wheelStyle:'Rotor',webStyle:'Forked',spokes:5,teeth:16,diameter:120,bore:0,webWidth:4}],['mechanical','Module 2 mechanical',{mode:'Mechanical',teeth:24,module:2,bore:6}]],p=>{
  const diameter=p.mode==='Mechanical'?(Math.round(p.teeth)+2)*p.module:p.diameter;
  const radiusOuter=diameter/2;
  const decorative=p.mode!=='Mechanical';
@@ -151,9 +155,11 @@ export const gearGenerator=define('gears','Cogs & Gears','Mechanical',[
    positive.push(extrusion(outer,height,[0,y,0],[inner]));
   }
  }
- if((creativeWeb||relief)&&!inlay)return {positive,secondary:[],negative:[],materialSplitHeight:p.thickness-.8,materialSplitRole:'top',bounds:{width:diameter,depth:diameter,height:p.thickness+(relief?p.reliefHeight:0)},warnings:['Decorative wheel. Check wheel clearances before using moving parts.']};
+ const serialSupport=decorative&&p.webStyle==='Solid'&&p.wheelStyle!=='Pulley'&&!holes.length?{outline,thickness:p.thickness}:null;
+ const serialReason='Use a solid decorative gear without a shaft bore, fixing holes, openwork or pulley recess.';
+ if((creativeWeb||relief)&&!inlay)return {positive,serialSupport,serialReason,secondary:[],negative:[],materialSplitHeight:p.thickness-.8,materialSplitRole:'top',bounds:{width:diameter,depth:diameter,height:p.thickness+(relief?p.reliefHeight:0)},warnings:['Decorative wheel. Check wheel clearances before using moving parts.']};
  const secondary=[extrusion(inlay?circle(hubRadius):outline,.8,[0,p.thickness-.8,0],inlay?(p.bore?[circle(p.bore/2)]:[circle(hubRadius*.55)]):holes)];
- return {positive,secondary,negative:[],bounds:{width:diameter,depth:diameter,height:p.thickness+(relief?p.reliefHeight:0)},warnings:['Pinch points and moving parts require guarding and physical checks. Mechanical meshing still requires a mating-gear test.']};
+ return {positive,secondary,negative:[],serialSupport,serialReason,bounds:{width:diameter,depth:diameter,height:p.thickness+(relief?p.reliefHeight:0)},warnings:['Pinch points and moving parts require guarding and physical checks. Mechanical meshing still requires a mating-gear test.']};
 },{supportsMechanisms:true});
 export const waveGenerator=define('waves','Waves & Organic Forms','Organic',[
  choice('flowStyle','Flow structure','Parallel',['Parallel','Concentric','Vortex','Saddle','Dune']),numeric('width','Length',110,30,200),numeric('depth','Width',65,20,160),numeric('thickness','Minimum base thickness',4,2,15),numeric('amplitude','Wave height',12,1,40),numeric('frequency','Wave count',2,0.5,6,'',.1),numeric('phase','Phase',0,0,360,'degrees'),numeric('direction','Direction',0,0,360,'degrees'),numeric('variation','Organic variation',.25,0,1,'',.05)
@@ -363,13 +369,15 @@ export const capGenerator=define('control-caps','Buttons & Control Caps','Contro
  return {positive,secondary,negative,materialBand,bounds:{width:p.diameter,depth:d,height:p.height*1.15+2},warnings:['Adapter dimensions are nominal: measure the real switch, print a fit coupon and test operation. This is a cap, not a printed click mechanism.']};
 },{supportsMechanisms:true});
 export const pebbleGenerator=define('light-pods','Glowing Pebbles & Light Pods','Lighting',[
- choice('shellForm','Shell profile','Pebble',['Pebble','Swept stone','Lantern','Layered dome']),
+ choice('shellForm','Shell profile','Pebble',['Pebble','Swept stone','Lantern','Layered dome','Beacon']),
  choice('surface','Surface texture','Plain',['Plain','Ribs','Scallops']),numeric('relief','Texture depth',.16,0,.25,'',.01),
  numeric('width','Width',70,30,150),numeric('depth','Depth',55,25,140),numeric('height','Height',35,18,90),numeric('wall','Wall thickness',2.4,1.2,8,'mm',.2),numeric('facets','Circumference facets',32,12,64,'',4),boolean('illuminated','Accessible illumination cavity',true),numeric('opening','Underside access diameter',24,12,55),numeric('cable','Cable exit diameter',5,3,10)
 ],[['river','River pebble',{}],['mineral','Faceted mineral pod',{facets:12,width:60,depth:50,height:45}],['solid','Solid tactile pebble',{illuminated:false,width:55,height:28}],
  ['swept','Asymmetrical river stone',{shellForm:'Swept stone',depth:66,opening:22}],
  ['lantern','Ribbed lantern diffuser',{shellForm:'Lantern',surface:'Ribs',width:74,depth:68,height:55,opening:24}],
- ['layered','Scalloped low-profile dome',{shellForm:'Layered dome',surface:'Scallops',width:92,depth:72,height:24,opening:25}]],p=>{
+ ['layered','Scalloped low-profile dome',{shellForm:'Layered dome',surface:'Scallops',width:92,depth:72,height:24,opening:25}],
+ ['beacon-tall','Fluted beacon',{shellForm:'Beacon',surface:'Plain',width:76,depth:68,height:61,opening:23}],
+ ['beacon-low','Low scalloped beacon',{shellForm:'Beacon',surface:'Scallops',width:108,depth:79,height:31,opening:24}]],p=>{
  const radii=[p.width/2,p.height/2,p.depth/2],centre=[0,p.height*.43,0];
  if(p.shellForm!=='Pebble'||p.surface!=='Plain') {
   if(p.wall>=Math.min(...radii)-3)throw Error('Wall thickness leaves no usable inner volume.');
@@ -440,10 +448,10 @@ export const characterGenerator=define('characters','Characters & Silhouettes','
  return {positive,secondary,negative:[],bounds:{width:w,depth:h,height:t+1.2},warnings:['Broad joined features reduce fragility; inspect printed horns, ears, legs and edges before participant use.']};
 });
 export const tileGenerator={...tactileTileGenerator,parameterSchema:tactileTileGenerator.parameterSchema.map(s=>({...s,label:s.label||s.key.replace(/[A-Z]/g,c=>' '+c.toLowerCase()),step:s.key==='seed'?1:s.key==='randomness'?.05:.5})),
- recipe(input){const r=generateTile(input);return {pixelBoreSupport:{outline:r.bodies[0].mesh.boreOutline,minThickness:r.parameters.thickness},positive:[{kind:'mesh',mesh:r.bodies[0].mesh}],partitioned:r.parameters.dualMaterial,secondary:r.bodies.length===2?[{kind:'mesh',mesh:r.bodies[1].mesh}]:[],negative:[],dualMaterial:r.parameters.dualMaterial,bounds:this.estimateBounds(input),warnings:['Tactile feel, cleanability and edge comfort require a printed sample.']};}};
+ recipe(input){const r=generateTile(input);return {serialSupport:{outline:r.bodies[0].mesh.boreOutline,thickness:r.parameters.thickness},pixelBoreSupport:{outline:r.bodies[0].mesh.boreOutline,minThickness:r.parameters.thickness},positive:[{kind:'mesh',mesh:r.bodies[0].mesh}],partitioned:r.parameters.dualMaterial,secondary:r.bodies.length===2?[{kind:'mesh',mesh:r.bodies[1].mesh}]:[],negative:[],dualMaterial:r.parameters.dualMaterial,bounds:this.estimateBounds(input),warnings:['Tactile feel, cleanability and edge comfort require a printed sample.']};}};
 export const generators=[tileGenerator,gearGenerator,waveGenerator,capGenerator,characterGenerator,pebbleGenerator];
 export function makeCatalogue(crystalAdapter){const registry=createGeneratorRegistry();for(const g of [crystalAdapter,...generators].filter(Boolean))registry.register(g);return registry;}
-export function applyBuildModules(recipe,build={},capabilities={}){
+export function applyBuildModules(recipe,build={},capabilities={}, {preview=false}={}){
  const r={...recipe,positive:[...recipe.positive],negative:[...(recipe.negative||[])],secondary:[...(recipe.secondary||[])],warnings:[...(recipe.warnings||[])]};
  // The same recipe reaches both preview and the fabrication worker.
  if(!r.partitioned){
@@ -481,7 +489,14 @@ export function applyBuildModules(recipe,build={},capabilities={}){
    if(reason)throw Error('P'+(index+1)+': '+reason);
   }
  }
+ const routing=planNativePixelString(r,build);
+ if(routing.enabled&&!routing.ready&&!preview)throw Error(routing.reason);
  addPixelHoleCuts(r,build.pixelHoles);
+ if(routing.ready){
+  r.negative.push(...routing.cutters);
+  r.warnings.push('Serial grooves are underside-open. Check cable seating and roof layers in Cura and on a physical print.');
+ }
+ r.nativeRouting=routing;
  return r;
 }
 

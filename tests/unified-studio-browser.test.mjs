@@ -442,6 +442,48 @@ try{
  await openPrint();
  assert.match(await dual.innerText(),/Stale/);
  assert(await dual.locator('[data-job-export]').isDisabled());
+ {
+  await page.locator('#smsNew').click();
+  await page.getByRole('button',{name:/Browse Tactile Texture Tiles starting points/}).click();
+  const preset=page.locator('#smsPicker [data-preset=terraces]');
+  assert(await preset.locator('img').count());
+  await preset.click();
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  const palette=page.locator('.sms-palette');
+  const serial=palette.getByRole('group',{name:'Serial LED string'});
+  await palette.getByRole('button',{name:'Add pixel hole',exact:true}).click();
+  const position=palette.locator('[data-pixel-field=x]');
+  await position.fill('-15');await position.press('Tab');
+  await palette.getByRole('button',{name:'Add pixel hole',exact:true}).click();
+  await position.fill('15');await position.press('Tab');
+  await serial.locator('[data-native-route]').check();
+  assert.match(await serial.innerText(),/Channels ready/);
+  assert.match(await serial.innerText(),/P1 → P2/);
+  await serial.locator('[data-native-pitch]').selectOption('25');
+  assert.match(await serial.innerText(),/Cable budget exceeded/);
+  await serial.locator('[data-native-pitch]').selectOption('custom');
+  const custom=serial.locator('[data-native-custom]');
+  await custom.fill('40');await custom.press('Tab');
+  await serial.locator('[data-native-preview]').uncheck();
+  await serial.locator('[data-native-preview]').check();
+  await serial.locator('[data-native-tail]').fill('120');await serial.locator('[data-native-tail]').press('Tab');
+  assert.match(await serial.innerText(),/Channels ready/);
+  await serial.scrollIntoViewIfNeeded();
+  await shot('wt012-tile-routing');
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  const routedJob=page.locator('#smsJobs article');
+  await routedJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const archive=zipEntries((await useDownload(routedJob.locator('[data-job-export]'))).bytes);
+  assert.equal(JSON.parse(archive.get('print-job-manifest.json')).routing.channels.length,3);
+  await page.locator('#smsNew').click();
+  await page.getByRole('button',{name:/Browse Cogs & Gears starting points/}).click();
+  await page.locator('#smsPicker [data-preset=forked-sun]').click();
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  assert(await serial.locator('[data-native-route]').isDisabled());
+  assert.match(await serial.innerText(),/solid decorative gear/);
+  await shot('wt012-openwork-blocked');
+ }
  assert.deepEqual(errors,[]);
  console.log('Unified Home, Design, Build, Library and Quick Print screenshots captured.');
 }catch(error){

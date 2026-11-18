@@ -1,5 +1,11 @@
 # AI handover — read immediately after AGENTS.md
 
+## WT-012 · Creative catalogue and native routing
+
+Tiles add contour terraces and connected padded cells. Decorative gears add paired forked through-windows. Light pods add a fluted beacon shell with the established optional cavity and access cuts. New styles preserve existing generator identities and presets.
+
+Native routing is opt-in through `build.serialRouting` version 1 and uses the existing ordered checked pixel records. Backing outlines and minimum thickness certify eligible single-material tiles and solid decorative gears. The shared Crystal tangent and curve math is reused, while the Crystal planner stays independent. Native tails leave at distinct conservatively screened perimeter locations. UI and cutters share derived paths and preparation rejects invalid strings. Older projects remain bore-only unless enabled. Added mounts, part offsets, openwork, pulley recesses, thin backings and thin or hollow pods cannot be routed. Manifold subtraction and Cura inspection address different checks. Actual cable fit, bend strain, illumination and printed roof quality remain physical acceptance work.
+
 ## WT-010 · Rename saved projects
 
 Library cards can rename a saved snapshot using existing local persistence. Only its title changes. Search follows the new title, and opening still uses the existing confirmation and backup flow.
