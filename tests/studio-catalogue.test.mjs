@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import Module from 'manifold-3d';
-import {generators,applyBuildModules} from '../studio-catalogue.js';
+import {capGenerator,generators,applyBuildModules} from '../studio-catalogue.js';
 import {prepareRecipe} from '../studio-geometry.js';
 import {exportMaterialBodies} from '../studio-material-export.js';
 const wasm=await Module();wasm.setup();
@@ -21,3 +21,15 @@ for(const generator of generators){
  }
 }
 console.log('All six new generators: real Manifold, connected material bodies and manufacturing exports passed.');
+
+const symbolOptions=capGenerator.parameterSchema.find(field=>field.key==='symbol').options;
+for(const id of ['knob','selector']){
+ const preset=capGenerator.presets.find(item=>item.id===id);
+ const symbols=new Set();
+ for(const symbol of symbolOptions){
+  const recipe=capGenerator.recipe({...preset.parameters,symbol,dualMaterial:true});
+  symbols.add(JSON.stringify(recipe.secondary));
+  assert.equal(prepareRecipe(THREE,wasm,recipe).bodies.length,2,id+'/'+symbol);
+ }
+ assert.equal(symbols.size,symbolOptions.length,'Every '+id+' symbol has distinct geometry');
+}

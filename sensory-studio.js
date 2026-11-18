@@ -173,7 +173,8 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const style=model.parameters.controlStyle||'Pushbutton';
   const familyFields={
    outline:['Pushbutton'],top:['Pushbutton'],
-   symbol:['Pushbutton','Rotary knob'],
+   symbol:['Pushbutton','Rotary knob','Rotary selector'],
+   cornerRound:style==='Pushbutton'&&model.parameters.outline==='Square'?['Pushbutton']:[],
    gripProfile:['Rotary knob','Rotary selector'],gripCount:['Rotary knob','Rotary selector'],gripDepth:['Rotary knob','Rotary selector'],
    leverAngle:['Toggle lever','Rocker'],
    socketProfile:['Rotary knob','Rotary selector','Toggle lever','Rocker','Fader cap','Thumb joystick','Directional pad','Indicator lens']
@@ -198,7 +199,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    (model.link?'<p class="sms-descriptor">Linked to library revision '+model.link.revision+'.</p><button id="smsBreak">Make an independent variant</button>'+(update?'<button id="smsAccept">Accept library revision '+update.revision+'</button>':''):'')+
    '<div class="sms-actions"><button id="smsUndo">Undo</button><button id="smsRedo">Redo</button><button id="smsDuplicate">Duplicate</button><button id="smsSaveModel">Save to Library</button></div>'+
    (stage==='design'?'<label>Starting point<select id="smsPreset"><option value="">Choose a preset…</option>'+g.presets.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('')+'</select></label>'+designSections(g,model):
-    (g.capabilities.supportsBase?details('Base and backing','Add a flat backing and set its thickness.','<label><input type="checkbox" data-build="base" '+(model.build.base?'checked':'')+'> Integrated flat base</label><label>Base thickness (mm)<input type="number" data-build="baseThickness" value="'+(model.build.baseThickness||3)+'" min="2" max="15"></label>'):'')+(g.capabilities.supportsMounting?details('Mounting holes','Add through holes for your fixings.','<label><input type="checkbox" data-build="mounting" '+(model.build.mounting?'checked':'')+'> Two through mounting holes</label><label>Hole diameter (mm)<input type="number" data-build="holeDiameter" value="'+(model.build.holeDiameter||3.4)+'" min="2" max="8" step=".1"></label>'):'')+(g.capabilities.supportsLEDs?details('Lighting and cable access','Set the cavity and opening in Design.','<p>Use the Light and materials and Holes and fittings sections to size the cavity and cable exit.</p>'):''))+
+    (g.capabilities.supportsBase?details('Base and backing','Add a flat backing and set its thickness.','<label><input type="checkbox" data-build="base" '+(model.build.base?'checked':'')+'> Integrated flat base</label><label>Base thickness (mm)<input type="number" data-build="baseThickness" value="'+(model.build.baseThickness||3)+'" min="2" max="15"></label>'):'')+(g.capabilities.supportsMounting?details('Mounting holes','Choose plain or recessed fixing holes.','<label><input type="checkbox" data-build="mounting" '+(model.build.mounting?'checked':'')+'> Two mounting holes</label><label>Fixing profile<select data-build="mountStyle">'+['Through holes','Underside counterbores','Underside countersinks'].map(value=>'<option'+(model.build.mountStyle===value?' selected':'')+'>'+value+'</option>').join('')+'</select></label><label>Hole diameter (mm)<input type="number" data-build="holeDiameter" value="'+(model.build.holeDiameter||3.4)+'" min="2" max="8" step=".1"></label>'):'')+(g.capabilities.supportsLEDs?details('Lighting and cable access','Set the cavity and opening in Design.','<p>Use the Light and materials and Holes and fittings sections to size the cavity and cable exit.</p>'):''))+
    '<div id="smsModelError" class="sms-descriptor" role="status"></div>';
   $('smsModelName').onchange=e=>commit({name:e.target.value.trim()||g.displayName});
   if($('smsDesign'))$('smsDesign').onclick=()=>{stage='design';renderTabs();renderEditor();};if($('smsBuild'))$('smsBuild').onclick=()=>{stage='build';renderTabs();renderEditor();};if($('smsSend'))$('smsSend').onclick=()=>send(model.id);
@@ -215,9 +216,14 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     renderEditor();
     return;
    }
+   if(schema.key==='outline'&&g.typeId==='control-caps'){
+    commit({parameters:{...model.parameters,outline:value}});
+    renderEditor();
+    return;
+   }
    const output=panel.querySelector('[data-value-for="'+schema.key+'"]');if(output)output.textContent=value+' '+(schema.unit||'');commit({parameters:{...model.parameters,[schema.key]:value}});
   });
-  panel.querySelectorAll('[data-build]').forEach(input=>input.onchange=()=>commit({build:{...model.build,[input.dataset.build]:input.type==='checkbox'?input.checked:Number(input.value)}}));
+  panel.querySelectorAll('[data-build]').forEach(input=>input.onchange=()=>commit({build:{...model.build,[input.dataset.build]:input.type==='checkbox'?input.checked:input.tagName==='SELECT'?input.value:Number(input.value)}}));
   editors.refresh();
  }
  function commit(changes,{history=true}={}){
