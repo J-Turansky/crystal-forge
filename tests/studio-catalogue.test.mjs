@@ -191,6 +191,7 @@ for(const [recipe,family] of [[tileRoute,tileGenerator],[gearRoute,gearGenerator
   const ceilingVertices=[];
   for(let i=0;i<vertices.length;i+=stride)if(Math.abs(vertices[i+1]-1.8)<1e-4)ceilingVertices.push(vertices[i]);
   assert(Math.min(...ceilingVertices)<-30&&Math.max(...ceilingVertices)>30,'Channel ceiling reaches both external sides.');
+  console.log('WT-012 routed export:',family.typeId,count);
   const output=exportMaterialBodies(routed,{name:family.typeId+'-routed'});
   assert.equal(output.stls.length,1);assert(output.threeMF.length>100);
  }
@@ -198,6 +199,8 @@ for(const [recipe,family] of [[tileRoute,tileGenerator],[gearRoute,gearGenerator
 const curveBuild={pixelHoles:[checked('left',-15),checked('right',15,2)],pixelBuilderVersion:1,serialRouting:serial};
 const curvePlan=applyBuildModules(tileRoute,curveBuild).nativeRouting;
 assert(curvePlan.links[1].path.length>2);
+const shortTail=applyBuildModules(tileRoute,{...curveBuild,serialRouting:{...serial,inTail:5,outTail:100}}, {},{preview:true}).nativeRouting;
+assert.match(shortTail.links[0].reason,/Cable budget/);assert.equal(shortTail.links.at(-1).reason,'');
 assert(curvePlan.links[1].measure>Math.hypot(30,2));
 assert.throws(()=>applyBuildModules(tileRoute,{...curveBuild,serialRouting:{...serial,pitch:25}}),/Cable budget exceeded/);
 assert.throws(()=>applyBuildModules(tileRoute,{...curveBuild,pixelHoles:[...curveBuild.pixelHoles].reverse()}),/tangent-compatible/);

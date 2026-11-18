@@ -599,7 +599,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const block=document.createElement('fieldset');
   block.innerHTML='<legend>Serial LED string</legend>';
   root.prepend(block);
-  const settings={version:1,enabled:false,pitch:50,tail:200,...model.build.serialRouting};
+  const settings={version:1,enabled:false,pitch:50,inTail:200,outTail:200,...model.build.serialRouting};
   const disabled=model.link?' disabled':'';
   const change=fields=>{
    if(commit({build:{...model.build,serialRouting:{...settings,...fields}}}))redrawPixelEditor();
@@ -614,7 +614,8 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(!settings.enabled)return;
   block.insertAdjacentHTML('beforeend','<label>Physical pixel pitch<select data-native-pitch'+disabled+
    '><option value="25">25 mm</option><option value="50">50 mm</option><option value="100">100 mm</option><option value="custom">Custom</option></select></label>'+
-   '<label>Edge tail limit, each (mm)<input data-native-tail type="number" min="5" max="250" value="'+esc(settings.tail)+'"'+disabled+'></label>'+
+   '<label>IN tail limit (mm)<input data-native-in-tail type="number" min="5" max="250" value="'+esc(settings.inTail)+'"'+disabled+'></label>'+
+   '<label>OUT tail limit (mm)<input data-native-out-tail type="number" min="5" max="250" value="'+esc(settings.outTail)+'"'+disabled+'></label>'+
    '<label><input data-native-preview type="checkbox"'+(hiddenNativeRoutes.has(model.id)?'':' checked')+'> Show routes and arrows</label>');
   const pitch=block.querySelector('[data-native-pitch]');
   pitch.value=settings.customPitch||![25,50,100].includes(settings.pitch)?'custom':settings.pitch;
@@ -623,7 +624,8 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    if(!input.value||!input.checkValidity()){input.reportValidity();input.value=settings[key];return;}
    change({[key]:input.valueAsNumber});
   };
-  bindNumber(block.querySelector('[data-native-tail]'),'tail');
+  bindNumber(block.querySelector('[data-native-in-tail]'),'inTail');
+  bindNumber(block.querySelector('[data-native-out-tail]'),'outTail');
   if(pitch.value==='custom'){
    pitch.parentElement.insertAdjacentHTML('afterend','<label>Custom pitch (mm)<input data-native-custom type="number" min="5" max="250" value="'+esc(settings.pitch)+'"'+disabled+'></label>');
    bindNumber(block.querySelector('[data-native-custom]'),'pitch');

@@ -61,10 +61,12 @@ export function nativeRouteEligibility(recipe,build){
 
 export function planNativePixelString(recipe,build){
  const settings=build.serialRouting;
- const plan={enabled:settings?.version===1&&settings.enabled===true,ready:false,links:[],cutters:[],reason:nativeRouteEligibility(recipe,build)};
- if(!plan.enabled||plan.reason)return plan;
- const holes=build.pixelHoles||[],pitch=Number(settings.pitch),tail=Number(settings.tail??200);
- if(!Number.isFinite(pitch)||pitch<5||pitch>250||!Number.isFinite(tail)||tail<5||tail>250){
+ const plan={enabled:settings?.enabled===true,ready:false,links:[],cutters:[],reason:nativeRouteEligibility(recipe,build)};
+ if(!plan.enabled)return plan;
+ if(settings.version!==1){plan.reason='This serial route version is unsupported. Turn routing off to prepare bores only.';return plan;}
+ if(plan.reason)return plan;
+ const holes=build.pixelHoles||[],pitch=Number(settings.pitch),inTail=Number(settings.inTail??settings.tail??200),outTail=Number(settings.outTail??settings.tail??200);
+ if(![pitch,inTail,outTail].every(value=>Number.isFinite(value)&&value>=5&&value<=250)){
   plan.reason='Enter a cable pitch and tail budget between 5 and 250 mm.';return plan;
  }
  if(!holes.length||holes.length>16||holes.some(p=>!p.checked||!p.id||![p.x,p.z,p.diameter,p.clearance,p.rotation??0].every(Number.isFinite))||
@@ -97,7 +99,7 @@ export function planNativePixelString(recipe,build){
  const outside=(edge,axis)=>edge&&[.5,1,1.5,2,2.5,3,3.5,4].every(step=>boundary(add(edge,axis,step),outline)<0)?edge:null;
  const outward={x:-inAxis.x,z:-inAxis.z};
  const entry=outside(exitAlong(inPort,outward,outline),outward),exit=outside(exitAlong(outPort,outAxis,outline),outAxis);
- addLink('EDGE IN → P1',entry?[entry,inPort]:null,[start.id],tail,entry);
+ addLink('EDGE IN → P1',entry?[entry,inPort]:null,[start.id],inTail,entry);
  for(let i=0;i<pixels.length-1;i++){
   const a=pixels[i],b=pixels[i+1],p=pixelStringPort(a,'output'),q=pixelStringPort(b,'input');
   const forward=unit(sub(q,p)),from=pixelStringAxis(a),to=pixelStringAxis(b);
@@ -105,7 +107,7 @@ export function planNativePixelString(recipe,build){
   // Include the in-bore distance at each end for physical centre-to-centre pitch.
   addLink('P'+(i+1)+' → P'+(i+2),curve,[a.id,b.id],pitch,null,gap(a,p)+gap(b,q));
  }
- addLink('P'+pixels.length+' → EDGE OUT',exit?[outPort,exit]:null,[end.id],tail,exit);
+ addLink('P'+pixels.length+' → EDGE OUT',exit?[outPort,exit]:null,[end.id],outTail,exit);
  if(entry&&exit&&gap(entry,exit)<6)plan.links.at(-1).reason='Use distinct perimeter exits at least 6 mm apart.';
  plan.reason=plan.links.filter(link=>link.reason).map(link=>link.label+': '+link.reason).join(' ');
  plan.ready=!plan.reason;

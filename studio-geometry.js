@@ -133,7 +133,19 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
  try{
   onProgress('Joining physical bodies');let total=union(recipe.positive);
   if(recipe.secondary?.length&&!recipe.partitioned)total=hold(total.add(union(recipe.secondary)));
-  for(const part of recipe.negative||[]){
+  if(recipe.nativeRouting?.ready){
+   onProgress('Cutting serial LED channels');
+   const cuts=[];
+   for(const part of recipe.negative){
+    const cut=convert(part);
+    if(hold(total.intersect(cut)).volume()<.1)
+     throw Error((part.pixelHole||part.wireChannel||'Cut')+' does not cut the model.');
+    cuts.push(cut);
+   }
+   const originalVolume=total.volume();
+   total=hold(total.subtract(hold(wasm.Manifold.union(cuts))));
+   if(originalVolume-total.volume()<.1)throw Error('Serial channels did not remove material.');
+  }else for(const part of recipe.negative||[]){
    const before=total;
    total=hold(total.subtract(convert(part)));
    if((part.pixelHole||part.wireChannel)&&before.volume()-total.volume()<.1)
