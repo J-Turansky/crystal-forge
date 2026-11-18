@@ -1,0 +1,67 @@
+name: "Wonder Trunks AI task"
+description: "Propose or dispatch an independently scoped AI/human development task (not self-authorisation)"
+title: "WT-### · "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Task presence does not authorise coding. Owner approval and a pinned prompt commit are required. First check active PRs, Issues and the orchestration charter on planning/prompts.
+  - type: input
+    id: task_id
+    attributes:
+      label: "Task ID"
+      description: "Unique identifier supplied by the coordinator, e.g. WT-002"
+      placeholder: "WT-002"
+    validations:
+      required: true
+  - type: textarea
+    id: intent
+    attributes:
+      label: "Creative purpose and user-facing outcome"
+      description: "What should actually become possible, and why?"
+    validations:
+      required: true
+  - type: input
+    id: spec
+    attributes:
+      label: "Approved specification"
+      description: "prompts/NNN-file.md @ FULL_SHA, or explicitly say DRAFT — NOT APPROVED"
+      placeholder: "DRAFT — NOT APPROVED"
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: "In-scope and out-of-scope changes"
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: "Dependencies, conflicting Issues/PRs and files likely touched"
+      description: "Link current work and state how duplication was checked"
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: "Acceptance tests and required evidence"
+    validations:
+      required: true
+  - type: dropdown
+    id: status
+    attributes:
+      label: "Status"
+      options:
+        - "Draft / needs owner approval"
+        - "Owner approved and ready to claim"
+        - "In progress"
+        - "Blocked"
+        - "Review"
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: "Assigned contributor / integration owner"
+      placeholder: "Unassigned"
