@@ -69,3 +69,11 @@ body.sms-unified .layout{height:auto;min-height:0;flex:1;position:relative;grid-
 }
 
 .sms-unified #smsFocus{pointer-events:auto;position:relative;z-index:1}
+
+@media(max-width:850px){
+ body.sms-unified{overflow-x:clip}
+ .sms-unified :is(.topbar,.topcluster,.workspace-tabs,.studio-modelbar){min-width:0;max-width:100%;flex-wrap:wrap}
+ .sms-unified .layout{width:100%;max-width:100%;overflow-x:clip}
+ .sms-unified .sms-overlay{overflow-wrap:anywhere}
+ .sms-unified #smsHomeSearch{max-width:100%}
+}
