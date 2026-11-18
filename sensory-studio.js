@@ -389,6 +389,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const build=model.generator.typeId==='crystals'?document.querySelector('.topbar [data-tab=build]').classList.contains('active'):stage==='build';
   const root=shell.palette;root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent=build?'Build tools':'Design choices';root.append(heading);
+  const controls=document.createElement('div');controls.className='sms-context-controls';root.append(controls);
   if(!build&&family.presets.length){
    const cards=document.createElement('div');cards.className='sms-preset-strip';
    for(const preset of visualPresets(family)){
@@ -397,9 +398,9 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     const card=document.createElement('button');card.append(modelPicture(presetThumbnails.get(key)),preset.name);card.disabled=!!model.link;
     card.onclick=()=>{commit({parameters:copy(preset.parameters)});renderEditor();};cards.append(card);
    }
-   root.append(cards);
+   const presets=document.createElement('details'),summary=document.createElement('summary');
+   summary.textContent='Illustrated starting points';presets.append(summary,cards);root.append(presets);
   }
-  const controls=document.createElement('div');controls.className='sms-context-controls';root.append(controls);
   const addAction=(label,target)=>{
    if(!target)return;
    const button=document.createElement('button');button.type='button';button.textContent=label;button.disabled=target.disabled||!!model.link;
