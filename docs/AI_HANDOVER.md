@@ -2,6 +2,8 @@
 
 ## WT-002 · Stage C0 draft
 
+The new non-parallel wave profiles use a planar material split instead of unioning an overlapping base box. The first catalogue fabrication run reached the Vortex preset and rejected a degenerate export triangle. The existing strict exporter and the legacy Parallel construction are retained. The catalogue regression exercises the new profiles in single and dual materials with STL and 3MF output.
+
 The unified shell now moves existing app controls into one header and places workspace navigation below it. Panel visibility and widths use the device-local wt-workspace-panels-v1 key. Panels stay mounted during hide/show, preserving scroll, settings, renderer and project state. The classic layout remains available. Browser CI exercises the rail, panel restores, and existing model/Build routes. Verify the exact-head runs before approval. C0 and the three P1 regressions passed on checkpoint `295895f`. The catalogue draft now starts with continuous-backing basket, pebble and scale relief tiles and concentric, vortex, saddle and dune waves. Four other families, richer selected-component controls and full catalogue visuals remain outstanding.
 
 ### Independent review follow-up
