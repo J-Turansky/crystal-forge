@@ -84,6 +84,17 @@ for(const [generator,ids] of [[waveGenerator,['river','rings','eddy','saddle','d
  });
  assert.equal(new Set(signatures).size,ids.length);
 }
+const presetParameters=(family,id)=>family.presets.find(preset=>preset.id===id).parameters;
+const legacyKnob=presetParameters(capGenerator,'knob');
+const rotaryDish=capGenerator.recipe({...legacyKnob,rotaryTop:'Dish',rotaryMark:'Recessed pointer'});
+assert.equal(rotaryDish.positive[0].kind,'mesh');
+assert.deepEqual(rotaryDish.negative.at(-1),capGenerator.recipe(legacyKnob).negative.at(-1),
+ 'The new face retains the measured socket cutter.');
+const lantern=presetParameters(pebbleGenerator,'lantern');
+const unlitLantern=prepareRecipe(THREE,wasm,pebbleGenerator.recipe({...lantern,illuminated:false}));
+const litLantern=prepareRecipe(THREE,wasm,pebbleGenerator.recipe(lantern));
+assert(unlitLantern.bodies[0].volume-litLantern.bodies[0].volume>100,'Lantern subtracts a real internal cavity.');
+
 for(const generator of generators){
  assert(generator.presets.length>=3,generator.displayName+' requires three meaningful presets.');
  for(const preset of generator.presets){

@@ -1525,6 +1525,7 @@ if(studioBootstrap&&!new URLSearchParams(location.search).has('legacy'))studioBr
    return coupon.diameters;
   }finally{coupon.geometry.dispose();}
  },
+ formationDefaults:()=>clone(defaults),
  createCrystals:parameters=>({crystals:generateFormation({...defaults,...parameters}),selectedId:null}),
  previewGroup:()=>{const group=new THREE.Group();for(const mesh of [...crystalMeshes,...(baseMesh?[baseMesh]:[]),...baseAccents])group.add(mesh.clone());return group;},
  detach:()=>{

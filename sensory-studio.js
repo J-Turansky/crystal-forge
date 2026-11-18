@@ -8,6 +8,7 @@ import {exportMaterialBodies} from './studio-material-export.js';
 import {installExactValueEditors} from './exact-value-editors.js';
 import {createCuraProfile,zipProfileEntries,curaFallbackText,calculateCuraSettings} from './cura-profiles.js';
 import {StudioVault} from './studio-vault.js';
+import {crystalStartingPoints,crystalStartingPointPreview} from './studio-crystal-presets.js';
 const copy=x=>JSON.parse(JSON.stringify(x));
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const $=id=>document.getElementById(id);
@@ -18,7 +19,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  let printExpanded=false;
  state.savedProjects??=[];project.printer={printer:'Ultimaker 3 Extended',curaNozzle:.4,curaMaterial:'PLA',curaQuality:60,curaIntent:'balanced',...project.printer};
  const crystalAdapter={typeId:'crystals',typeVersion:1,displayName:'Crystal Clusters',category:'Lighting',defaultParameters:adapter.capture().settings,
-  parameterSchema:[],presets:[],capabilities:{supportsBase:true,supportsLEDs:true,supportsMounting:true,supportsTactileSurfaces:false,supportsMechanisms:false,supportsDualMaterial:false,supportsPartSplitting:true},
+  parameterSchema:[],presets:crystalStartingPoints(adapter.formationDefaults()),capabilities:{supportsBase:true,supportsLEDs:true,supportsMounting:true,supportsTactileSurfaces:false,supportsMechanisms:false,supportsDualMaterial:false,supportsPartSplitting:true},
   validateParameters:p=>({valid:!!p,errors:[],parameters:p}),generatePreview:()=>adapter.capture(),
   generateManufacturingGeometry:()=>adapter.capture(),estimateBounds:()=>adapter.bounds(),migrateParameters:(_,p)=>p};
  const registry=makeCatalogue(crystalAdapter),cache=new Map(),histories=new Map(),prepared=new Map(),workers=new Map();
@@ -140,7 +141,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    if(preset)button.dataset.preset=preset.id;else button.dataset.generator=family.typeId;
    const label=document.createElement('span');label.textContent=preset?.name||family.displayName;
    const key=family.typeId+':'+(preset?.id||'default');
-   if(!presetThumbnails.has(key)){
+   if(!preset&&!presetThumbnails.has(key)){
     let preview=null;
     if(family.typeId==='crystals'){
      const cluster=project.models.find(model=>model.generator.typeId==='crystals');
@@ -148,7 +149,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     }else preview=recipeThumbnail(family,preset?.parameters||family.defaultParameters);
     if(preview)presetThumbnails.set(key,preview);
    }
-   button.append(modelPicture(presetThumbnails.get(key)),label);
+   button.append(preset?presetPicture(family,preset):modelPicture(presetThumbnails.get(key)),label);
    button.onclick=()=>{picker.close();add(family.typeId,preset?.parameters,preset?.name);};
    tile.append(button);
    if(!preset&&family.presets.length){
@@ -260,6 +261,20 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    return thumbRenderer.domElement.toDataURL('image/png');
   }catch{return null;}
  }
+ function crystalPresetThumbnail(settings){
+  let group;
+  try{group=crystalStartingPointPreview(THREE,settings);return thumbnail(group);}
+  catch{return null;}
+  finally{if(group)disposeGroup(group);}
+ }
+ function presetPicture(family,preset){
+  const key=family.typeId+':'+preset.id;
+  if(!presetThumbnails.has(key)){
+   const picture=family.typeId==='crystals'?crystalPresetThumbnail(preset.parameters):recipeThumbnail(family,preset.parameters);
+   if(picture)presetThumbnails.set(key,picture);
+  }
+  return modelPicture(presetThumbnails.get(key));
+ }
  function recipeThumbnail(generator,parameters,build={},colours){
   let group;
   try{
@@ -328,7 +343,9 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const style=model.parameters.controlStyle||'Pushbutton';
   const familyFields={
    outline:['Pushbutton'],top:['Pushbutton'],
-   symbol:['Pushbutton','Rotary knob','Rotary selector'],
+   symbol:model.parameters.rotaryMark==='Recessed pointer'?['Pushbutton','Rotary selector']:['Pushbutton','Rotary knob','Rotary selector'],
+   rotaryTop:['Rotary knob'],rotaryMark:['Rotary knob'],
+   controlGrip:['Thumb joystick','Toggle lever','Rocker','Fader cap','Directional pad'],
    cornerRound:style==='Pushbutton'&&model.parameters.outline==='Square'?['Pushbutton']:[],
    gripProfile:['Rotary knob','Rotary selector'],gripCount:['Rotary knob','Rotary selector'],gripDepth:['Rotary knob','Rotary selector'],
    leverAngle:['Toggle lever','Rocker'],
@@ -364,6 +381,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(hit){
    panel.querySelector('#smsPartEditor').open=true;
    selectRecipePart(model,hit.object.userData.partId);
+   renderPalette();
   }
  });
  function partEditor(model){
@@ -395,20 +413,22 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    mesh.material.emissive?.setHex(id&&mesh.userData.partId===id?0x116047:0);
   }
  }
+ function applyPartOffset(model,id,offset){
+  if(!id)return false;
+  const partOffsets={...model.build.partOffsets};
+  if(offset.some(Boolean))partOffsets[id]=offset;
+  else delete partOffsets[id];
+  if(!commit({build:{...model.build,partOffsets}}))return false;
+  selectRecipePart(model,id);
+  renderPalette();
+  return true;
+ }
  function bindPartEditor(model){
   const selector=$('smsPartSelect');
   if(!selector)return;
   selectRecipePart(model,selectedParts.get(model.id)||'');
-  selector.onchange=()=>selectRecipePart(model,selector.value);
-  function apply(offset){
-   const id=selector.value;
-   if(!id)return;
-   const partOffsets={...model.build.partOffsets};
-   if(offset.some(Boolean))partOffsets[id]=offset;
-   else delete partOffsets[id];
-   commit({build:{...model.build,partOffsets}});
-   selectRecipePart(model,id);
-  }
+  selector.onchange=()=>{selectRecipePart(model,selector.value);renderPalette();};
+  const apply=offset=>applyPartOffset(model,selector.value,offset);
   $('smsPartApply').onclick=()=>{
    const fields=[...panel.querySelectorAll('[data-part-axis]')];
    if(fields.every(input=>input.reportValidity()&&Number.isFinite(input.valueAsNumber)))apply(fields.map(input=>input.valueAsNumber));
@@ -442,15 +462,41 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const heading=document.createElement('h2');heading.textContent=build?'Build tools':'Design choices';root.append(heading);
   const controls=document.createElement('div');controls.className='sms-context-controls';root.append(controls);
   if(!build&&family.presets.length){
+   const crystal=family.typeId==='crystals';
    const cards=document.createElement('div');cards.className='sms-preset-strip';
-   for(const preset of visualPresets(family)){
-    const key=family.typeId+':'+preset.id;
-    if(!presetThumbnails.has(key))presetThumbnails.set(key,recipeThumbnail(family,preset.parameters));
-    const card=document.createElement('button');card.append(modelPicture(presetThumbnails.get(key)),preset.name);card.disabled=!!model.link;
-    card.onclick=()=>{commit({parameters:copy(preset.parameters)});renderEditor();};cards.append(card);
-   }
    const presets=document.createElement('details'),summary=document.createElement('summary');
-   summary.textContent='Illustrated starting points';presets.append(summary,cards);controls.before(presets);
+   summary.textContent=crystal?'Crystal starting points — creates a new model':'Illustrated starting points';
+   presets.append(summary,cards);controls.before(presets);
+   const populate=()=>{
+    if(cards.childElementCount)return;
+    for(const preset of visualPresets(family)){
+     const card=document.createElement('button');card.type='button';card.append(presetPicture(family,preset),preset.name);
+     card.disabled=!crystal&&!!model.link;
+     card.onclick=()=>{
+      if(crystal){add(family.typeId,preset.parameters,preset.name);return;}
+      commit({parameters:copy(preset.parameters)});renderEditor();
+     };
+     cards.append(card);
+    }
+   };
+   if(crystal)presets.addEventListener('toggle',()=>{if(presets.open)populate();});
+   else populate();
+  }
+  const part=build?null:$('smsPartSelect');
+  if(part?.value){
+   const region=document.createElement('section'), title=document.createElement('h3');
+   region.className='sms-context-controls';region.setAttribute('aria-label','Selected part');controls.before(region);
+   title.textContent=part.selectedOptions[0].textContent;region.append(title);
+   const id=part.value,offset=model.build.partOffsets?.[id]||[0,0,0];
+   for(const [axis,label] of ['Left / right','Lift','Front / back'].entries()){
+    const key='part-offset-'+axis;
+    visualRange(region,{key,label,min:axis===1?0:-50,max:50,step:.1,unit:'mm'},offset[axis],value=>{
+     const next=[...offset];next[axis]=Number(value);
+     if(!applyPartOffset(model,id,next))return false;
+     shell.palette.querySelector('[data-palette-key="'+key+'"]')?.focus({preventScroll:true});
+     return true;
+    },!!model.link);
+   }
   }
   const addAction=(label,target)=>{
    if(!target)return;
@@ -482,7 +528,18 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     ...(!['Solid','Legacy'].includes(parameters.webStyle)&&parameters.spokes?['rimWidth','webWidth','hub']:[]),
     ...(parameters.reliefStyle!=='None'?['reliefHeight']:[])
    ];
-   const keys=(family.typeId==='gears'?gearKeys():family.visualFields)||{
+   const controlKeys=()=>{
+    const style=parameters.controlStyle;
+    return ['controlStyle','diameter','height',
+     ...(['Rotary knob','Rotary selector'].includes(style)?['gripProfile','gripCount','gripDepth']:[]),
+     ...(style==='Rotary knob'?['rotaryTop','rotaryMark']:[]),
+     ...(['Thumb joystick','Toggle lever','Rocker','Fader cap','Directional pad'].includes(style)?['controlGrip']:[])
+    ];
+   };
+   const characterKeys=()=>['character','construction','width','depth',...(parameters.construction==='Layered'?[
+    ...(['Goat','Sheep','Boat'].includes(parameters.character)?['silhouettePose']:[]),'outlineRoundness','reliefFinish',
+    ...(parameters.reliefFinish!=='Plain'?['reliefRise']:[])]:[])];
+   const keys=({gears:gearKeys,'control-caps':controlKeys,characters:characterKeys}[family.typeId]?.()||family.visualFields)||{
     'tactile-tiles':['pattern','width','height','relief'],
     waves:['flowStyle','amplitude','frequency','width'],
     'control-caps':['diameter','height','gripDepth'],

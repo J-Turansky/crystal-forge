@@ -2,6 +2,8 @@
 
 ## v0.16.0-dev.7 — Compact Studio workspace controls
 
+- Add distinct creative starting points for all six families and expose selected part offsets directly in the Design palette.
+
 - Group project and app actions in one toolbar.
 - Collapse the model rail or independently hide and restore workspace panels.
 - Remember workspace panel widths and visibility on this device.

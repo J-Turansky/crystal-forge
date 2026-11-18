@@ -1,5 +1,13 @@
 # AI handover — read immediately after AGENTS.md
 
+## WT-002 · PR #35
+
+- Tactile Tiles and Waves add procedurally distinct surface presets. Crystal starting points create independent models using existing formation and preview machinery. Existing editable Crystal models, LED layouts and vault records keep their established paths.
+- Rotary caps add dish and stepped geometry with scalloped grip and optional fabricated recessed pointers. Broad grip alternatives cover other control families. Existing socket cutters are reused. Recessed pointer geometry appears in exported meshes and still needs a matching preview cut.
+- Characters now have opt-in layered outlines, rounded corners, raised or domed relief and pose options. Light Pods now have opt-in swept stone, lantern and layered dome shells with separate textures, underside access and cable cuts. The legacy recipes remain defaults.
+- The centre palette exposes offsets for a selected editable part and keeps the precision controls in sync. Pixel selection and movement from the centre palette remain follow-up work.
+- Review exact-head GitHub Actions logs before approval. Fit and diffusion require printed samples.
+
 ## WT-002 · Stage C0 draft
 
 The new non-parallel wave profiles use a planar material split instead of unioning an overlapping base box. The first catalogue fabrication run reached the Vortex preset and rejected a degenerate export triangle. The existing strict exporter and the legacy Parallel construction are retained. The catalogue regression exercises the new profiles in single and dual materials with STL and 3MF output.
