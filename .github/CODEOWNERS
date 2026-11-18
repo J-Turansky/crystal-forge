@@ -1,0 +1,6 @@
+# Default reviewer for application and contributor changes.
+# This requests code-owner review in GitHub; enforcement needs a repository
+# ruleset or branch protection configured by the owner.
+/* @connorturansky-svg
+/.github/ @connorturansky-svg
+/docs/ @connorturansky-svg
