@@ -1,5 +1,11 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.4 — Unified Wonder Trunks Studio workspace
+
+- Add Creative Home, a model rail and a split 3D workspace with searchable precision settings.
+- Start Quick Print with the current model and expand to more models when needed.
+- Keep the classic layout available with layout=legacy.
+
 ## v0.16.0-dev.3 — Studio stability and release foundations
 
 - Rebuild the thumb joystick as one closed solid for print preparation.

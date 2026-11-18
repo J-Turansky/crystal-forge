@@ -27,3 +27,43 @@ body.sms-workspace .sms-panel-details{background:var(--panel);border-left:3px so
 .sms-picker-back{grid-column:1/-1;justify-self:start}
 .sms-picture-empty{display:grid;place-items:center;min-height:130px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;color:var(--muted);font-weight:400}
 @media(max-width:440px){#smsPicker .sms-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sms-picker-tile img,.sms-picture-empty{height:94px;min-height:94px}}
+
+/* Unified shell. The classic canvas and its controls keep their IDs and handlers. */
+body.sms-unified{display:flex;flex-flow:column;height:100dvh;min-height:0;overflow:hidden}
+body.sms-unified .studio-modelbar{order:-1;position:static;min-height:0}
+body.sms-unified .layout{height:auto;min-height:0;flex:1;position:relative;grid-template-rows:minmax(0,1fr)}
+.sms-unified .layout>.sms-rail,.sms-unified .layout>.sms-centre,.sms-unified .layout>.sms-settings{min-width:0;min-height:0}
+.sms-rail,.sms-settings{padding:12px;background:var(--panel);overflow:auto}
+.sms-rail{display:flex;flex-direction:column;gap:10px;border-right:1px solid var(--border)}
+.sms-rail .studio-modeltabs{display:flex;flex:0 1 auto;flex-direction:column;overflow:auto}
+.sms-rail .studio-modeltabs button{white-space:normal;display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:8px;align-items:center;text-align:left;padding:7px}
+.sms-rail img,.sms-rail .sms-picture-empty{width:44px;height:35px;min-height:0;object-fit:contain;font-size:0;background:#edf2f8;border-radius:4px}
+.sms-centre{display:grid;grid-template-rows:minmax(0,var(--sms-view-height)) 22px minmax(0,1fr);position:relative}
+.sms-centre .viewarea{height:auto;min-height:0;overflow:hidden}
+.sms-split{width:calc(100% - 28px);margin:0 14px;accent-color:var(--teal)}
+.sms-palette{overflow:auto;padding:16px;background:var(--bg);border-top:1px solid var(--border)}
+.sms-palette h2{margin:0 0 12px}
+.sms-preset-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:9px;margin-bottom:15px}
+.sms-preset-strip button{display:grid;gap:6px;text-align:left;font-weight:700}
+.sms-preset-strip img{width:100%;height:80px;object-fit:contain;border-radius:5px;background:#edf2f8}
+.sms-settings{border-left:1px solid var(--border)}
+.sms-settings>:is(.left,.right){height:auto;min-height:0;overflow:visible;border:0;padding:8px 0}
+.sms-settings>input{width:100%;margin-bottom:8px;padding:8px}
+.sms-settings [data-filtered],.sms-unified .sms-replaced-print{display:none!important}
+.sms-unified .workspace-tabs [aria-current]{outline:2px solid currentColor;outline-offset:-3px}
+.sms-unified :focus-visible{outline:3px solid #1681d4;outline-offset:2px}
+.sms-unified[data-studio-view=home] .sms-settings{visibility:hidden}
+.sms-unified[data-studio-view=home] .sms-centre>.viewarea,.sms-unified[data-studio-view=library] .sms-centre>.viewarea,.sms-unified[data-studio-view=print] .sms-centre>.viewarea{visibility:hidden}
+.sms-unified .sms-overlay{background:var(--bg)}
+.sms-unified.sms-focused .viewarea{position:fixed!important;inset:0;z-index:30;height:100dvh}
+#smsPrintCurrent{margin-bottom:12px}
+#smsPrintModels{margin:12px 0}
+@media(max-width:850px){
+ body.sms-unified{height:auto;min-height:100dvh;overflow:auto}
+ body.sms-unified .layout{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(515px,78dvh) auto;height:auto}
+ .sms-rail{border:0;overflow-x:auto}
+ .sms-rail .studio-modeltabs{flex-direction:row;max-width:100%}
+ .sms-rail .studio-modeltabs button{min-width:125px}
+ .sms-settings{overflow:visible}
+ .sms-unified[data-studio-view=home] .sms-settings{display:none}
+}

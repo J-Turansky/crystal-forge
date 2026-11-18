@@ -1,5 +1,9 @@
 # PR14 / v0.15.1 — physical pixel-spacing snap (draft)
 
+## Unified interface draft
+
+Version `0.16.0-dev.4` introduces the shell and current-model-first Quick Print. Use `?layout=legacy` for the classic Studio layout with the same data. Visual Design parity, advanced direct manipulation, shared 3D Build placement, SVG then STL/OBJ importing, and mature Library and Print workflows remain follow-up milestones.
+
 ## Current sequence
 
 1. Stabilise fabrication and require release metadata before Pages deployment.

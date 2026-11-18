@@ -981,8 +981,9 @@ $('featureOverlay').onchange=()=>updateHardwareAnnotationVisibility();
 
 $('colours').querySelectorAll('button').forEach(b=>b.onclick=()=>{s.colour=Number(b.dataset.colour);syncForm();rebuild();snapshot()});
 // Persistent appearance setting. Separate from saved geometry projects.
-let activeTheme='dark';
-try{activeTheme=localStorage.getItem('crystal-forge-theme')==='light'?'light':'dark'}catch(e){}
+const classicLayout=new URLSearchParams(location.search).get('layout')==='legacy'||new URLSearchParams(location.search).has('legacy');
+let activeTheme=classicLayout?'dark':'light';
+try{const preference=localStorage.getItem('crystal-forge-theme');if(preference==='light'||preference==='dark')activeTheme=preference;}catch(e){}
 function applyTheme(theme,save=true){
  activeTheme=theme==='light'?'light':'dark';
  document.body.classList.toggle('theme-light',activeTheme==='light');
@@ -1515,7 +1516,7 @@ installConciseHelp();
 if(studioBootstrap&&!new URLSearchParams(location.search).has('legacy'))studioBridge=installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstrap:studioBootstrap,adapter:{
  capture:()=>({settings:clone(s),crystals:clone(crystals),selectedId}),
  bounds:()=>{const size=modelBounds().getSize(new THREE.Vector3());return {width:size.x,depth:size.z,height:size.y};},
- status:setStatus,download,vault:()=>cloudVault,
+ status:setStatus,download,undo,vault:()=>cloudVault,
  pixelFitCoupon:async nominal=>{
   if(!Number.isFinite(nominal)||nominal<2||nominal>30)throw Error('Enter a pixel bore diameter between 2 and 30 mm.');
   const wasm=await loadManifold(),coupon=makeCalibrationStrip(wasm,nominal);
