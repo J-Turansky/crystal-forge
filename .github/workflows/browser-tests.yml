@@ -113,7 +113,9 @@ jobs:
         if: always()
         with:
           name: crystal-forge-browser-screenshot
-          path: qa/browser-smoke.png
+          path: |
+            qa/browser-smoke.png
+            qa/unified-*.png
           if-no-files-found: ignore
       - name: Fail on browser errors
         if: steps.install.outcome != 'success' || steps.browser.outcome != 'success'

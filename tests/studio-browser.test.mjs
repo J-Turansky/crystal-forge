@@ -7,7 +7,8 @@ const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(
 async function exact(key,value){await page.locator('output[data-value-for="'+key+'"]').click();await page.locator('[data-exact-input="'+key+'"]').fill(String(value));await page.locator('[data-exact-input="'+key+'"]').press('Enter');}
 async function add(type){await page.locator('#smsNew').click();await page.locator('#smsPicker [data-generator="'+type+'"]').click();}
 try{
- await page.goto(process.env.CRYSTAL_FORGE_URL||'http://127.0.0.1:4321',{waitUntil:'domcontentloaded'});
+ const url=new URL(process.env.CRYSTAL_FORGE_URL||'http://127.0.0.1:4321');url.searchParams.set('layout','legacy');
+ await page.goto(url.href,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__sensoryStudio,null,{timeout:60000});
  assert.equal(await page.locator('.collapsible-section[open]').count(),0,'Sections start closed.');
  assert((await page.locator('.section-descriptor').first().innerText()).length>10);
