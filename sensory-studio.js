@@ -423,17 +423,26 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     },!!model.link);
    }
   }else{
-   const keys=family.visualFields||{
+   const parameters={...family.defaultParameters,...model.parameters};
+   const gearKeys=()=>parameters.mode==='Mechanical'?['mode','teeth','module','pressureAngle','bore','thickness']:[
+    'mode','wheelStyle','webStyle','reliefStyle','diameter','thickness','bore',
+    ...(!['Cam','Pulley'].includes(parameters.wheelStyle)?['teeth']:[]),
+    ...(parameters.webStyle==='Solid'?[]:['spokes']),
+    ...(!['Solid','Legacy'].includes(parameters.webStyle)&&parameters.spokes?['rimWidth','webWidth','hub']:[]),
+    ...(parameters.reliefStyle!=='None'?['reliefHeight']:[])
+   ];
+   const keys=(family.typeId==='gears'?gearKeys():family.visualFields)||{
     'tactile-tiles':['pattern','width','height','relief'],
     waves:['amplitude','frequency','width'],
     'control-caps':['diameter','height','gripDepth'],
     characters:['character','width','depth'],
     'light-pods':['width','height','facets']
    }[family.typeId]||[];
-   const parameters={...family.defaultParameters,...model.parameters};
    const apply=(key,value)=>{
     const open=[...panel.querySelectorAll('details')].map(group=>group.open);
-    if(!commit({parameters:{...model.parameters,[key]:value}}))return false;
+    const next={...model.parameters,[key]:value};
+    if(family.typeId==='gears'&&key==='webStyle'&&!['Solid','Legacy'].includes(value)&&!parameters.spokes)next.spokes=3;
+    if(!commit({parameters:next}))return false;
     renderEditor();
     panel.querySelectorAll('details').forEach((group,index)=>{if(open[index])group.open=true;});
     shell.palette.querySelector('[data-palette-key="'+key+'"]')?.focus({preventScroll:true});
