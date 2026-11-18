@@ -1,5 +1,9 @@
 # AI handover — read immediately after AGENTS.md
 
+## WT-008 · Print Centre queue
+
+Built on merged WT-007 / PR #44. Queue order and per-job overrides persist in the existing project document. The shared printer resolver applies project defaults, model settings and job overrides in that order. Preparation accepts only its own active worker and request, while model or effective printer changes invalidate affected results. Prepared mesh data stays in memory and must be regenerated after reopening. Custom printers require manual Cura settings. Envelope warnings are advisory and physical slicing, material assignment and printing remain manual. The draft PR records exact-head checks and screenshots.
+
 ## WT-007 · Visual saved projects
 
 Built on merged WT-006 / PR #41. Library project cards use the first stored thumbnail or the established placeholder. Project-title search is case-insensitive and independent of the model-type filter. Open uses the existing confirmation, backup and project replacement flow. Saved snapshots and thumbnail generation retain their existing formats and paths. See the WT-007 draft PR for exact-head checks and desktop and mobile screenshots.

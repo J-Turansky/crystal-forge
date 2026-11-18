@@ -2,7 +2,7 @@ import {renderPixelProfileDiagram} from './pixel-profile-diagram.js';
 import {applyPixelFittingProfile,resolvePixelFitting,withMeasuredPixelFit,saveablePixelFit} from './studio-pixel-fit.js';
 import {pixelBuilderMarkup,pixelHoleMarkup,bindPixelBuilder,pixelProfiles,stablePixels,findPixelPosition,checkedPixelBore,newPixel} from './studio-pixel-builder.js';
 import {createModel,addModel,findModel,openTab,closeTab,reorderTabs,duplicateModel,editModel,
- queueModel,beginPreparation,finishPreparation,cancelPreparation,canExport,saveLibraryRevision,
+ queueModel,beginPreparation,finishPreparation,cancelPreparation,canExport,resolveJobPrinter,movePrintJob,invalidatePrintJob,saveLibraryRevision,
  insertLibraryModel,availableLinkedUpdate,acceptLinkedUpdate,breakLink,modelFingerprint,validateProject,WORKSPACE_KEY,newId} from './studio-documents.js';
 import {makeCatalogue,applyBuildModules,generators} from './studio-catalogue.js';
 import {previewRecipe,disposeGroup} from './studio-geometry.js';
@@ -18,7 +18,8 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  const state=bootstrap,project=state.project;
  renderer.localClippingEnabled=true;
  const unified=new URLSearchParams(location.search).get('layout')!=='legacy';
- let printExpanded=false;
+ let printExpanded=false,quickPrintThumbnail=null;
+ const printSizes=new WeakMap();
  state.savedProjects??=[];project.printer={printer:'Ultimaker 3 Extended',curaNozzle:.4,curaMaterial:'PLA',curaQuality:60,curaIntent:'balanced',...project.printer};
  const crystalAdapter={typeId:'crystals',typeVersion:1,displayName:'Crystal Clusters',category:'Lighting',defaultParameters:adapter.capture().settings,
   parameterSchema:[],presets:crystalStartingPoints(adapter.formationDefaults()),capabilities:{supportsBase:true,supportsLEDs:true,supportsMounting:true,supportsTactileSurfaces:false,supportsMechanisms:false,supportsDualMaterial:false,supportsPartSplitting:true},
@@ -293,6 +294,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const placeholder=document.createElement('span');placeholder.className='sms-picture-empty';placeholder.textContent='Preview unavailable';return placeholder;
  }
  function renderTabs(){
+  for(const job of project.printJobs)if(job.status==='stale')discardPrintResult(job.id);
   if(shell){const history=histories.get(currentId),crystal=active()?.generator.typeId==='crystals';const blocked=mode!=='model'||!!active()?.link;$('smsGlobalUndo').disabled=blocked||!(crystal?adapter.canUndo(-1):history?.index>0);$('smsGlobalRedo').disabled=blocked||!(crystal?adapter.canUndo(1):history?.index<history?.items.length-1);document.body.dataset.studioView=mode;shell.home.toggleAttribute('aria-current',mode==='home');$('smsLibrary').toggleAttribute('aria-current',mode==='library');if(mode!=='model'&&document.body.classList.contains('sms-focused'))shell.focus.click();}
   const type=mode==='model'?active()?.generator.typeId:null;
   document.body.dataset.modelTheme=type||'workspace';
@@ -1037,58 +1039,204 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    }else{await studioVault.push(state);if(label)label.textContent='Synced — complete private backup saved.';}
   }catch(error){if(label)label.textContent='Sync paused / conflict: '+error.message;adapter.status(error.message);}
  }
- function send(id){captureCrystal();queueModel(project,id);save();showPrint();}
+ function enqueue(id){return project.printJobs.find(job=>job.modelId===id)||queueModel(project,id);}
+ function send(id){captureCrystal();enqueue(id);save();showPrint();}
  function showPrint(){if(shell)printExpanded=false;captureCrystal();mode='print';overlay.hidden=false;document.body.classList.add('sms-sidebar-mode');panel.hidden=false;
-  panel.innerHTML='<h2>Print Centre</h2><p class="sms-descriptor">One printer setup for every queued model.</p><label>Printer<select id="smsPrinter"><option>Ultimaker 3 Extended</option><option>Ultimaker 2+</option><option>Custom / other</option></select></label><label>Nozzle / AA core<select id="smsNozzle">'+[.25,.4,.6,.8].map(n=>'<option>'+n+'</option>').join('')+'</select></label><label>Material<select id="smsMaterial"><option>PLA</option><option>PETG</option></select></label><label>Quality<input id="smsQuality" type="number" min="0" max="100" value="'+project.printer.curaQuality+'"></label><p class="sms-descriptor">Dual material uses the UM3. Confirm both AA cores, materials, extruder assignments and layer support in Cura.</p><button id="smsCura">Download Cura settings</button><button id="smsPrepareAll">Prepare queued jobs</button><button id="smsPrintBackup">Save project and jobs</button><p id="smsPrintStatus" role="status"></p>';
+  const model=active();
+  quickPrintThumbnail=model?.thumbnail||(model?.generator.typeId==='crystals'?thumbnail(adapter.previewGroup()):null);
+  panel.innerHTML='<h2>Print Centre</h2><p class="sms-descriptor">Project printer defaults for jobs without overrides.</p><label>Printer<select id="smsPrinter"><option>Ultimaker 3 Extended</option><option>Ultimaker 2+</option><option>Custom / other</option></select></label><label>Nozzle / AA core<select id="smsNozzle">'+[.25,.4,.6,.8].map(n=>'<option>'+n+'</option>').join('')+'</select></label><label>Material<select id="smsMaterial"><option>PLA</option><option>PETG</option></select></label><label>Quality<input id="smsQuality" type="number" min="0" max="100" value="'+project.printer.curaQuality+'"></label><p class="sms-descriptor">Dual material uses the UM3. Confirm both AA cores, materials, extruder assignments and layer support in Cura.</p><button id="smsCura">Download Cura settings</button><button id="smsPrepareAll">Prepare queued jobs</button><button id="smsPrintBackup">Save project and jobs</button><p id="smsPrintStatus" role="status"></p>';
   $('smsPrinter').value=project.printer.printer;$('smsNozzle').value=project.printer.curaNozzle;$('smsMaterial').value=project.printer.curaMaterial;
-  for(const [id,key]of[['smsPrinter','printer'],['smsNozzle','curaNozzle'],['smsMaterial','curaMaterial'],['smsQuality','curaQuality']])$(id).onchange=e=>{project.printer[key]=['curaNozzle','curaQuality'].includes(key)?Number(e.target.value):e.target.value;for(const job of project.printJobs){if(workers.has(job.id)){workers.get(job.id).terminate();workers.delete(job.id);}job.status='stale';job.requestId=null;prepared.delete(job.id);}save();renderJobs();};
+  for(const [id,key] of [['smsPrinter','printer'],['smsNozzle','curaNozzle'],['smsMaterial','curaMaterial'],['smsQuality','curaQuality']]){
+   $(id).onchange=e=>{
+    const input=e.target,old=project.printer[key];
+    if(!input.value||!input.checkValidity()){input.reportValidity();input.value=old;return;}
+    const before=project.printJobs.map(job=>effectivePrinter(job));
+    project.printer[key]=printSettingValue(key,input.value);
+    project.printJobs.forEach((job,index)=>invalidateIfChanged(job,before[index]));
+    save();renderJobs();
+   };
+  }
   $('smsCura').onclick=()=>{try{const p=createCuraProfile(curaOptions(project.printer));adapter.download(new Blob([p.bytes]),p.filename);}catch(error){$('smsPrintStatus').textContent=error.message;}};
-  $('smsPrepareAll').onclick=()=>{for(const job of project.printJobs.filter(j=>j.status!=='prepared'&&j.status!=='preparing'))prepare(job.id);};$('smsPrintBackup').onclick=backup;
+  $('smsPrepareAll').onclick=()=>{for(const job of project.printJobs.filter(j=>!currentPrintResult(j)&&j.status!=='preparing'))prepare(job.id);};$('smsPrintBackup').onclick=backup;
   renderTabs();renderJobs();
  }
  function curaOptions(p){return {machine:p.printer,nozzle:p.curaNozzle,material:p.curaMaterial,quality:p.curaQuality,intent:p.curaIntent||'balanced',qualityType:'auto'};}
+ const printSettings=[
+  ['printer','Printer',['Ultimaker 3 Extended','Ultimaker 2+','Custom / other']],
+  ['curaNozzle','Nozzle (mm)',[.25,.4,.6,.8]],
+  ['curaMaterial','Material',['PLA','PETG']],
+  ['curaQuality','Quality (0–100)',null]
+ ];
+ function effectivePrinter(job){return resolveJobPrinter(project,findModel(project,job.modelId),job);}
+ function printSettingValue(key,value){return ['curaNozzle','curaQuality'].includes(key)?Number(value):value;}
+ function discardPrintResult(id){
+  const worker=workers.get(id);workers.delete(id);worker?.terminate();prepared.delete(id);
+ }
+ function invalidateIfChanged(job,before){
+  const after=effectivePrinter(job);
+  if(Object.keys({...before,...after}).some(key=>before[key]!==after[key])){
+   if(job.status!=='queued')invalidatePrintJob(job);
+   delete job.progress;discardPrintResult(job.id);
+  }
+ }
+ function currentPrintResult(job){
+  return canExport(project,job.id)?prepared.get(job.id):undefined;
+ }
+ function printExportBlock(job,result,settings){
+  if(!result){
+   if(job.status==='preparing')return 'Preparation is in progress.';
+   if(job.status==='failed')return 'Retry preparation before downloading.';
+   if(job.status==='cancelled')return 'Preparation was cancelled. Retry to enable downloads.';
+   if(job.status==='stale')return 'The previous preparation is stale. Prepare the current revision.';
+   return 'Prepare this job to enable downloads.';
+  }
+  if(result.bodies.length>1&&settings.printer!=='Ultimaker 3 Extended')
+   return 'Choose Ultimaker 3 Extended for two materials, or switch the model to one material and prepare again.';
+  return '';
+ }
+ function printEnvelope(result,settings){
+  if(!result)return '';
+  let size=printSizes.get(result);
+  if(!size){
+   const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
+  for(const {mesh} of result.bodies){
+   const points=mesh.vertProperties||mesh.points,stride=mesh.numProp||3;
+   for(let i=0;i<points.length;i+=stride)for(let axis=0;axis<3;axis++){
+    min[axis]=Math.min(min[axis],points[i+axis]);max[axis]=Math.max(max[axis],points[i+axis]);
+   }
+  }
+   size=[0,2,1].map(axis=>max[axis]-min[axis]);printSizes.set(result,size);
+  }
+  const bed=settings.printer==='Ultimaker 2+'?[223,223,205]:settings.printer==='Ultimaker 3 Extended'?[215,215,300]:null;
+  const warning=bed&&size.some((n,i)=>n>bed[i])?' — Warning: exceeds printer envelope. Check scale and orientation in Cura.':'';
+  return size.map(n=>n.toFixed(1)).join(' × ')+' mm'+warning;
+ }
  function renderJobs(){
-  if(mode!=='print')return;overlay.innerHTML=(shell?'<h1>Quick Print</h1><div id="smsPrintCurrent" class="sms-tile"></div><div class="sms-actions"><button id="smsExpandPrint">'+(printExpanded?'Show current model only':'Add more models')+'</button></div><div id="smsPrintModels" class="sms-actions"></div>':'<h1>Print jobs</h1><p>Each job belongs to one model and revision. Editing a model makes its old job stale.</p>')+'<div id="smsJobs" class="sms-grid"></div>';
+  if(mode!=='print')return;
+  const focused=document.activeElement,focusJob=focused?.closest('[data-print-job]')?.dataset.printJob;
+  const focusControl=focused?.getAttributeNames().find(name=>name.startsWith('data-job-'));
+  overlay.innerHTML=(shell?'<h1>Quick Print</h1><div id="smsPrintCurrent" class="sms-tile"></div><div class="sms-actions"><button id="smsExpandPrint" aria-expanded="'+printExpanded+'">'+(printExpanded?'Show current model only':'Add more models')+'</button></div>':'<h1>Print jobs</h1>')+'<div id="smsPrintModels" class="sms-actions"></div><div id="smsJobs" class="sms-grid"></div>';
   if(shell){
    const model=active(),card=$('smsPrintCurrent');
    if(model){
-    const name=document.createElement('strong');name.textContent=model.name;card.append(modelPicture(model.thumbnail||(model.generator.typeId==='crystals'?thumbnail(adapter.previewGroup()):null)),name);
+    const name=document.createElement('strong');name.textContent=model.name;
+    card.append(modelPicture(quickPrintThumbnail),name);
     if(!project.printJobs.some(job=>job.modelId===model.id)){
-     const start=document.createElement('button');start.textContent='Prepare current model';start.onclick=()=>{const job=queueModel(project,model.id);prepare(job.id);};card.append(start);
+     const start=document.createElement('button');start.textContent='Prepare current model';
+     start.onclick=()=>prepare(enqueue(model.id).id);card.append(start);
     }
    }
-   $('smsExpandPrint').onclick=()=>{printExpanded=!printExpanded;renderJobs();};
+   $('smsExpandPrint').onclick=()=>{printExpanded=!printExpanded;renderJobs();$('smsExpandPrint').focus();};
    $('smsPrepareAll').hidden=!printExpanded;
-   if(printExpanded)for(const item of project.models.filter(item=>!project.printJobs.some(job=>job.modelId===item.id))){
-    const button=document.createElement('button');button.textContent='Add '+item.name;button.onclick=()=>{queueModel(project,item.id);save();renderJobs();};$('smsPrintModels').append(button);
-   }
   }
-  for(const job of project.printJobs){if(shell&&!printExpanded&&job.modelId!==currentId)continue;const model=findModel(project,job.modelId),tile=document.createElement('article');tile.className='sms-tile';const can=canExport(project,job.id)&&prepared.has(job.id);
-   let dims='';const result=prepared.get(job.id);if(result){const all=result.bodies.flatMap(b=>Array.from(b.mesh.vertProperties||b.mesh.points));const stride=result.bodies[0].mesh.numProp||3;const size=[0,1,2].map(axis=>{let min=Infinity,max=-Infinity;for(let i=axis;i<all.length;i+=stride){min=Math.min(min,all[i]);max=Math.max(max,all[i]);}return max-min;});dims=size.map(n=>n.toFixed(1)).join(' × ')+' mm';const bed=project.printer.printer==='Ultimaker 2+'?[223,223,205]:[215,215,300];if(size.some((n,i)=>n>bed[[0,2,1][i]]))dims+=' — exceeds printer envelope';}
-   tile.innerHTML='<h3>'+esc(model.name)+'</h3><p>'+esc(job.status)+' · source revision '+job.revision+'</p><p class="sms-descriptor">'+esc(dims)+'</p><div class="sms-actions"><button data-job-prepare>'+ (job.status==='preparing'?'Preparing…':'Prepare')+'</button><button data-job-cancel>Cancel</button><button data-job-export '+(!can?'disabled':'')+'>Download production ZIP</button><button data-job-3mf '+(!can?'disabled':'')+'>Download 3MF</button><button data-job-remove>Remove</button></div><p class="sms-descriptor">'+esc(job.error||job.progress||'Exports are locked until this revision is prepared.')+'</p>';
-   tile.querySelector('[data-job-prepare]').disabled=job.status==='preparing';tile.querySelector('[data-job-prepare]').onclick=()=>prepare(job.id);
-   tile.querySelector('[data-job-cancel]').onclick=()=>{workers.get(job.id)?.terminate();workers.delete(job.id);cancelPreparation(project,job.id);prepared.delete(job.id);save();renderJobs();};
-   tile.querySelector('[data-job-remove]').onclick=()=>{workers.get(job.id)?.terminate();workers.delete(job.id);prepared.delete(job.id);project.printJobs=project.printJobs.filter(j=>j.id!==job.id);save();renderJobs();};
-   tile.querySelector('[data-job-export]').onclick=()=>exportJob(job.id,false);tile.querySelector('[data-job-3mf]').onclick=()=>exportJob(job.id,true);$('smsJobs').append(tile);
+  if(!shell||printExpanded)for(const model of project.models.filter(item=>!project.printJobs.some(job=>job.modelId===item.id))){
+   const button=document.createElement('button');button.textContent='Add '+model.name;
+   button.onclick=()=>{enqueue(model.id);save();renderJobs();};$('smsPrintModels').append(button);
+  }
+  for(const [index,job] of project.printJobs.entries()){
+   if(shell&&!printExpanded&&job.modelId!==currentId)continue;
+   const model=findModel(project,job.modelId),tile=document.createElement('article');
+   tile.className='sms-tile';tile.dataset.printJob=job.id;
+   const result=currentPrintResult(job),settings=effectivePrinter(job),block=printExportBlock(job,result,settings);
+   const preparing=job.status==='preparing';
+   const state=job.status[0].toUpperCase()+job.status.slice(1);
+   const family=registry.get(model.generator.typeId)?.displayName||model.generator.typeId;
+   const advisory=settings.printer==='Custom / other'?'Custom printer: enter settings manually in Cura.':
+    settings.printer==='Ultimaker 3 Extended'&&settings.curaNozzle===.6?'UM3 has no standard AA 0.6 mm core. Select a supported core for a Cura profile.':'';
+   tile.innerHTML='<h3>'+esc(model.name)+'</h3><p>'+esc(family)+' · source revision '+model.revision+
+    (result?' · prepared revision '+job.preparedRevision:'')+'</p><p><strong>'+state+'</strong></p>'+
+    '<p role="status" data-job-progress>'+esc(job.error||(preparing?job.progress:'')||'')+'</p>'+
+    '<p class="sms-descriptor">'+esc(printEnvelope(result,settings))+'</p><p>'+esc(block||'Downloads available.')+'</p>'+
+    (advisory?'<p>'+esc(advisory)+'</p>':'')+
+    '<fieldset><legend>Job printer settings</legend><p class="sms-descriptor">Job overrides take precedence over model settings and project defaults.</p>'+
+    printSettings.map(([key,label,options])=>{
+     const own=Object.hasOwn(job.overrides||{},key),modelOwn=Object.hasOwn(model.printerOverrides||{},key);
+     const input=options?'<select data-job-setting="'+key+'">'+[...new Set([...options,settings[key]])].map(v=>'<option>'+esc(v)+'</option>').join('')+'</select>':
+      '<input data-job-setting="'+key+'" type="number" min="0" max="100" required>';
+     return '<label>'+label+' · '+(own?'job override':modelOwn?'model setting':'project default')+input+'</label>';
+    }).join('')+'<button data-job-reset>Use project defaults</button></fieldset>'+
+    '<div class="sms-actions"><button data-job-up>Move up</button><button data-job-down>Move down</button>'+
+    '<button data-job-prepare>'+(preparing?'Preparing…':['failed','cancelled'].includes(job.status)?'Retry':'Prepare')+'</button>'+
+    '<button data-job-cancel>Cancel</button><button data-job-export>Download production ZIP</button><button data-job-3mf>Download 3MF</button><button data-job-remove>Remove</button></div>';
+   tile.prepend(modelPicture(model.thumbnail||(model.id===currentId?quickPrintThumbnail:null)));
+   const action=(name,disabled,run)=>{
+    const button=tile.querySelector('[data-job-'+name+']');button.disabled=disabled;button.onclick=run;
+   };
+   for(const input of tile.querySelectorAll('[data-job-setting]')){
+    const key=input.dataset.jobSetting;input.value=settings[key];
+    input.onchange=()=>{
+     if(!input.value||!input.checkValidity()){input.reportValidity();input.value=settings[key];return;}
+     job.overrides={...job.overrides,[key]:printSettingValue(key,input.value)};
+     invalidateIfChanged(job,settings);save();renderJobs();
+    };
+   }
+   action('reset',!Object.keys(job.overrides||{}).length,()=>{
+    job.overrides={};invalidateIfChanged(job,settings);save();renderJobs();
+   });
+   for(const [name,offset] of [['up',-1],['down',1]])
+    action(name,index+offset<0||index+offset>=project.printJobs.length,()=>{if(movePrintJob(project,job.id,offset)){save();renderJobs();}});
+   action('prepare',preparing,()=>prepare(job.id));
+   action('cancel',!preparing,()=>{
+    cancelPreparation(project,job.id);delete job.progress;discardPrintResult(job.id);save();renderJobs();
+   });
+   action('remove',false,()=>{
+    cancelPreparation(project,job.id);discardPrintResult(job.id);
+    project.printJobs=project.printJobs.filter(item=>item.id!==job.id);save();renderJobs();
+   });
+   action('export',!!block,()=>exportJob(job.id,false));
+   action('3mf',!!block,()=>exportJob(job.id,true));
+   $('smsJobs').append(tile);
+   if(focusJob===job.id&&focusControl){
+    const control=focusControl==='data-job-setting'?tile.querySelector('[data-job-setting="'+focused.dataset.jobSetting+'"]'):tile.querySelector('['+focusControl+']');
+    control?.focus({preventScroll:true});
+   }
   }
  }
  function prepare(id){
-  if(workers.has(id))return;const ticket=beginPreparation(project,id);prepared.delete(id);const worker=new Worker(new URL('./studio-model-worker.js',import.meta.url),{type:'module'});workers.set(id,worker);
-  const finish=()=>{worker.terminate();workers.delete(id);save();renderJobs();renderTabs();};
-  worker.onmessage=({data})=>{const job=project.printJobs.find(j=>j.id===id);if(!job||job.requestId!==ticket.requestId){if(workers.get(id)===worker){worker.terminate();workers.delete(id);renderTabs();}return;}
-   if(data.type==='progress'){job.progress=data.stage;renderJobs();return;}
-   if(finishPreparation(project,ticket,{error:data.type==='error'?data.message:null})){if(data.type==='complete')prepared.set(id,data.prepared);}finish();
-  };
-  worker.onerror=e=>{finishPreparation(project,ticket,{error:e.message||'Worker failed.'});finish();};worker.postMessage({ticket});save();renderJobs();renderTabs();
+  const job=project.printJobs.find(item=>item.id===id);
+  if(!job||job.status==='preparing'||workers.has(id))return;
+  const ticket=beginPreparation(project,id);
+  delete job.progress;prepared.delete(id);
+  const redraw=()=>{save();renderJobs();renderTabs();};
+  let worker;
+  try{
+   worker=new Worker(new URL('./studio-model-worker.js',import.meta.url),{type:'module'});
+   workers.set(id,worker);
+   const current=()=>workers.get(id)===worker&&job.requestId===ticket.requestId;
+   const finish=(error,result)=>{
+    if(!current())return;
+    if(finishPreparation(project,ticket,{error})&&result)prepared.set(id,result);
+    workers.delete(id);worker.terminate();delete job.progress;redraw();
+   };
+   worker.onmessage=({data})=>{
+    if(!current()||data.ticket?.requestId!==ticket.requestId)return;
+    if(data.type==='progress'){
+     job.progress=data.stage;
+     if(mode==='print'){
+      const tile=[...$('smsJobs').children].find(card=>card.dataset.printJob===id);
+      if(tile)tile.querySelector('[data-job-progress]').textContent=data.stage;
+     }
+    }else if(data.type==='complete'&&data.prepared?.bodies?.length)finish(null,data.prepared);
+    else finish(data.message||'The worker did not return a prepared mesh.');
+   };
+   worker.onerror=event=>{event.preventDefault();finish(event.message||'Preparation worker failed.');};
+   worker.onmessageerror=()=>finish('The preparation worker returned an unreadable result.');
+   worker.postMessage({ticket});
+  }catch(error){
+   finishPreparation(project,ticket,{error:error.message});discardPrintResult(id);
+  }
+  redraw();
  }
  function exportJob(id,only3MF){
-  try{if(!canExport(project,id)||!prepared.has(id))throw Error('Prepare the current model revision first.');
-   const job=project.printJobs.find(j=>j.id===id),model=findModel(project,job.modelId),result=prepared.get(id);
-   if(result.bodies.length>1&&project.printer.printer!=='Ultimaker 3 Extended')throw Error('Choose the UM3 Extended for two materials, or turn off dual material and prepare again.');
+  try{
+   const job=project.printJobs.find(j=>j.id===id);
+   if(!job)throw Error('This print job was removed.');
+   const model=findModel(project,job.modelId),result=currentPrintResult(job),settings=effectivePrinter(job);
+   const block=printExportBlock(job,result,settings);if(block)throw Error(block);
    const exported=exportMaterialBodies(result,{name:model.name});
    if(only3MF){adapter.download(new Blob([exported.threeMF],{type:'model/3mf'}),exported.filename);return;}
    const entries=exported.stls.map(s=>[s.name,s.bytes]);entries.push([exported.filename,exported.threeMF],['editable-model.json',JSON.stringify(model,null,2)],['material-roles.json',JSON.stringify(exported.assignments,null,2)],['print-report.json',JSON.stringify(result.report,null,2)]);
-   try{const profile=createCuraProfile(curaOptions({...project.printer,...model.printerOverrides,...job.overrides}));entries.push([profile.filename,profile.bytes],['cura-manual-settings.txt',profile.fallbackText]);}catch(error){entries.push(['cura-manual-review.txt',error.message]);}
+   try{const profile=createCuraProfile(curaOptions(settings));entries.push([profile.filename,profile.bytes],['cura-manual-settings.txt',profile.fallbackText]);}catch(error){entries.push(['cura-manual-review.txt',error.message+'\nJob settings: '+JSON.stringify(curaOptions(settings),null,2)]);}
    entries.push(['READ-ME.txt',exported.warnings.join('\n')+'\nThe STL files share one origin. Import them together as parts, not independently auto-arranged objects.']);
    adapter.download(new Blob([zipProfileEntries(entries)],{type:'application/zip'}),'sensory-model-production.zip');
   }catch(error){adapter.status(error.message);if($('smsPrintStatus'))$('smsPrintStatus').textContent=error.message;}

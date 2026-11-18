@@ -116,3 +116,8 @@ body.sms-unified .layout{grid-template-columns:var(--sms-rail-width) minmax(0,1f
  .sms-unified .sms-settings{grid-row:3}
  .sms-unified .layout[data-rail=icons] .sms-rail button{min-width:46px;width:46px}
 }
+
+#smsJobs{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));margin-top:14px}
+#smsJobs fieldset{min-width:0;border:1px solid var(--border);border-radius:8px;padding:8px;display:grid;gap:6px}
+#smsJobs fieldset label{display:grid;gap:3px;font-size:13px}
+#smsJobs fieldset :is(input,select){width:100%;min-width:0;color:var(--ink);background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:5px}
