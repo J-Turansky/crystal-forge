@@ -197,7 +197,9 @@ function panelControlRecipe(p){
    :cylinder(socket/2,p.socketDepth+.2,[0,(p.socketDepth-.2)/2,0]));
  }
  const band=Math.min(2,h*.16);
- return {positive,negative,secondary,materialBand:secondary.length?undefined:box([width+2,band,depth+2]),
+ return {positive,negative,secondary,
+  materialSplitHeight:shape==='Indicator lens'?band:undefined,
+  materialBand:secondary.length||shape==='Indicator lens'?undefined:box([width+2,band,depth+2]),
   bounds:{width,depth,height:top},warnings:['Printed control shell. Measure the actual hardware and check fit and movement with a physical sample.']};
 }
 

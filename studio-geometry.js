@@ -100,7 +100,12 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
   }
   if(total.status()!=='NoError'||total.isEmpty()||total.volume()<=0)throw Error('Manufacturing produced no valid material.');
   let regions=[{role:'primary',solid:total}];
-  if(recipe.dualMaterial&&(recipe.materialBand||recipe.secondary?.length)){
+  if(recipe.dualMaterial&&recipe.materialSplitHeight!==undefined){
+   // Split the existing solid once so both bodies use the same interface.
+   // Subtracting its Boolean intersection with a band can leave coincident shells.
+   const [above,below]=total.splitByPlane([0,1,0],recipe.materialSplitHeight);
+   regions=[{role:'primary',solid:hold(above)},{role:'secondary',solid:hold(below)}];
+  }else if(recipe.dualMaterial&&(recipe.materialBand||recipe.secondary?.length)){
    let secondary=recipe.materialBand?convert(recipe.materialBand):union(recipe.secondary);
    if(recipe.partitioned){
     for(const part of recipe.negative||[])secondary=hold(secondary.subtract(convert(part)));

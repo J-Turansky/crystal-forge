@@ -5,11 +5,17 @@
 1. Stabilise fabrication and require release metadata before Pages deployment.
 2. Build the reversible three-column interface shell with a pinned 3D preview and light-mode design system.
 3. Add visual Design tools, contextual settings, direct manipulation and help.
-4. Extend shared Build with real pixel fitting and serial routing.
+4. Extend shared Build with real pixel fitting and serial routing, then add SVG extrusion followed by validated STL/OBJ import.
 5. Expand the combined Library and multi-model projects.
-6. Build the visual Print Tray and validate production exports.
+6. Make Quick Print start with the current model, with optional multi-model jobs, and validate production exports.
 
 Each milestone requires explicit acceptance criteria, regression coverage and a demonstration with real Crystal and Control Cap models. The existing editor remains the baseline until migration and functional parity are verified.
+
+## Imported models — planned after the shell
+
+- **SVG extrusion first.** Preview closed local contours and internal holes, set millimetre dimensions and extrusion depth, lock aspect ratio by default, and support orientation and applicable edge smoothing. Fixtures must preserve holes, flag unsupported open paths, strokes, text or filters, and round-trip through Library, shared Build cuts and validated export.
+- **STL/OBJ next.** Confirm units and dimensions, preview and persist the source, and apply saved scale, rotation and position. Fixtures must verify transform round-trip, reject malformed geometry, and limit Boolean edits and manufacturing to validated closed solids. Keep unsupported meshes viewable with a clear explanation where safe.
+- Reuse the same Design/Build/Print workflow and manufacturing validation. Expose import actions only as each workflow passes its acceptance checks.
 
 ## Sensory Model Studio v0.16.0 — active draft work
 

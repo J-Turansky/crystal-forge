@@ -2,7 +2,7 @@
 
 ## Current baseline and stability draft
 
-PR #27 was merged at `15808aa18518e85a33f22124824551a3c1bd7102`. Its final head passed static and browser checks and failed fabrication during STL encoding after the fader case. The current stability branch keeps the editor and storage schemas in place. It introduces a single-shell joystick recipe, a focused export fixture and a production version gate. Recheck all suites on the exact review head. The notes below describe historical checkpoints.
+PR #27 was merged at `15808aa18518e85a33f22124824551a3c1bd7102`. Its final head passed static and browser checks and failed fabrication during STL encoding after the fader case. The current stability branch keeps the editor and storage schemas in place. It introduces a single-shell joystick recipe, a focused export fixture and a production version gate. The joystick passed on the first draft head. Its next failure was a disconnected primary body in the dual-material indicator lens. The follow-up splits the lens on a single plane and adds a volume-conservation and export fixture. Check all suites on the exact review head before opening the interface PR. The roadmap now schedules SVG extrusion ahead of STL/OBJ. The notes below describe historical checkpoints.
 
 ## PR16 production-readiness checkpoint
 

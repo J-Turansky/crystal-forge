@@ -13,6 +13,14 @@ for(const dualMaterial of [false,true]){
  assert.equal(exported.stls.length,dualMaterial?2:1);
  assert(exported.threeMF.length>100);
 }
+const indicator=capGenerator.presets.find(preset=>preset.id==='indicator');
+const lens=prepareRecipe(THREE,wasm,capGenerator.recipe({...indicator.parameters,dualMaterial:false}));
+const splitLens=prepareRecipe(THREE,wasm,capGenerator.recipe({...indicator.parameters,dualMaterial:true}));
+assert.deepEqual(splitLens.bodies.map(body=>body.role),['primary','secondary']);
+assert(Math.abs(splitLens.bodies.reduce((volume,body)=>volume+body.volume,0)-lens.bodies[0].volume)<1e-4,
+ 'The indicator material split must preserve the lens volume.');
+assert.equal(exportMaterialBodies(splitLens,{name:'indicator-lens-regression'}).stls.length,2);
+console.log('Indicator lens regression: connected material bodies, conserved volume and STL export passed.');
 for(const generator of generators){
  assert(generator.presets.length>=3,generator.displayName+' requires three meaningful presets.');
  for(const preset of generator.presets){
