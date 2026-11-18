@@ -149,7 +149,7 @@ export const gearGenerator=define('gears','Cogs & Gears','Mechanical',[
    positive.push(extrusion(outer,height,[0,y,0],[inner]));
   }
  }
- if((creativeWeb||relief)&&!inlay)return {positive,secondary:[],negative:[],materialSplitHeight:p.thickness-.8,bounds:{width:diameter,depth:diameter,height:p.thickness+(relief?p.reliefHeight:0)},warnings:['Decorative wheel. Check wheel clearances before using moving parts.']};
+ if((creativeWeb||relief)&&!inlay)return {positive,secondary:[],negative:[],materialSplitHeight:p.thickness-.8,materialSplitRole:'top',bounds:{width:diameter,depth:diameter,height:p.thickness+(relief?p.reliefHeight:0)},warnings:['Decorative wheel. Check wheel clearances before using moving parts.']};
  const secondary=[extrusion(inlay?circle(hubRadius):outline,.8,[0,p.thickness-.8,0],inlay?(p.bore?[circle(p.bore/2)]:[circle(hubRadius*.55)]):holes)];
  return {positive,secondary,negative:[],bounds:{width:diameter,depth:diameter,height:p.thickness+(relief?p.reliefHeight:0)},warnings:['Pinch points and moving parts require guarding and physical checks. Mechanical meshing still requires a mating-gear test.']};
 },{supportsMechanisms:true});

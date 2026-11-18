@@ -2,7 +2,13 @@
 
 ## WT-002 · Stage C0 draft
 
-The unified shell now moves existing app controls into one header and places workspace navigation below it. Panel visibility and widths use the device-local wt-workspace-panels-v1 key. Panels stay mounted during hide/show, preserving scroll, settings, renderer and project state. The classic layout remains available. Browser CI exercises the rail, panel restores, and existing model/Build routes. Verify the exact-head runs before approval. Six-family geometry remains pending the C0 gate.
+The unified shell now moves existing app controls into one header and places workspace navigation below it. Panel visibility and widths use the device-local wt-workspace-panels-v1 key. Panels stay mounted during hide/show, preserving scroll, settings, renderer and project state. The classic layout remains available. Browser CI exercises the rail, panel restores, and existing model/Build routes. Verify the exact-head runs before approval. Six-family geometry remains pending the C0 and independent-review gates.
+
+### Independent review follow-up
+
+- P1-1: precision controls refresh the contextual palette from accepted state and reset rejected edits in place. The turbine regression exercises the 110 mm exact value and the rejected 11-tooth Mechanical edit.
+- P1-2: automatic placement on contour-extruded models checks solid outlines, internal windows, edge clearance and earlier bores. Other recipe types retain the existing fallback and strict prepared-mesh check. The turbine fixture verifies material removal at 100 and 110 mm.
+- P1-3: Face means the contrasting upper region for creative gears. Clipped preview meshes and Manifold use the same split height; two gear styles and thicknesses check region position and export. Installed slicer and physical verification remain pending.
 
 ## Stage B creative editor
 

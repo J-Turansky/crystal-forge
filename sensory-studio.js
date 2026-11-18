@@ -13,6 +13,7 @@ const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const $=id=>document.getElementById(id);
 export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstrap,adapter}){
  const state=bootstrap,project=state.project;
+ renderer.localClippingEnabled=true;
  const unified=new URLSearchParams(location.search).get('layout')!=='legacy';
  let printExpanded=false;
  state.savedProjects??=[];project.printer={printer:'Ultimaker 3 Extended',curaNozzle:.4,curaMaterial:'PLA',curaQuality:60,curaIntent:'balanced',...project.printer};
@@ -250,7 +251,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  let thumbRenderer=null;
  function thumbnail(group){
   try{
-   thumbRenderer??=new THREE.WebGLRenderer({antialias:true,alpha:false});thumbRenderer.setSize(200,150);thumbRenderer.setPixelRatio(1);
+   thumbRenderer??=new THREE.WebGLRenderer({antialias:true,alpha:false});thumbRenderer.localClippingEnabled=true;thumbRenderer.setSize(200,150);thumbRenderer.setPixelRatio(1);
    const thumbScene=new THREE.Scene();thumbScene.background=new THREE.Color(0xeaf0f7);thumbScene.add(new THREE.AmbientLight(0xffffff,2));
    const light=new THREE.DirectionalLight(0xffffff,3);light.position.set(80,140,100);thumbScene.add(light);
    const clone=group.clone(true);thumbScene.add(clone);const box=new THREE.Box3().setFromObject(clone);if(box.isEmpty())return null;
@@ -560,7 +561,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     renderEditor();
     return;
    }
-   const output=panel.querySelector('[data-value-for="'+schema.key+'"]');if(output)output.textContent=value+' '+(schema.unit||'');commit({parameters:{...model.parameters,[schema.key]:value}});
+   const accepted=commit({parameters:{...model.parameters,[schema.key]:value}});
+   const current=model.parameters[schema.key]??schema.default;
+   if(input.type==='checkbox')input.checked=!!current;else input.value=current;
+   const output=panel.querySelector('[data-value-for="'+schema.key+'"]');
+   if(output)output.textContent=current+' '+(schema.unit||'');
+   if(accepted)renderPalette();
   });
   const coupon=$('smsPixelCoupon');
   if(coupon)coupon.onclick=async()=>{
@@ -574,7 +580,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const pixelSection=$('smsPixelAdd')?.closest('details');
   if(pixelSection)bindPixelBuilder(panel,{
    holes:Array.isArray(model.build.pixelHoles)?model.build.pixelHoles:[],
-   getBounds:()=>applyBuildModules(g.recipe(model.parameters),{...model.build,pixelHoles:[]},g.capabilities).bounds,
+   getRecipe:()=>applyBuildModules(g.recipe(model.parameters),{...model.build,pixelHoles:[]},g.capabilities),
    onChange:pixelHoles=>commit({build:{...model.build,pixelHoles}}),
    onError:message=>{$('smsModelError').textContent=message;},
    reopen:()=>{renderEditor();$('smsPixelAdd').closest('details').open=true;}
