@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {createProject,createModel,addModel,findModel,openTab,closeTab,reorderTabs,
- duplicateModel,editModel,queueModel,beginPreparation,finishPreparation,cancelPreparation,canExport,
+ duplicateModel,editModel,queueModel,resolveJobPrinter,movePrintJob,invalidatePrintJob,beginPreparation,finishPreparation,cancelPreparation,canExport,
  saveLibraryRevision,insertLibraryModel,availableLinkedUpdate,acceptLinkedUpdate,breakLink,
  exportProject,importProject,WORKSPACE_KEY,BACKUP_KEY,LEGACY_KEYS} from '../studio-documents.js';
 import {migrateLegacySnapshot,migrateLegacyStorage} from '../studio-migration.js';
@@ -34,6 +34,15 @@ job.overrides={material:'PETG'};
 ticket=beginPreparation(p,job.id,'request-5');
 assert.deepEqual(ticket.printer,{machine:'UM3',nozzle:.8,material:'PETG'});
 assert.equal(p.printer.nozzle,.4);
+assert.deepEqual(ticket.printer,resolveJobPrinter(p,findModel(p,'a'),job));
+const secondJob=queueModel(p,'b',{jobId:'second-job'});
+assert.equal(movePrintJob(p,job.id,-1),false);
+assert.equal(movePrintJob(p,secondJob.id,-1),true);
+assert.deepEqual(importProject(exportProject(p)).printJobs.map(item=>item.id),[secondJob.id,job.id]);
+assert.equal(p.printJobs[1],job);
+invalidatePrintJob(job);
+assert.equal(finishPreparation(p,ticket),false);
+assert.equal(secondJob.status,'queued');
 const library=[];
 saveLibraryRevision(library,findModel(p,'a'));
 assert.throws(()=>saveLibraryRevision(library,findModel(p,'a')));

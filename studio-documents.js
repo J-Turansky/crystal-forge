@@ -148,6 +148,17 @@ const findJob = (project, id) => {
  requireValue(job, 'Print job not found.');
  return job;
 };
+export const resolveJobPrinter = (project, model, job) => ({...project.printer, ...model.printerOverrides, ...job.overrides});
+export function movePrintJob(project, id, offset) {
+ const job = findJob(project, id), index = project.printJobs.indexOf(job), target = index + offset;
+ if (![-1, 1].includes(offset) || target < 0 || target >= project.printJobs.length) return false;
+ project.printJobs.splice(index, 1);
+ project.printJobs.splice(target, 0, job);
+ return true;
+}
+export function invalidatePrintJob(job) {
+ job.status = 'stale'; job.requestId = null; job.preparedRevision = null; job.error = null;
+}
 export function beginPreparation(project, jobId, requestId = newId()) {
  const job = findJob(project, jobId), model = findModel(project, job.modelId);
  requireValue(text(requestId), 'Preparation request ID required.');
@@ -155,7 +166,7 @@ export function beginPreparation(project, jobId, requestId = newId()) {
  job.preparedRevision = null; job.error = null;
  // Job overrides are snapshotted; changes to shared defaults never edit model geometry.
  return copy({jobId, modelId: model.id, revision: model.revision, requestId,
-  model, printer: {...project.printer, ...model.printerOverrides, ...job.overrides}});
+  model, printer: resolveJobPrinter(project, model, job)});
 }
 export function finishPreparation(project, ticket, {error = null} = {}) {
  const job = project.printJobs.find(item => item.id === ticket.jobId);
