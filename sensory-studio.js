@@ -21,7 +21,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  let currentId=null,mode='model',stage='design',switching=false,saveTimer=null,dirty=false,search='',filter='all',studioVault=null,vaultClient=null,previewBuilds=0;
  const link=document.createElement('link');link.rel='stylesheet';link.href='./sensory-studio.css';document.head.append(link);
  const bar=document.createElement('nav');bar.className='studio-modelbar';bar.setAttribute('aria-label','Project and model workspaces');
- bar.innerHTML='<input id="smsProjectTitle" class="sms-project-input project-title" aria-label="Project name"><button id="smsLibrary">Library</button><div id="smsTabs" class="studio-modeltabs" role="tablist" aria-label="Open models"></div><button id="smsNew" aria-label="Add a model">＋ New model</button><button id="smsPrint">Print Centre</button><span id="smsSaveState" role="status"></span>';
+ bar.innerHTML='<input id="smsProjectTitle" class="sms-project-input project-title" aria-label="Project name"><button id="smsLibrary">Library</button><div id="smsTabs" class="studio-modeltabs" role="tablist" aria-label="Open models"></div><button id="smsNew" aria-label="Add a model">＋ New model</button><button id="smsPrint">Print Centre</button><button id="smsReload" title="Save your project and load the latest published Studio">↻ Reload Studio</button><span id="smsSaveState" role="status"></span>';
  document.querySelector('.topbar').before(bar);
  const panel=document.createElement('div');panel.id='smsEditor';panel.className='sms-controls';panel.hidden=true;document.querySelector('.left').prepend(panel);
  const overlay=document.createElement('div');overlay.className='sms-overlay';overlay.hidden=true;overlay.id='smsOverlay';document.querySelector('.viewarea').style.position='relative';document.querySelector('.viewarea').append(overlay);
@@ -35,6 +35,20 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  if(!project.tabs.length)openTab(project,project.models[0].id);
  $('smsProjectTitle').value=project.title;
  $('smsProjectTitle').onchange=()=>{project.title=$('smsProjectTitle').value.trim()||'Untitled project';save();};
+ $('smsReload').onclick=()=>{
+  try{
+   saveImmediately();
+  }catch(error){
+   $('smsSaveState').textContent='Reload paused — download a backup';
+   adapter.status('Your work is still open. '+error.message);
+   return;
+  }
+  const url=new URL(window.location.href);
+  url.searchParams.set('reload',String(Date.now()));
+  window.location.replace(url.href);
+ };
+ const release=document.querySelector('meta[name="studio-release"]')?.content;
+ if(release)$('smsReload').title+=' · Build '+release.slice(0,7);
  $('smsLibrary').onclick=()=>showLibrary();$('smsPrint').onclick=()=>showPrint();$('smsNew').onclick=()=>picker.showModal();
  const editors=installExactValueEditors();
  function active(){return currentId?findModel(project,currentId):null;}

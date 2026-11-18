@@ -122,9 +122,9 @@ export const pebbleGenerator=define('light-pods','Glowing Pebbles & Light Pods',
  const outer={...sphere(radii,centre),segments:Math.round(p.facets)};
  const negative=[box([p.width+2,p.height,p.depth+2],[0,-p.height/2,0])];
  if(p.illuminated){negative.push(sphere(radii.map(r=>r-p.wall),centre),cylinder(p.opening/2,p.height/2,[0,p.height/4-1,0]),{...cylinder(p.cable/2,p.depth),rotation:[Math.PI/2,0,0],position:[0,p.cable/2,p.depth/2]});}
- return {positive:[outer],secondary:[{...outer,radii:[radii[0]+.1,radii[1],radii[2]+.1]}],negative,
-  // A thin opaque foot is an actual second body partition, rather than an identical overlapping shell.
-  materialBand:{height:Math.max(3,p.wall)},bounds:{width:p.width,depth:p.depth,height:p.height*.93},warnings:p.illuminated?[lightingWarning,'Inspect access opening, cable exit and curved roof in Cura.']:['Non-illuminated solid variant.']};
+ const bandHeight=Math.max(3,p.wall,p.illuminated?p.cable+.5:0);
+ return {positive:[outer],secondary:[],negative,
+  materialBand:box([p.width+2,bandHeight,p.depth+2]),bounds:{width:p.width,depth:p.depth,height:p.height*.93},warnings:p.illuminated?[lightingWarning,'Inspect access opening, cable exit and curved roof in Cura.']:['Non-illuminated solid variant.']};
 },{supportsLEDs:true});
 // Characters lie flat as extruded, connected silhouettes with broad features.
 export const characterGenerator=define('characters','Characters & Silhouettes','Characters',[
@@ -160,13 +160,12 @@ export function makeCatalogue(crystalAdapter){const registry=createGeneratorRegi
 export function applyBuildModules(recipe,build={},capabilities={}){
  const r={...recipe,positive:[...recipe.positive],negative:[...(recipe.negative||[])],secondary:[...(recipe.secondary||[])],warnings:[...(recipe.warnings||[])]};
  const b=r.bounds;
- if(r.materialBand){r.secondary=[box([b.width+2,r.materialBand.height,b.depth+2])];}
  if(build.mounting&&capabilities.supportsMounting){
   const spacing=Math.min(build.spacing||b.width*.55,b.width*.65),diameter=build.holeDiameter||3.4;
   if(diameter<2||diameter>8||spacing<diameter*3)throw Error('Mounting hole spacing or diameter is unsafe.');
   for(const x of [-spacing/2,spacing/2])r.negative.push(cylinder(diameter/2,b.height+4,[x,b.height/2,0]));
   r.warnings.push('Through mounting holes are un-rated; test actual mounting loads.');
  }
- if(build.base&&capabilities.supportsBase){const thickness=Number(build.baseThickness||3);if(thickness<2||thickness>15)throw Error('Base thickness must be 2–15 mm.');r.positive.push(box([b.width+6,thickness,b.depth+6]));r.bounds={...b,width:b.width+6,depth:b.depth+6};}
+ if(build.base&&capabilities.supportsBase){const thickness=Number(build.baseThickness||3);if(thickness<2||thickness>15)throw Error('Base thickness must be 2–15 mm.');r.positive.push(box([b.width+6,thickness,b.depth+6]));r.bounds={...b,width:b.width+6,depth:b.depth+6};if(r.materialBand)r.materialBand={...r.materialBand,size:[r.bounds.width+2,r.materialBand.size[1],r.bounds.depth+2]};}
  return r;
 }
