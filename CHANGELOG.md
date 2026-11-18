@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.9 — Visual saved-project gallery
+
+- Find saved projects by name and open them from cards with model counts and previews.
+
 ## v0.16.0-dev.8 — Interactive pixel fittings and measured fit tests
 
 - Place, select and move fittings on verified native model surfaces.
