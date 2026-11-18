@@ -1,5 +1,11 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.7 — Compact Studio workspace controls
+
+- Group project and app actions in one toolbar.
+- Collapse the model rail or independently hide and restore workspace panels.
+- Remember workspace panel widths and visibility on this device.
+
 ## v0.16.0-dev.6 — External AI collaboration foundations
 
 - Add contributor onboarding, task and pull-request templates, and owner review guidance.

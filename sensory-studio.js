@@ -58,7 +58,56 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const undoButton=button('↶ Undo',()=>shellUndo(-1),'smsGlobalUndo');
   const redoButton=button('↷ Redo',()=>shellUndo(1),'smsGlobalRedo');
   const styleNav=document.querySelector('.workspace-tabs');
-  styleNav.prepend(home,$('smsLibrary'));bar.append(undoButton,redoButton);
+  const top=document.querySelector('.topbar');
+  styleNav.prepend(home,$('smsLibrary'));styleNav.setAttribute('aria-label','Workspaces');
+  top.after(styleNav);styleNav.classList.add('sms-workspace-nav');
+  const utility=top.querySelector('.utility');
+  const more=document.createElement('details');more.className='sms-more';
+  const moreLabel=document.createElement('summary');moreLabel.textContent='More';more.append(moreLabel);
+  for(const item of [utility.querySelector('.modebar'),$('themeBtn'),$('helpBtn'),$('descriptionsBtn'),$('changelogBtn')])more.append(item);
+  top.querySelector('.topcluster').append($('smsProjectTitle'),$('smsSaveState'));
+  utility.append($('smsReload'),undoButton,redoButton,more,$('smsPrint'));bar.remove();
+
+  const preferenceKey='wt-workspace-panels-v1';
+  let saved={};try{saved=JSON.parse(localStorage.getItem(preferenceKey))||{};}catch{}
+  const view={rail:['icons','hidden'].includes(saved.rail)?saved.rail:'expanded',settings:saved.settings!==false,palette:saved.palette!==false,
+   railWidth:Number.isFinite(saved.railWidth)?Math.min(240,Math.max(140,saved.railWidth)):176,
+   settingsWidth:Number.isFinite(saved.settingsWidth)?Math.min(490,Math.max(250,saved.settingsWidth)):300};
+  const menus=document.createElement('details');menus.className='sms-more';
+  const menuLabel=document.createElement('summary');menuLabel.textContent='Panels';menus.append(menuLabel);utility.append(menus);
+  const toggleRail=button('Collapse model rail',()=>{view.rail=view.rail==='expanded'?'icons':'expanded';applyPanels();},'smsToggleRail');
+  const hideRail=button('',()=>{view.rail=view.rail==='hidden'?'expanded':'hidden';applyPanels();menuLabel.focus();},'smsHideRail');
+  const toggleSettings=button('',()=>{view.settings=!view.settings;applyPanels();},'smsToggleSettings');
+  const togglePalette=button('',()=>{view.palette=!view.palette;applyPanels();},'smsTogglePalette');
+  rail.prepend(toggleRail);menus.append(hideRail,toggleSettings,togglePalette);
+  const resizePanel=(key,label,min,max)=>{
+   const row=document.createElement('label');row.textContent=label;
+   const slider=document.createElement('input');slider.type='range';slider.min=min;slider.max=max;slider.value=view[key];slider.setAttribute('aria-label',label);
+   slider.oninput=()=>{view[key]=Number(slider.value);applyPanels();};row.append(slider);menus.append(row);
+  };
+  resizePanel('railWidth','Model rail width',140,240);
+  resizePanel('settingsWidth','Settings width',250,490);
+  for(const [region,id] of [[rail,'smsModelRail'],[settings,'smsPrecision'],[palette,'smsVisualPalette']])region.id=id;
+  for(const [control,region] of [[toggleRail,rail],[hideRail,rail],[toggleSettings,settings],[togglePalette,palette]])control.setAttribute('aria-controls',region.id);
+  const describe=(control,expanded,label)=>{control.setAttribute('aria-expanded',String(expanded));control.textContent=label;control.title=label;control.setAttribute('aria-label',label);};
+  function applyPanels(){
+   layout.dataset.rail=view.rail;layout.dataset.settings=view.settings?'visible':'hidden';centre.dataset.palette=view.palette?'visible':'hidden';
+   layout.style.setProperty('--sms-rail-width',view.rail==='hidden'?'0px':view.rail==='icons'?'56px':view.railWidth+'px');
+   layout.style.setProperty('--sms-settings-width',view.settings?view.settingsWidth+'px':'0px');
+   rail.hidden=view.rail==='hidden';settings.hidden=!view.settings;palette.hidden=!view.palette;split.hidden=!view.palette;
+   describe(toggleRail,view.rail==='expanded',view.rail==='expanded'?'Collapse model rail':'Expand model rail');
+   describe(hideRail,view.rail!=='hidden',view.rail==='hidden'?'Show model rail':'Hide model rail');
+   describe(toggleSettings,view.settings,view.settings?'Hide settings':'Show settings');
+   describe(togglePalette,view.palette,view.palette?'Hide visual palette':'Show visual palette');
+   try{localStorage.setItem(preferenceKey,JSON.stringify(view));}catch{}
+  }
+  applyPanels();
+  document.addEventListener('keydown',event=>{
+   if(event.key!=='Escape')return;
+   const opened=[menus,more].filter(menu=>menu.open);
+   if(opened.length){opened.forEach(menu=>{menu.open=false;menu.querySelector('summary').focus();});return;}
+   if(mode!=='model'&&!document.querySelector('dialog[open]')&&currentId)document.querySelector('.workspace-tabs [data-tab=design]').click();
+  });
   $('smsPrint').hidden=true;$('smsPrint').classList.add('sms-replaced-print');
   const focus=button('Focus 3D',()=>{
    const full=document.body.classList.toggle('sms-focused');focus.textContent=full?'Exit focus':'Focus 3D';focus.setAttribute('aria-pressed',String(full));
@@ -69,7 +118,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  function shellUndo(delta){
   if(mode!=='model'||active()?.link)return;
-  if(active()?.generator.typeId==='crystals')adapter.undo(delta);else undo(delta);
+  if(active()?.generator.typeId==='crystals'){adapter.undo(delta);renderTabs();renderPalette();}else undo(delta);
  }
  const picker=document.createElement('dialog');picker.id='smsPicker';picker.setAttribute('aria-labelledby','smsPickerTitle');
  picker.innerHTML='<h2 id="smsPickerTitle">Create a model</h2><div class="sms-grid"></div><form method="dialog"><button>Close</button></form>';
@@ -225,19 +274,20 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const placeholder=document.createElement('span');placeholder.className='sms-picture-empty';placeholder.textContent='Preview unavailable';return placeholder;
  }
  function renderTabs(){
-  if(shell){$('smsGlobalUndo').disabled=mode!=='model'||!!active()?.link;$('smsGlobalRedo').disabled=$('smsGlobalUndo').disabled;document.body.dataset.studioView=mode;shell.home.toggleAttribute('aria-current',mode==='home');$('smsLibrary').toggleAttribute('aria-current',mode==='library');if(mode!=='model'&&document.body.classList.contains('sms-focused'))shell.focus.click();}
+  if(shell){const history=histories.get(currentId),crystal=active()?.generator.typeId==='crystals';const blocked=mode!=='model'||!!active()?.link;$('smsGlobalUndo').disabled=blocked||!(crystal?adapter.canUndo(-1):history?.index>0);$('smsGlobalRedo').disabled=blocked||!(crystal?adapter.canUndo(1):history?.index<history?.items.length-1);document.body.dataset.studioView=mode;shell.home.toggleAttribute('aria-current',mode==='home');$('smsLibrary').toggleAttribute('aria-current',mode==='library');if(mode!=='model'&&document.body.classList.contains('sms-focused'))shell.focus.click();}
   const type=mode==='model'?active()?.generator.typeId:null;
   document.body.dataset.modelTheme=type||'workspace';
   document.body.classList.add('sms-workspace');
-  for(const button of document.querySelectorAll('.topbar [data-tab]')){
+  for(const button of document.querySelectorAll('.workspace-tabs [data-tab]')){
    const step=button.dataset.tab;
-   button.textContent={design:'1 · Design',build:'2 · Build',print:'3 · Print Centre'}[step];
-   const selected=mode==='print'?step==='print':mode==='model'&&step===(type==='crystals'?document.querySelector('.topbar [data-tab].active')?.dataset.tab:stage);
+   button.textContent=shell?{design:'Design',build:'Build',print:'Print Centre'}[step]:{design:'1 · Design',build:'2 · Build',print:'3 · Print Centre'}[step];
+   const selected=mode==='print'?step==='print':mode==='model'&&step===(type==='crystals'?document.querySelector('.workspace-tabs [data-tab].active')?.dataset.tab:stage);
    if(selected)button.setAttribute('aria-current','step');else button.removeAttribute('aria-current');
   }
   const root=$('smsTabs');root.replaceChildren();
   for(const id of project.tabs){const model=findModel(project,id),button=document.createElement('button');button.role='tab';button.dataset.modelTheme=model.generator.typeId;button.id='model-tab-'+id;button.setAttribute('aria-selected',String(currentId===id&&mode==='model'));button.tabIndex=currentId===id?0:-1;
    button.textContent=model.name+(project.printJobs.some(j=>j.modelId===id&&j.status==='preparing')?' ⏳':'');button.draggable=true;
+   button.setAttribute('aria-label',model.name);
    if(shell)button.prepend(modelPicture(model.thumbnail||(model.id===currentId&&model.generator.typeId==='crystals'?thumbnail(adapter.previewGroup()):null)));
    const close=document.createElement('span');close.textContent='×';close.className='close-tab';close.setAttribute('aria-hidden','true');button.append(close);
    button.onclick=e=>{if(e.target===close){closeModel(id);return;}switchModel(id);};
@@ -386,7 +436,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  function renderPalette(){
   if(!shell||mode!=='model')return;
   const model=active(),family=registry.get(model.generator.typeId);
-  const build=model.generator.typeId==='crystals'?document.querySelector('.topbar [data-tab=build]').classList.contains('active'):stage==='build';
+  const build=model.generator.typeId==='crystals'?document.querySelector('.workspace-tabs [data-tab=build]').classList.contains('active'):stage==='build';
   const root=shell.palette;root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent=build?'Build tools':'Design choices';root.append(heading);
   const controls=document.createElement('div');controls.className='sms-context-controls';root.append(controls);

@@ -1,5 +1,9 @@
 # AI handover — read immediately after AGENTS.md
 
+## WT-002 · Stage C0 draft
+
+The unified shell now moves existing app controls into one header and places workspace navigation below it. Panel visibility and widths use the device-local wt-workspace-panels-v1 key. Panels stay mounted during hide/show, preserving scroll, settings, renderer and project state. The classic layout remains available. Browser CI exercises the rail, panel restores, and existing model/Build routes. Verify the exact-head runs before approval. Six-family geometry remains pending the C0 gate.
+
 ## Stage B creative editor
 
 The unified palette contains real model parameter controls and existing Build actions. Decorative gear modes extend the recipe while old saved values retain the legacy geometry. See the roadmap for the six-family acceptance gates. The current draft must pass Chromium, static and real Manifold on its exact head.
