@@ -243,7 +243,7 @@ export const pebbleGenerator=define('light-pods','Glowing Pebbles & Light Pods',
  if(p.illuminated){negative.push(sphere(radii.map(r=>r-p.wall),centre),cylinder(p.opening/2,p.height/2,[0,p.height/4-1,0]),{...cylinder(p.cable/2,p.depth),rotation:[Math.PI/2,0,0],position:[0,p.cable/2,p.depth/2]});}
  const bandHeight=Math.max(3,p.wall,p.illuminated?p.cable+.5:0);
  return {positive:[outer],secondary:[],negative,
-  materialBand:box([p.width+2,bandHeight,p.depth+2]),bounds:{width:p.width,depth:p.depth,height:p.height*.93},warnings:p.illuminated?[lightingWarning,'Inspect access opening, cable exit and curved roof in Cura.']:['Non-illuminated solid variant.']};
+  materialSplitHeight:bandHeight,bounds:{width:p.width,depth:p.depth,height:p.height*.93},warnings:p.illuminated?[lightingWarning,'Inspect access opening, cable exit and curved roof in Cura.']:['Non-illuminated solid variant.']};
 },{supportsLEDs:true});
 // Characters lie flat as extruded, connected silhouettes with broad features.
 export const characterGenerator=define('characters','Characters & Silhouettes','Characters',[

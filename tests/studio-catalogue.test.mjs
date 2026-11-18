@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import Module from 'manifold-3d';
-import {capGenerator,generators,applyBuildModules} from '../studio-catalogue.js';
+import {capGenerator,pebbleGenerator,generators,applyBuildModules} from '../studio-catalogue.js';
 import {prepareRecipe} from '../studio-geometry.js';
 import {exportMaterialBodies} from '../studio-material-export.js';
 const wasm=await Module();wasm.setup();
@@ -21,6 +21,12 @@ assert(Math.abs(splitLens.bodies.reduce((volume,body)=>volume+body.volume,0)-len
  'The indicator material split must preserve the lens volume.');
 assert.equal(exportMaterialBodies(splitLens,{name:'indicator-lens-regression'}).stls.length,2);
 console.log('Indicator lens regression: connected material bodies, conserved volume and STL export passed.');
+const river=pebbleGenerator.presets.find(preset=>preset.id==='river');
+const riverSingle=prepareRecipe(THREE,wasm,pebbleGenerator.recipe({...river.parameters,dualMaterial:false}));
+const riverDual=prepareRecipe(THREE,wasm,pebbleGenerator.recipe({...river.parameters,dualMaterial:true}));
+assert.equal(exportMaterialBodies(riverDual,{name:'river-pod-regression'}).stls.length,2);
+assert(Math.abs(riverDual.bodies.reduce((volume,body)=>volume+body.volume,0)-riverSingle.bodies[0].volume)<1e-4);
+console.log('River pod regression: connected material bodies, conserved volume and STL export passed.');
 for(const generator of generators){
  assert(generator.presets.length>=3,generator.displayName+' requires three meaningful presets.');
  for(const preset of generator.presets){
