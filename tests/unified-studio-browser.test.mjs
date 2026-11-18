@@ -236,7 +236,40 @@ try{
  await river.scrollIntoViewIfNeeded();
  await shot('wt007-project-gallery-mobile');
  await page.setViewportSize({width:1440,height:1000});
- const open=river.getByRole('button',{name:'Open project River workshop'});
+ const rename=river.getByRole('button',{name:'Rename saved project River workshop'});
+ for(const input of [null,'   ','✨'.repeat(101),'River workshop']){
+  const dialogResult=new Promise((resolve,reject)=>page.once('dialog',async dialog=>{
+   try{
+    const initial=dialog.defaultValue();
+    if(input===null)await dialog.dismiss();else await dialog.accept(input);
+    resolve(initial);
+   }catch(error){reject(error);}
+  }));
+  await rename.press('Enter');
+  assert.equal(await dialogResult,'River workshop');
+  assert.equal(await river.count(),1);
+  assert.equal(await projects.locator('article').count(),savedCount);
+  assert.equal(await page.locator('#smsProjectTitle').inputValue(),'Current unsaved title');
+  if(input!==null&&input!=='River workshop')assert.match(await river.getByRole('status').innerText(),/1 to 100/);
+ }
+ assert.deepEqual(await snapshot(),currentModels);
+ await search.fill('river workshop');
+ const renamedTitle='Tide & <Light> 🌊';
+ page.once('dialog',dialog=>dialog.accept('  '+renamedTitle+'  '));
+ await rename.click();
+ assert.equal(await projects.locator('article').count(),0);
+ await search.fill('tIDE');
+ const renamed=projects.locator('article').filter({has:page.getByRole('heading',{name:renamedTitle,exact:true})});
+ assert.equal(await renamed.count(),1);
+ assert.match(await renamed.innerText(),new RegExp(savedModels.length+' models'));
+ assert.equal(await renamed.locator('img').getAttribute('src'),thumbnail);
+ assert.equal(await page.locator('#smsProjectTitle').inputValue(),'Current unsaved title');
+ await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+ await page.reload();await page.waitForFunction(()=>window.__sensoryStudio);
+ await page.locator('#smsLibrary').click();
+ assert.equal(await projects.locator('article').count(),savedCount);
+ assert.equal(await renamed.locator('img').getAttribute('src'),thumbnail);
+ const open=renamed.getByRole('button',{name:'Open project '+renamedTitle});
  page.once('dialog',dialog=>dialog.dismiss());
  await open.click();
  assert.equal(await page.locator('#smsProjectTitle').inputValue(),'Current unsaved title');
@@ -244,7 +277,7 @@ try{
  assert.deepEqual(await snapshot(),currentModels);
  page.once('dialog',dialog=>dialog.accept());
  await open.click();
- assert.equal(await page.locator('#smsProjectTitle').inputValue(),'River workshop');
+ assert.equal(await page.locator('#smsProjectTitle').inputValue(),renamedTitle);
  assert.deepEqual(await snapshot(),savedModels);
  await page.locator('#smsLibrary').click();
  assert.equal(await projects.locator('article').count(),savedCount+1);

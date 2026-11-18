@@ -1012,6 +1012,24 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     if(!confirm('Open this saved project? Your current project will be kept as a saved copy.'))return;
     remember();state.savedProjects.push(copy(project));replaceProject(saved);
    };
+   const rename=document.createElement('button');
+   rename.type='button';rename.textContent='Rename';
+   rename.setAttribute('aria-label','Rename saved project '+saved.title);
+   const status=document.createElement('p');status.className='sms-descriptor';status.setAttribute('role','status');
+   rename.onclick=()=>{
+    const input=prompt('Rename saved project',saved.title);
+    if(input===null)return;
+    const title=input.trim();
+    if(!title||Array.from(title).length>100){
+     status.textContent='Enter a project name of 1 to 100 characters.';
+     return;
+    }
+    status.textContent='';
+    if(title===saved.title)return;
+    saved.title=title;save();renderLibraryCards();
+   };
+   tile.querySelector('.sms-actions').append(rename);
+   tile.append(status);
    $('smsSavedProjects').append(tile);
   }
  }

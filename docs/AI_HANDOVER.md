@@ -1,5 +1,9 @@
 # AI handover — read immediately after AGENTS.md
 
+## WT-010 · Rename saved projects
+
+Library cards can rename a saved snapshot using existing local persistence. Only its title changes. Search follows the new title, and opening still uses the existing confirmation and backup flow.
+
 ## WT-009 · Print export identity
 
 Built on merged WT-008 / PR #46. Print Centre names outer downloads with a bounded model slug, source revision and stable job ID hash. Packs retain their original internal export paths and add a manifest of effective job settings, Cura profile outcome and actual archive entries. Cura slicing and physical validation remain manual.

@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.12 — Rename saved projects in Library
+
+- Rename a saved project from its Library card without opening it.
+
 ## v0.16.0-dev.11 — Named production packs and print-job manifest
 
 - Identify downloaded 3MF and production ZIP files by model, revision and print job, with matching settings inside each pack.
