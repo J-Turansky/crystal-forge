@@ -455,14 +455,15 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const marker=markerAt(model,event),placing=placementModel===model.id&&!model.link;
   if(!marker&&!placing)return;
   consume(event);viewport.focus({preventScroll:true});viewport.setPointerCapture(event.pointerId);
-  pixelGesture={model,marker,placing,id:event.pointerId,time:performance.now(),start:[event.clientX,event.clientY]};
+  const canDrag=marker?.userData.pixelId===selectedPixels.get(model.id);
+  pixelGesture={model,marker,placing,canDrag,id:event.pointerId,time:performance.now(),start:[event.clientX,event.clientY]};
   if(marker)selectPixel(model,marker.userData.pixelId);
  },true);
  viewport.addEventListener('pointermove',event=>{
   const gesture=pixelGesture;
   if(!gesture||gesture.id!==event.pointerId)return;
   consume(event);
-  if(!gesture.marker||gesture.model.link||gesture.placing)return;
+  if(!gesture.marker||!gesture.canDrag||gesture.model.link||gesture.placing)return;
   const [x,y]=gesture.start;
   if(!gesture.origin&&Math.hypot(event.clientX-x,event.clientY-y)<4)return;
   if(!gesture.origin&&performance.now()-gesture.time<180){cancelPixelGesture();return;}
@@ -724,7 +725,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   $('smsPartOffsets').disabled=!id||!!model.link;
   panel.querySelectorAll('[data-part-axis]').forEach(input=>{input.value=offset[Number(input.dataset.partAxis)];});
   for(const mesh of cache.get(model.id)?.group?.children||[]){
-   mesh.material.emissive?.setHex(id&&mesh.userData.partId===id?0x116047:0);
+   mesh.material?.emissive?.setHex(id&&mesh.userData.partId===id?0x116047:0);
   }
  }
  function applyPartOffset(model,id,offset){

@@ -58,11 +58,17 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
    face.userData.materialRole='secondary';face.userData.partId=part.partId;group.add(face);
   }
  }
+ const solidSurfaces=group.children.slice();
+ const surfaceRay=new THREE.Raycaster();
+ group.updateMatrixWorld(true);
  for(const hole of recipe.negative||[])if(hole.pixelHole){
   const ring=new THREE.Mesh(new THREE.TorusGeometry(hole.radius,.18,6,48),
    new THREE.MeshBasicMaterial({color:0xffbe47,depthTest:false}));
   ring.rotation.x=-Math.PI/2;
-  ring.position.set(hole.position[0],recipe.bounds.height+.3,hole.position[2]);
+  const [x,,z]=hole.position;
+  surfaceRay.set(new THREE.Vector3(x,recipe.bounds.height+100,z),new THREE.Vector3(0,-1,0));
+  const surface=surfaceRay.intersectObjects(solidSurfaces,false)[0];
+  ring.position.set(x,(surface?.point.y??recipe.bounds.height)+.3,z);
   ring.renderOrder=5;
   ring.userData.previewOnly=true;
   ring.userData.pixelId=hole.pixelId;

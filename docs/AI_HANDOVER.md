@@ -2,6 +2,8 @@
 
 ## WT-006 · Interactive Build
 
+[Draft PR #41](https://github.com/connorturansky-svg/crystal-forge/pull/41) records exact-head workflow results and interaction screenshots. [Baseline WT-002 screenshots](https://github.com/connorturansky-svg/crystal-forge/actions/runs/44346201182/artifacts/14447240625) cover the pre-WT-006 workspace.
+
 Baseline is main `351e2c7` after #35. WT-003 / #37 retains ownership of its isolated SVG importer.
 
 | Area | Baseline | WT-006 boundary |

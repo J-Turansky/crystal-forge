@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {chromium} from 'playwright';
 const browser=await chromium.launch({headless:true,executablePath:process.env.CRYSTAL_FORGE_BROWSER_EXECUTABLE||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
+const page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
+const errors=[];page.on('pageerror',error=>errors.push(error.message));
 try{
- const page=await browser.newPage({viewport:{width:1440,height:1000}});
- const errors=[];page.on('pageerror',error=>errors.push(error.message));
  const url=process.env.CRYSTAL_FORGE_URL||'http://127.0.0.1:4321';
  if(process.env.CRYSTAL_FORGE_BASELINE_URL){
   const baseline=await browser.newPage({viewport:{width:1440,height:1000}});
@@ -204,4 +204,9 @@ try{
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),true);
  assert.deepEqual(errors,[]);
  console.log('Unified Home, Design, Build, Library and Quick Print screenshots captured.');
+}catch(error){
+ console.error('Unified browser page errors:',errors);
+ await fs.mkdir('qa',{recursive:true});
+ await page.screenshot({path:'qa/unified-wt006-failure.png'});
+ throw error;
 }finally{await browser.close();}
