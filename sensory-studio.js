@@ -164,19 +164,20 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  function designSections(generator,model){
   const groups=[
    ['Form and silhouette','Choose the outline, teeth or surface pattern.',/mode|outline|pattern|character|top|symbol|style/i],
-   ['Size and proportions','Set the overall size and depth.',/width|height|depth|thickness|diameter|head|legs/i],
-   ['Edges and surface feel','Change the relief, curves and edge profile.',/corner|relief|density|variation|amplitude|frequency|orientation|phase|facets|direction|round|tooth/i],
+   ['Size and proportions','Set the overall size and depth.',/^(?!grip|socket).*?(width|height|depth|thickness|diameter|head|legs)/i],
+   ['Edges and surface feel','Change the relief, curves and edge profile.',/corner|relief|density|variation|amplitude|frequency|orientation|phase|facets|direction|round|tooth|grip|leverAngle/i],
    ['Holes and fittings','Make space for shafts, spokes or other hardware.',/shaft|bore|hub|spokes|socket|tolerance|opening|cable|hole/i],
    ['Light and materials','Choose material regions and lighting options.',/dualMaterial|illuminated|wall|inlay/i]
   ];
-  const remaining=new Set(generator.parameterSchema);
+  const family=generator.parameterSchema.find(field=>field.key==='controlStyle');
+  const remaining=new Set(generator.parameterSchema.filter(field=>field!==family));
   const output=groups.map(([title,description,pattern])=>{
    const controls=[...remaining].filter(field=>pattern.test(field.key));
    controls.forEach(field=>remaining.delete(field));
    return controls.length?details(title,description,controls.map(field=>control(field,model.parameters)).join('')):'';
   });
   if(remaining.size)output.push(details('Fine adjustments','Adjust the seed or other generator settings.',[...remaining].map(field=>control(field,model.parameters)).join('')));
-  return output.join('');
+  return (family?control(family,model.parameters):'')+output.join('');
  }
  function renderEditor(){
   if(mode!=='model'||!active())return;const model=active(),g=registry.get(model.generator.typeId);
