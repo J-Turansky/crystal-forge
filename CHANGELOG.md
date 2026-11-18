@@ -5,6 +5,7 @@
 - Group project and app actions in one toolbar.
 - Collapse the model rail or independently hide and restore workspace panels.
 - Remember workspace panel widths and visibility on this device.
+- Add basket, pebble and scale tiles plus concentric, vortex, saddle and dune waves.
 
 ## v0.16.0-dev.6 — External AI collaboration foundations
 

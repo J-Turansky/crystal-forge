@@ -450,7 +450,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     card.onclick=()=>{commit({parameters:copy(preset.parameters)});renderEditor();};cards.append(card);
    }
    const presets=document.createElement('details'),summary=document.createElement('summary');
-   summary.textContent='Illustrated starting points';presets.append(summary,cards);root.append(presets);
+   summary.textContent='Illustrated starting points';presets.append(summary,cards);controls.before(presets);
   }
   const addAction=(label,target)=>{
    if(!target)return;
@@ -484,7 +484,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    ];
    const keys=(family.typeId==='gears'?gearKeys():family.visualFields)||{
     'tactile-tiles':['pattern','width','height','relief'],
-    waves:['amplitude','frequency','width'],
+    waves:['flowStyle','amplitude','frequency','width'],
     'control-caps':['diameter','height','gripDepth'],
     characters:['character','width','depth'],
     'light-pods':['width','height','facets']

@@ -2,7 +2,7 @@
 
 ## WT-002 · Stage C0 draft
 
-The unified shell now moves existing app controls into one header and places workspace navigation below it. Panel visibility and widths use the device-local wt-workspace-panels-v1 key. Panels stay mounted during hide/show, preserving scroll, settings, renderer and project state. The classic layout remains available. Browser CI exercises the rail, panel restores, and existing model/Build routes. Verify the exact-head runs before approval. Six-family geometry remains pending the C0 and independent-review gates.
+The unified shell now moves existing app controls into one header and places workspace navigation below it. Panel visibility and widths use the device-local wt-workspace-panels-v1 key. Panels stay mounted during hide/show, preserving scroll, settings, renderer and project state. The classic layout remains available. Browser CI exercises the rail, panel restores, and existing model/Build routes. Verify the exact-head runs before approval. C0 and the three P1 regressions passed on checkpoint `295895f`. The catalogue draft now starts with continuous-backing basket, pebble and scale relief tiles and concentric, vortex, saddle and dune waves. Four other families, richer selected-component controls and full catalogue visuals remain outstanding.
 
 ### Independent review follow-up
 

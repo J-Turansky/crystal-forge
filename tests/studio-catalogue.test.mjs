@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import Module from 'manifold-3d';
-import {gearGenerator,capGenerator,pebbleGenerator,generators,applyBuildModules} from '../studio-catalogue.js';
+import {waveGenerator,tileGenerator,gearGenerator,capGenerator,pebbleGenerator,generators,applyBuildModules} from '../studio-catalogue.js';
 import {findPixelPosition} from '../studio-pixel-builder.js';
 import {previewRecipe,disposeGroup,prepareRecipe} from '../studio-geometry.js';
 import {exportMaterialBodies} from '../studio-material-export.js';
@@ -74,6 +74,15 @@ for(const id of ['turbine','crown-open']){
   assert.equal(output.stls.length,2);
   assert(output.threeMF.length>100);
  }
+}
+for(const [generator,ids] of [[waveGenerator,['river','rings','eddy','saddle','dune']],[tileGenerator,['grass','basket','pebbles','scales']]]){
+ const signatures=ids.map(id=>{
+  const preset=generator.presets.find(item=>item.id===id);
+  assert(preset,id);
+  const {points}=generator.recipe(preset.parameters).positive[0].mesh;
+  return JSON.stringify(Array.from(points).filter((_,index)=>index%93===1));
+ });
+ assert.equal(new Set(signatures).size,ids.length);
 }
 for(const generator of generators){
  assert(generator.presets.length>=3,generator.displayName+' requires three meaningful presets.');

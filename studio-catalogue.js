@@ -154,10 +154,26 @@ export const gearGenerator=define('gears','Cogs & Gears','Mechanical',[
  return {positive,secondary,negative:[],bounds:{width:diameter,depth:diameter,height:p.thickness+(relief?p.reliefHeight:0)},warnings:['Pinch points and moving parts require guarding and physical checks. Mechanical meshing still requires a mating-gear test.']};
 },{supportsMechanisms:true});
 export const waveGenerator=define('waves','Waves & Organic Forms','Organic',[
- numeric('width','Length',110,30,200),numeric('depth','Width',65,20,160),numeric('thickness','Minimum base thickness',4,2,15),numeric('amplitude','Wave height',12,1,40),numeric('frequency','Wave count',2,0.5,6,'',.1),numeric('phase','Phase',0,0,360,'degrees'),numeric('direction','Direction',0,0,360,'degrees'),numeric('variation','Organic variation',.25,0,1,'',.05)
-],[['river','Flowing river',{}],['wind','Wind surface',{frequency:1,amplitude:20,direction:30}],['ripples','Soft overlapping ripples',{frequency:4,amplitude:6,variation:.6}]],p=>{
+ choice('flowStyle','Flow structure','Parallel',['Parallel','Concentric','Vortex','Saddle','Dune']),numeric('width','Length',110,30,200),numeric('depth','Width',65,20,160),numeric('thickness','Minimum base thickness',4,2,15),numeric('amplitude','Wave height',12,1,40),numeric('frequency','Wave count',2,0.5,6,'',.1),numeric('phase','Phase',0,0,360,'degrees'),numeric('direction','Direction',0,0,360,'degrees'),numeric('variation','Organic variation',.25,0,1,'',.05)
+],[['river','Flowing river',{}],['wind','Wind surface',{frequency:1,amplitude:20,direction:30}],['ripples','Soft overlapping ripples',{frequency:4,amplitude:6,variation:.6}],['rings','Concentric ripple basin',{flowStyle:'Concentric',frequency:2}],['eddy','Turning river eddy',{flowStyle:'Vortex',frequency:1.5}],['saddle','Crossing saddle',{flowStyle:'Saddle',amplitude:19}],['dune','Wind-sculpted dune',{flowStyle:'Dune',amplitude:19}]],p=>{
  const a=p.direction*Math.PI/180,phase=p.phase*Math.PI/180;
- const top=(x,z)=>p.thickness+p.amplitude*(1+Math.sin((x*Math.cos(a)+z*Math.sin(a))/p.width*p.frequency*Math.PI*2+phase+Math.sin(z/p.depth*Math.PI*2+p.seed*.01)*p.variation))/2;
+ const top=(x,z)=>{
+  const u=(x*Math.cos(a)+z*Math.sin(a))/p.width,v=(-x*Math.sin(a)+z*Math.cos(a))/p.depth;
+  const r=Math.hypot(u,v),phaseRate=p.frequency*Math.PI*2;
+  let relief;
+  switch(p.flowStyle){
+   case 'Concentric': relief=(1+Math.cos(r*phaseRate+phase))/2;break;
+   case 'Vortex': {
+    // Fade angular terms at the origin, where the azimuth is undefined.
+    const strength=Math.min(1,r*6);
+    relief=.5+.5*strength*Math.sin(r*phaseRate*1.8+Math.atan2(v,u)*2+phase);break;
+   }
+   case 'Saddle': relief=.5+.45*Math.tanh((u*u-v*v)*p.frequency*4+p.variation*u);break;
+   case 'Dune': relief=Math.exp(-Math.pow((u-.18*Math.sin(v*4+phase))*p.frequency*3,2))*(.8+.2*Math.cos(v*2+phase));break;
+   default: relief=(1+Math.sin(u*phaseRate+phase+Math.sin(z/p.depth*Math.PI*2+p.seed*.01)*p.variation))/2;
+  }
+  return p.thickness+p.amplitude*relief;
+ };
  const mesh=heightField(p.width,p.depth,top);
  return {positive:[{kind:'mesh',mesh}],secondary:[box([p.width,.8,p.depth],[0,.4,0])],negative:[],bounds:{width:p.width,depth:p.depth,height:p.thickness+p.amplitude},warnings:['Review the wave slopes in Cura; the flat underside is the intended bed face.']};
 });
