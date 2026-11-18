@@ -65,11 +65,27 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
   ring.position.set(hole.position[0],recipe.bounds.height+.3,hole.position[2]);
   ring.renderOrder=5;
   ring.userData.previewOnly=true;
+  ring.userData.pixelId=hole.pixelId;
+  const angle=hole.pixelRotation*Math.PI/180;
+  const direction=new THREE.Vector3(Math.cos(angle),0,Math.sin(angle));
+  for(const sign of [-1,1]){
+   const port=new THREE.ArrowHelper(direction.clone().multiplyScalar(sign),ring.position.clone(),hole.radius+2,sign<0?0x37bbeb:0xffe17c,1.2,.8);
+   port.renderOrder=5;port.userData.previewOnly=true;port.userData.pixelPort=hole.pixelId;group.add(port);
+  }
   group.add(ring);
+  if(typeof document!=='undefined'){
+   const canvas=document.createElement('canvas');canvas.width=96;canvas.height=48;
+   const text=canvas.getContext('2d');
+   text.fillStyle='#193146';text.fillRect(0,0,96,48);text.fillStyle='#fff9db';text.font='bold 32px sans-serif';text.textAlign='center';
+   text.fillText('P'+hole.pixelHole.split(' ').at(-1),48,36);
+   const tag=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthTest:false}));
+   tag.position.copy(ring.position);tag.position.y+=2;tag.scale.set(6,3,1);tag.renderOrder=6;
+   tag.userData.previewOnly=true;tag.userData.pixelLabel=hole.pixelId;group.add(tag);
+  }
  }
  return group;
 }
-export function disposeGroup(group){group.traverse(node=>{node.geometry?.dispose();if(Array.isArray(node.material))node.material.forEach(m=>m.dispose());else node.material?.dispose();});group.removeFromParent();}
+export function disposeGroup(group){group.traverse(node=>{if(node.userData.pixelLabel)node.material?.map?.dispose();if(!node.isSprite)node.geometry?.dispose();if(Array.isArray(node.material))node.material.forEach(m=>m.dispose());else node.material?.dispose();});group.removeFromParent();}
 export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
  const owned=[];const hold=solid=>(owned.push(solid),solid);
  const convert=part=>{

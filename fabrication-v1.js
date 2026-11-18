@@ -743,15 +743,18 @@ export function save3MF(geom,filename='crystal-forge.3mf'){
 }
 
 
-export function makeCalibrationStrip(wasm,nominal=12){
+export function makeCalibrationStrip(wasm,nominal=12,{diameters:requested}={}){
  const keep=[],hold=o=>{keep.push(o);return o};
  try{
-  const diameter=Math.max(2,Math.min(30,Number(nominal)||12)),fits=[-.2,-.1,0,.1,.2],
-   diameters=fits.map(delta=>Math.round((diameter+delta)*100)/100),
-   captions=diameters.map(d=>d.toFixed(2));
-  const pitch=Math.max(32,diameter+20),width=Math.max(28,diameter+20),height=5;
-  const bar=hold(wasm.Manifold.cube([pitch*5,height,width])),holes=[],legend=[];
-  for(let i=0;i<5;i++){
+  const diameter=Math.max(2,Math.min(30,Number(nominal)||12)),fits=[-.2,-.1,0,.1,.2];
+  if(requested!==undefined&&(!Array.isArray(requested)||requested.length<1||requested.length>5||
+   requested.some(value=>!Number.isFinite(value)||value<1.5||value>30.8)))
+   throw Error('Choose one to five test bores between 1.5 and 30.8 mm.');
+  const diameters=requested?.slice()??fits.map(delta=>Math.round((diameter+delta)*100)/100);
+  const captions=diameters.map(d=>d.toFixed(2)),span=requested?Math.max(...diameters):diameter;
+  const pitch=Math.max(32,span+20),width=Math.max(28,span+20),height=5;
+  const bar=hold(wasm.Manifold.cube([pitch*diameters.length,height,width])),holes=[],legend=[];
+  for(let i=0;i<diameters.length;i++){
    const core=hold(wasm.Manifold.cylinder(9,diameters[i]/2,diameters[i]/2,40)
     .rotate([-90,0,0]).translate([pitch*(i+.5),-2,width/2]));
    holes.push(core);

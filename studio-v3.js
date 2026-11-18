@@ -3,6 +3,7 @@ import {installExactValueEditors} from './exact-value-editors.js';
 import {installCollapsibleSections} from './collapsible-sections.js';
 import {migrateLegacyStorage} from './studio-migration.js';
 import {installSensoryStudio} from './sensory-studio.js';
+import {pixelFitCouponRequest} from './studio-pixel-fit.js';
 import {routingSummary,renderFeedback,installConciseHelp} from './routing-feedback.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {TransformControls} from 'three/addons/controls/TransformControls.js';
@@ -76,6 +77,16 @@ function mergePixelLibrary(){
  }catch(e){s.pixelProfiles=Array.isArray(s.pixelProfiles)?s.pixelProfiles:[]}
 }
 mergePixelLibrary();
+function readPixelFitProfiles(){
+ let saved=[];
+ try{saved=JSON.parse(localStorage.getItem(pixelLibraryKey)||'[]');}catch{}
+ const profiles=new Map();
+ for(const item of [...(s.pixelProfiles||[]),...(Array.isArray(saved)?saved:[])]){
+  const profile=normalisePixelProfile(item);
+  if(profile.id.startsWith('custom-'))profiles.set(profile.id,profile);
+ }
+ return [...profiles.values()].slice(-30);
+}
 if(!crystals.length)crystals=generateFormation(s);
 const history=[];let historyIndex=-1;
 const clone=x=>JSON.parse(JSON.stringify(x));
@@ -1223,7 +1234,9 @@ $('showManufacturing').onchange=e=>manufacturingView(e.target.checked);
 $('printHeatmap').onchange=applyPrintHeatmap;
 if(s.floatView){grid.visible=false;axes.visible=false}
 hardwareUI=createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,getBaseMesh:()=>baseMesh,
- getSettings:()=>s,getCrystals:()=>crystals,getManufacturingVisible:()=>!!manufacturingMesh?.visible,onStatus:setStatus,
+ getSettings:()=>s,getCrystals:()=>crystals,canEdit:()=>!window.__sensoryStudio?.currentModel?.link,
+ onSelectionChange:()=>document.dispatchEvent(new Event('studio-crystal-pixel-selection')),
+ getManufacturingVisible:()=>!!manufacturingMesh?.visible,onStatus:setStatus,
  onEdit:()=>{disposeManufacturing();syncForm();updateLEDs();hardwareUI.refresh();renderInfo();snapshot()}
 });
 
@@ -1517,11 +1530,28 @@ if(studioBootstrap&&!new URLSearchParams(location.search).has('legacy'))studioBr
  capture:()=>({settings:clone(s),crystals:clone(crystals),selectedId}),
  bounds:()=>{const size=modelBounds().getSize(new THREE.Vector3());return {width:size.x,depth:size.z,height:size.y};},
  status:setStatus,download,undo,canUndo:delta=>historyIndex+delta>=0&&historyIndex+delta<history.length,vault:()=>cloudVault,
- pixelFitCoupon:async nominal=>{
-  if(!Number.isFinite(nominal)||nominal<2||nominal>30)throw Error('Enter a pixel bore diameter between 2 and 30 mm.');
-  const wasm=await loadManifold(),coupon=makeCalibrationStrip(wasm,nominal);
+ crystalSelectedPixel:()=>hardwareUI.getSelectedPixel(),
+ updateCrystalPixel:(id,fields)=>hardwareUI.updatePixel(id,fields),
+ removeCrystalPixel:()=>hardwareUI.removeSelectedPixel(),
+ pixelFitProfiles:()=>readPixelFitProfiles(),
+ savePixelFitProfile:profile=>{
+  const p=normalisePixelProfile(profile);
+  if(!p.id.startsWith('custom-')||!p.measuredFit)throw Error('Enter a measured custom profile.');
+  const next=[...readPixelFitProfiles().filter(item=>item.id!==p.id),p].slice(-30);
+  localStorage.setItem(pixelLibraryKey,JSON.stringify(next));
+  return clone(p);
+ },
+ pixelFitCoupon:async (fitting,{kind='strip',format='stl'}={})=>{
+  const legacy=typeof fitting==='number';
+  if(legacy&&(!Number.isFinite(fitting)||fitting<2||fitting>30))throw Error('Enter a pixel bore diameter between 2 and 30 mm.');
+  if(format!=='stl'&&format!=='3mf')throw Error('Choose STL or 3MF format.');
+  const request=legacy?null:pixelFitCouponRequest(fitting,kind,readPixelFitProfiles());
+  const nominal=legacy?fitting:request.boreDiameter;
+  const wasm=await loadManifold(),coupon=makeCalibrationStrip(wasm,nominal,request?{diameters:request.diameters}:{});
   try{
-   saveSTL(coupon.geometry,'pixel-fit-'+nominal.toFixed(2).replace('.','_')+'mm.stl');
+   const basename=request?.filename??'pixel-fit-'+nominal.toFixed(2).replace('.','_')+'mm';
+   const save=format==='3mf'?save3MF:saveSTL;
+   save(coupon.geometry,basename+'.'+format);
    return coupon.diameters;
   }finally{coupon.geometry.dispose();}
  },

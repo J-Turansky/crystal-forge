@@ -315,12 +315,12 @@ try{
  await page.locator('[data-state="hardwareSnap"]').uncheck();
  await holeX.fill('9999');
  await holeX.press('Tab');
- await page.waitForFunction(()=>JSON.parse(localStorage.getItem('crystal-forge-v3')||'{}').settings?.manualPixelHoles?.[0]?.x===9999,null,{timeout:7000});
- assert((await page.locator('#hardwareGuideSummary').innerText()).includes('invalid'),'Invalid LED position is flagged by shared planner');
+ assert.equal(await holeX.inputValue(),'10','Rejected Crystal X edit restores the accepted field value');
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('crystal-forge-v3')).settings.manualPixelHoles[0].x),10);
+ assert.match(await page.locator('#status').innerText(),/does not clear/);
  await page.locator('[data-state="pixelPlacement"]').selectOption('auto');
- await page.waitForTimeout(250);
- assert.equal((await page.locator('#hardwareGuideSummary').innerText()).includes('invalid (red)'),true,'Hardware guidance remains visible');
- console.log('Manual LED X/Z editor and invalid position screening verified');
+ assert(await page.locator('#hardwareGuideSummary').isVisible(),'Hardware guidance remains visible');
+ console.log('Crystal X/Z edits retain accepted state when the proposed position cannot clear the base');
  // The tab preset must be accessible, visible, hover-explained and reflected
  // in the live hardware plan before preparing a manufacturing mesh.
  await page.locator('[data-state="wireMode"]').selectOption('parallel');
@@ -405,8 +405,28 @@ try{
  },draggedId);
  const markerRect=await marker.boundingBox();
  assert(markerRect,'Selected P marker is visible and can be directly manipulated');
+ // A fast motion is different from holding the selected fitting.
+ const readDraggedPixel=()=>page.evaluate(id=>{
+  const p=JSON.parse(localStorage.getItem('crystal-forge-v3')).settings.manualPixelHoles.find(p=>p.id===id);
+  return {x:p.x,z:p.z};
+ },draggedId);
  await page.mouse.move(markerRect.x+markerRect.width/2,markerRect.y+markerRect.height/2);
  await page.mouse.down();
+ await page.mouse.move(contextPoint.x,contextPoint.y);
+ await page.mouse.up();
+ assert.deepEqual(await readDraggedPixel(),start,'A quick drag does not move the selected fitting');
+ // A held drag previews a candidate but Escape retains the accepted placement.
+ await page.mouse.move(markerRect.x+markerRect.width/2,markerRect.y+markerRect.height/2);
+ await page.mouse.down();
+ await page.waitForTimeout(200);
+ await page.mouse.move(contextPoint.x,contextPoint.y,{steps:9});
+ assert.deepEqual(await readDraggedPixel(),start,'Drag preview never mutates the accepted placement');
+ await page.keyboard.press('Escape');
+ await page.mouse.up();
+ assert.deepEqual(await readDraggedPixel(),start,'Escape cancels the Crystal fitting move');
+ await page.mouse.move(markerRect.x+markerRect.width/2,markerRect.y+markerRect.height/2);
+ await page.mouse.down();
+ await page.waitForTimeout(200);
  await page.mouse.move(contextPoint.x,contextPoint.y,{steps:9});
  await page.mouse.up();
  await page.waitForTimeout(120);
@@ -559,4 +579,5 @@ try{
  if(logs.length)console.log('Browser logs:',logs.join('\n').slice(0,3000));
  throw e;
 }finally{await browser.close()}
+
 

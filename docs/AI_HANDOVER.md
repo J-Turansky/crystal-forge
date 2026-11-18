@@ -1,5 +1,22 @@
 # AI handover — read immediately after AGENTS.md
 
+## WT-006 · Interactive Build
+
+Baseline is main `351e2c7` after #35. WT-003 / #37 retains ownership of its isolated SVG importer.
+
+| Area | Baseline | WT-006 boundary |
+| --- | --- | --- |
+| Crystal fitting | Existing hardware markers, measured profiles, real cavities and fit coupons | Reuse the Crystal editor and planner |
+| Generic fitting | Numeric X/Z and bore cuts, preview rings, heuristic auto placement | Stable IDs and direct editing with certified placement |
+| Wiring | Existing Crystal planner owns ordered, opposed ports and curved length limits | Generic bores do not expose cable routing |
+| Physical fit | Existing downloadable coupons | Software tests verify geometry. Print, fit and illumination require real inspection |
+
+Generic fitting records retain historical X/Z, diameter and clearance. The first edit adds stable IDs, body rotation and `build.pixelBuilderVersion: 1`. New and edited fittings are marked for verified placement. Older recorded bores retain their established preparation path. The handover distinguishes diameter-only general bores from Crystal seats and channels.
+
+Crystal reuses the existing route solver for selection and movement. Selecting an automatic Crystal fitting still converts it to manual editing. Generic wall and cavity geometries without a conservative certificate refuse new bores. Native Pod shells retain their own designed access and cavity.
+
+Use Build to select a fitting, confirm the body and bore dimensions and download a single bore or clearance strip. In Cura, inspect the imported hole and bed contact, print flat with the intended material and nozzle, test the actual pixel and record the bore that physically fits. Generic coupons check diameter. Flange, retention, strain relief and light diffusion need separate physical tests.
+
 ## WT-002 · PR #35
 
 - Tactile Tiles and Waves add procedurally distinct surface presets. Crystal starting points create independent models using existing formation and preview machinery. Existing editable Crystal models, LED layouts and vault records keep their established paths.

@@ -1,3 +1,7 @@
+## WT-006 interactive Build
+
+Verified native through bores and contextual fitting edits extend the existing Crystal Build workflow. Generic cable tracks and optical validation require shape-specific clearance and physical testing. Later SVG integration follows independent WT-003 review.
+
 # PR14 / v0.15.1 — physical pixel-spacing snap (draft)
 
 ## Unified interface draft

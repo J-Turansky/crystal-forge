@@ -1,5 +1,11 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.8 — Interactive pixel fittings and measured fit tests
+
+- Place, select and move fittings on verified native model surfaces.
+- Edit exact fitting dimensions and download measured STL or 3MF fit tests.
+- Keep Crystal cable routing and print validation in the shared Build workflow.
+
 ## v0.16.0-dev.7 — Compact Studio workspace controls
 
 - Group project and app actions in one toolbar.
