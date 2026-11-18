@@ -76,6 +76,10 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  document.body.append(picker);
  const presetThumbnails=new Map();
  function openPicker(){renderPicker();picker.showModal();}
+ function visualPresets(family){
+  if(family.typeId!=='gears')return family.presets;
+  return [...family.presets].sort((a,b)=>Number(b.parameters.webStyle!=='Legacy')-Number(a.parameters.webStyle!=='Legacy'));
+ }
  function renderPicker(generator=null){
   const title=picker.querySelector('h2'),grid=picker.querySelector('.sms-grid');
   title.textContent=generator?generator.displayName+' starting points':'Create a model';
@@ -109,7 +113,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    const back=document.createElement('button');back.type='button';back.className='sms-picker-back';back.textContent='← All model types';
    back.onclick=()=>{renderPicker();grid.querySelector('[data-generator="'+generator.typeId+'"]')?.focus();};
    grid.append(back);
-   for(const preset of generator.presets)appendCard(generator,preset);
+   for(const preset of visualPresets(generator))appendCard(generator,preset);
   }else{
    for(const family of registry.list())appendCard(family,null);
   }
@@ -385,24 +389,93 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const build=model.generator.typeId==='crystals'?document.querySelector('.topbar [data-tab=build]').classList.contains('active'):stage==='build';
   const root=shell.palette;root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent=build?'Build tools':'Design choices';root.append(heading);
+  const controls=document.createElement('div');controls.className='sms-context-controls';root.append(controls);
   if(!build&&family.presets.length){
    const cards=document.createElement('div');cards.className='sms-preset-strip';
-   for(const preset of family.presets){
+   for(const preset of visualPresets(family)){
     const key=family.typeId+':'+preset.id;
     if(!presetThumbnails.has(key))presetThumbnails.set(key,recipeThumbnail(family,preset.parameters));
     const card=document.createElement('button');card.append(modelPicture(presetThumbnails.get(key)),preset.name);card.disabled=!!model.link;
     card.onclick=()=>{commit({parameters:copy(preset.parameters)});renderEditor();};cards.append(card);
    }
-   root.append(cards);
+   const presets=document.createElement('details'),summary=document.createElement('summary');
+   summary.textContent='Illustrated starting points';presets.append(summary,cards);root.append(presets);
   }
-  const groups=model.generator.typeId==='crystals'?document.querySelectorAll('.left [data-workspace].active details,.right details'):panel.querySelectorAll('details');
-  const tools=document.createElement('div');tools.className='sms-actions';
-  for(const group of groups){
-   const summary=group.querySelector('summary');if(!summary)continue;
-   const chooser=document.createElement('button');chooser.textContent=(build?'◇ ':'▰ ')+(summary.firstElementChild?.classList.contains('section-heading-row')?summary.firstElementChild.textContent.trim():summary.firstChild.textContent.trim());
-   chooser.onclick=()=>{shell.search.value='';shell.searchSettings();group.open=true;summary.focus();summary.scrollIntoView({block:'nearest'});};tools.append(chooser);
+  const addAction=(label,target)=>{
+   if(!target)return;
+   const button=document.createElement('button');button.type='button';button.textContent=label;button.disabled=target.disabled||!!model.link;
+   button.onclick=()=>target.click();controls.append(button);
+  };
+  if(build){
+   if(model.generator.typeId==='crystals'){
+    addAction('Fit base for gumdrop',$('fitPixelBaseBtn'));
+    addAction('Print a pixel fit test',$('calibrationBtn'));
+   }else{
+    const count=document.createElement('p');count.textContent=(model.build.pixelHoles?.length||0)+' pixel holes in this model';controls.append(count);
+    addAction('Add pixel hole',$('smsPixelAdd'));
+    addAction('Download pixel fit test',$('smsPixelCoupon'));
+   }
+  }else if(model.generator.typeId==='crystals'){
+   for(const [key,label] of [['count','Crystal count'],['spacing','Crystal spacing'],['width','Cluster width']]){
+    const original=document.querySelector('input[data-state="'+key+'"]');
+    if(original)visualRange(controls,{key,label,min:original.min,max:original.max,step:original.step},original.value,value=>{
+     original.value=value;original.dispatchEvent(new Event('input',{bubbles:true}));original.dispatchEvent(new Event('change',{bubbles:true}));
+    },!!model.link);
+   }
+  }else{
+   const parameters={...family.defaultParameters,...model.parameters};
+   const gearKeys=()=>parameters.mode==='Mechanical'?['mode','teeth','module','pressureAngle','bore','thickness']:[
+    'mode','wheelStyle','webStyle','reliefStyle','diameter','thickness','bore',
+    ...(!['Cam','Pulley'].includes(parameters.wheelStyle)?['teeth']:[]),
+    ...(parameters.webStyle==='Solid'?[]:['spokes']),
+    ...(!['Solid','Legacy'].includes(parameters.webStyle)&&parameters.spokes?['rimWidth','webWidth','hub']:[]),
+    ...(parameters.reliefStyle!=='None'?['reliefHeight']:[])
+   ];
+   const keys=(family.typeId==='gears'?gearKeys():family.visualFields)||{
+    'tactile-tiles':['pattern','width','height','relief'],
+    waves:['amplitude','frequency','width'],
+    'control-caps':['diameter','height','gripDepth'],
+    characters:['character','width','depth'],
+    'light-pods':['width','height','facets']
+   }[family.typeId]||[];
+   const apply=(key,value)=>{
+    const open=[...panel.querySelectorAll('details')].map(group=>group.open);
+    const next={...model.parameters,[key]:value};
+    if(family.typeId==='gears'&&key==='webStyle'&&!['Solid','Legacy'].includes(value)&&!parameters.spokes)next.spokes=3;
+    if(!commit({parameters:next}))return false;
+    renderEditor();
+    panel.querySelectorAll('details').forEach((group,index)=>{if(open[index])group.open=true;});
+    shell.palette.querySelector('[data-palette-key="'+key+'"]')?.focus({preventScroll:true});
+    return true;
+   };
+   for(const key of keys){
+    const field=family.parameterSchema.find(item=>item.key===key);if(!field)continue;
+    if(field.type==='number'){
+     visualRange(controls,field,parameters[key],value=>apply(key,Number(value)),!!model.link);
+    }else if(field.type==='select'){
+     const group=document.createElement('fieldset'),legend=document.createElement('legend');legend.textContent=field.label;group.append(legend);
+     for(const option of field.options){
+      const button=document.createElement('button');button.type='button';button.textContent=option;button.disabled=!!model.link;
+      button.setAttribute('aria-pressed',String(parameters[key]===option));
+      if(parameters[key]===option)button.dataset.paletteKey=key;
+      button.onclick=()=>apply(key,option);group.append(button);
+     }
+     controls.append(group);
+    }
+   }
   }
-  root.append(tools);shell.searchSettings();
+  shell.searchSettings();
+ }
+ function visualRange(root,field,value,apply,disabled){
+  const label=document.createElement('label'),caption=document.createElement('span'),out=document.createElement('output');
+  caption.textContent=field.label;
+  const input=document.createElement('input');input.type='range';input.dataset.paletteKey=field.key;
+  for(const key of ['min','max','step'])input[key]=field[key]??.1;
+  input.value=value;input.disabled=disabled;input.setAttribute('aria-label',field.label);
+  const update=()=>{out.textContent=input.value+(field.unit?' '+field.unit:'');};
+  input.oninput=update;
+  input.onchange=()=>{if(apply(input.value)===false){input.value=value;update();}};
+  update();label.append(caption,out,input);root.append(label);
  }
  function renderEditor(){
   if(mode!=='model'||!active())return;const model=active(),g=registry.get(model.generator.typeId);

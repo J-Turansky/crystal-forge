@@ -1,5 +1,9 @@
 # AI handover — read immediately after AGENTS.md
 
+## Stage B creative editor
+
+The unified palette contains real model parameter controls and existing Build actions. Decorative gear modes extend the recipe while old saved values retain the legacy geometry. See the roadmap for the six-family acceptance gates. The current draft must pass Chromium, static and real Manifold on its exact head.
+
 ## Current baseline and stability draft
 
 PR #27 was merged at `15808aa18518e85a33f22124824551a3c1bd7102`. Its final head passed static and browser checks and failed fabrication during STL encoding after the fader case. The current stability branch keeps the editor and storage schemas in place. It introduces a single-shell joystick recipe, a focused export fixture and a production version gate. The joystick passed on the first draft head. Its next failure was a disconnected primary body in the dual-material indicator lens. The follow-up splits the lens on a single plane and adds a volume-conservation and export fixture. The lens cases then passed, exposing the same partition failure in the river light pod. Light pods now use the same single-plane split, with a river-specific fixture. Check all suites on the exact review head before opening the interface PR. The roadmap now schedules SVG extrusion ahead of STL/OBJ. The notes below describe historical checkpoints.

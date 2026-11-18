@@ -32,6 +32,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -86,6 +87,15 @@ jobs:
           tail -n 100 /tmp/npm-install.log || true
           echo '== browser install tail =='
           tail -n 100 /tmp/playwright-install.log || true
+      - name: Serve the comparison baseline
+        if: github.event_name == 'pull_request'
+        env:
+          BASELINE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          mkdir -p /tmp/crystal-forge-before
+          git archive "$BASELINE_SHA" | tar -x -C /tmp/crystal-forge-before
+          python3 -m http.server 4322 --directory /tmp/crystal-forge-before > /tmp/crystal-forge-before.log 2>&1 &
+          echo CRYSTAL_FORGE_BASELINE_URL=http://127.0.0.1:4322 >> "$GITHUB_ENV"
       - name: Start local static host
         if: steps.install.outcome == 'success'
         run: |
