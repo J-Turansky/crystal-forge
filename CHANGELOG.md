@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.11 — Named production packs and print-job manifest
+
+- Identify downloaded 3MF and production ZIP files by model, revision and print job, with matching settings inside each pack.
+
 ## v0.16.0-dev.10 — Visual Print Centre and per-job settings
 
 - See model previews, queue order and live preparation stages in Print Centre.

@@ -1227,6 +1227,14 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   }
   redraw();
  }
+ function printDownloadStem(model,job){
+  const slug=model.name.normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase()
+   .replace(/[^a-z0-9]+/g,'-').slice(0,48).replace(/^-|-$/g,'')||'model';
+  // Hash the whole ID so imported IDs with shared prefixes still get different suffixes.
+  let suffix=0xcbf29ce484222325n;
+  for(const byte of new TextEncoder().encode(job.id))suffix=BigInt.asUintN(64,(suffix^BigInt(byte))*0x100000001b3n);
+  return slug+'-rev'+model.revision+'-'+suffix.toString(16).padStart(16,'0');
+ }
  function exportJob(id,only3MF){
   try{
    const job=project.printJobs.find(j=>j.id===id);
@@ -1234,11 +1242,39 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    const model=findModel(project,job.modelId),result=currentPrintResult(job),settings=effectivePrinter(job);
    const block=printExportBlock(job,result,settings);if(block)throw Error(block);
    const exported=exportMaterialBodies(result,{name:model.name});
-   if(only3MF){adapter.download(new Blob([exported.threeMF],{type:'model/3mf'}),exported.filename);return;}
+   const stem=printDownloadStem(model,job);
+   if(only3MF){adapter.download(new Blob([exported.threeMF],{type:'model/3mf'}),stem+'.3mf');return;}
    const entries=exported.stls.map(s=>[s.name,s.bytes]);entries.push([exported.filename,exported.threeMF],['editable-model.json',JSON.stringify(model,null,2)],['material-roles.json',JSON.stringify(exported.assignments,null,2)],['print-report.json',JSON.stringify(result.report,null,2)]);
-   try{const profile=createCuraProfile(curaOptions(settings));entries.push([profile.filename,profile.bytes],['cura-manual-settings.txt',profile.fallbackText]);}catch(error){entries.push(['cura-manual-review.txt',error.message+'\nJob settings: '+JSON.stringify(curaOptions(settings),null,2)]);}
-   entries.push(['READ-ME.txt',exported.warnings.join('\n')+'\nThe STL files share one origin. Import them together as parts, not independently auto-arranged objects.']);
-   adapter.download(new Blob([zipProfileEntries(entries)],{type:'application/zip'}),'sensory-model-production.zip');
+   let curaProfile='included';
+   try{
+    const profile=createCuraProfile(curaOptions(settings));
+    entries.push([profile.filename,profile.bytes],['cura-manual-settings.txt',profile.fallbackText]);
+   }catch(error){
+    curaProfile='manual-review';
+    entries.push(['cura-manual-review.txt',error.message+'\nJob settings: '+JSON.stringify(curaOptions(settings),null,2)]);
+   }
+   const manifestName='print-job-manifest.json';
+   const manifest={
+    schemaVersion:1,modelId:model.id,modelName:model.name,generatorType:model.generator.typeId,
+    modelRevision:model.revision,jobId:job.id,preparedRevision:job.preparedRevision,
+    printer:settings.printer,nozzleMm:settings.curaNozzle,material:settings.curaMaterial,quality:settings.curaQuality,
+    curaProfile,files:[...entries.map(([name])=>name),'READ-ME.txt',manifestName]
+   };
+   const instructions=[
+    'Model: '+model.name,'Revision: '+model.revision,'Job ID: '+job.id,
+    'Printer: '+manifest.printer,'Nozzle: '+manifest.nozzleMm+' mm',
+    'Material: '+manifest.material,'Quality: '+manifest.quality+' / 100','',
+    exported.warnings.join('\n'),
+    'The STL files share one origin. Import them together as parts, not independently auto-arranged objects.','',
+    'In Cura, select the matching printer, nozzle or core, and material before importing the model.',
+    curaProfile==='included'
+     ?'Import the included Cura profile or use cura-manual-settings.txt to enter the settings manually.'
+     :'See cura-manual-review.txt for the job settings and the reason a Cura profile was unavailable.',
+    'For multiple materials, check each part’s extruder assignment and the installed cores.',
+    'Inspect orientation, supports and every layer in installed Cura. Confirm physical fit and optics with a test print.'
+   ].join('\n');
+   entries.push(['READ-ME.txt',instructions],[manifestName,JSON.stringify(manifest,null,2)]);
+   adapter.download(new Blob([zipProfileEntries(entries)],{type:'application/zip'}),stem+'.zip');
   }catch(error){adapter.status(error.message);if($('smsPrintStatus'))$('smsPrintStatus').textContent=error.message;}
  }
  function backup(){captureCrystal();adapter.download(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),'wonder-trunks-studio-backup.json');}

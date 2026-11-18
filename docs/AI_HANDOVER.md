@@ -1,5 +1,9 @@
 # AI handover — read immediately after AGENTS.md
 
+## WT-009 · Print export identity
+
+Built on merged WT-008 / PR #46. Print Centre names outer downloads with a bounded model slug, source revision and stable job ID hash. Packs retain their original internal export paths and add a manifest of effective job settings, Cura profile outcome and actual archive entries. Cura slicing and physical validation remain manual.
+
 ## WT-008 · Print Centre queue
 
 Built on merged WT-007 / PR #44. Queue order and per-job overrides persist in the existing project document. The shared printer resolver applies project defaults, model settings and job overrides in that order. Preparation accepts only its own active worker and request, while model or effective printer changes invalidate affected results. Prepared mesh data stays in memory and must be regenerated after reopening. Custom printers require manual Cura settings. Envelope warnings are advisory and physical slicing, material assignment and printing remain manual. The draft PR records exact-head checks and screenshots.
