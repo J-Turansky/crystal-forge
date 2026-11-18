@@ -44,13 +44,58 @@ export function gearOutline(p){
  // Consecutive root vertices are shared between neighbouring teeth.
  return points.filter((v,i)=>i===0||Math.hypot(v[0]-points[i-1][0],v[1]-points[i-1][1])>1e-7).filter((v,i,arr)=>i!==arr.length-1||Math.hypot(v[0]-arr[0][0],v[1]-arr[0][1])>1e-7);
 }
+function creativeGearOutline(p, radius) {
+ const count=Math.round(p.teeth),samples=count*24;
+ return Array.from({length:samples},(_,i)=>{
+  const angle=i*2*Math.PI/samples,phase=(i%24)/24;
+  let crest;
+  switch(p.wheelStyle){
+   case 'Crown': crest=Math.min(1,phase*7,(1-phase)*7);break;
+   case 'Rotor': crest=Math.min(phase/0.83,(1-phase)/0.17);break;
+   case 'Scallop': crest=1-Math.pow(Math.sin(phase*Math.PI),8);break;
+   case 'Petal': crest=Math.pow(Math.sin(phase*Math.PI),2.4);break;
+   default: crest=(1+Math.cos(phase*Math.PI*2))/2;
+  }
+  const r=radius*(1-(1-crest)*p.toothDepth/100);
+  return [r*Math.cos(angle),r*Math.sin(angle)];
+ });
+}
+
+function creativeGearWindows(p, outline) {
+ const count=Math.round(p.spokes);
+ if(!count||p.webStyle==='Solid')return [];
+ const rim=Math.min(...outline.map(([x,z])=>Math.hypot(x,z)))-p.rimWidth;
+ const root=Math.max(p.hub/2,p.bore/2+2)+1;
+ const span=rim-root,sector=Math.PI/count;
+ // Keep finite webs between openings at the narrowest radius.
+ const half=sector-Math.asin(Math.min(.99,p.webWidth/(2*root)));
+ if(span<3||half<.055)throw Error('Openwork needs more room. Reduce the hub, rim or spoke count, or enlarge the wheel.');
+ return Array.from({length:count},(_,index)=>{
+  const centre=index*2*sector;
+  return Array.from({length:48},(_,step)=>{
+   const a=step*Math.PI/24,t=(1+Math.cos(a))/2;
+   let radius=root+span*t,side=Math.sin(a),sweep=0;
+   if(p.webStyle==='Sweep')sweep=half*.35*(t-.5);
+   if(p.webStyle==='Teardrop')side*=.43+.57*t;
+   if(p.webStyle==='Lens')side*=.82;
+   if(p.webStyle==='Sector'){
+    const power=x=>Math.sign(x)*Math.pow(Math.abs(x),.48);
+    radius=root+span*(1+power(Math.cos(a)))/2;
+    side=power(side);
+   }
+   const angle=centre+side*half*.78+sweep;
+   return [radius*Math.cos(angle),radius*Math.sin(angle)];
+  });
+ });
+}
+
 export const gearGenerator=define('gears','Cogs & Gears','Mechanical',[
- choice('mode','Purpose','Decorative',['Decorative','Mechanical']),numeric('teeth','Tooth count',20,8,80,'',1),numeric('diameter','Decorative outer diameter',80,25,180),numeric('thickness','Body thickness',8,3,25),numeric('module','Mechanical module',3,1,5),numeric('pressureAngle','Pressure angle',20,14.5,30,'degrees'),numeric('bore','Measured shaft bore',8,0,30),numeric('hub','Hub diameter',20,10,45),numeric('spokes','Spoke cutouts',0,0,8,'',1),choice('wheelStyle','Decorative rim','Involute',['Involute','Rounded lobes','Angular teeth','Cam','Pulley']),numeric('toothDepth','Decorative tooth depth',20,5,30,'%',1),choice('holeStyle','Spoke window shape','Round',['Round','Oval','Diamond']),numeric('extraHoles','Extra fixing holes',0,0,6,'',1),choice('inlayStyle','Colour region','Face',['Face','Hub ring'])
-],[['weather','Weather wheel',{}],['tactile','Large tactile cog',{teeth:12,diameter:100,thickness:10}],['pulley','Grooved pulley',{wheelStyle:'Pulley',spokes:5}],['flower','Rounded flower cog',{wheelStyle:'Rounded lobes',teeth:9,spokes:5,holeStyle:'Oval'}],['cam','Eccentric cam',{wheelStyle:'Cam',inlayStyle:'Hub ring'}],['mechanical','Module 2 mechanical',{mode:'Mechanical',teeth:24,module:2,bore:6}]],p=>{
+ choice('mode','Purpose','Decorative',['Decorative','Mechanical']),numeric('teeth','Tooth count',20,8,80,'',1),numeric('diameter','Decorative outer diameter',80,25,180),numeric('thickness','Body thickness',8,3,25),numeric('module','Mechanical module',3,1,5),numeric('pressureAngle','Pressure angle',20,14.5,30,'degrees'),numeric('bore','Measured shaft bore',8,0,30),numeric('hub','Hub diameter',20,10,45),numeric('spokes','Spoke cutouts',0,0,8,'',1),choice('wheelStyle','Decorative rim','Involute',['Involute','Rounded lobes','Angular teeth','Cam','Pulley','Crown','Rotor','Scallop','Petal']),numeric('toothDepth','Decorative tooth depth',20,5,30,'%',1),choice('holeStyle','Spoke window shape','Round',['Round','Oval','Diamond']),numeric('extraHoles','Extra fixing holes',0,0,6,'',1),choice('inlayStyle','Colour region','Face',['Face','Hub ring']),choice('webStyle','Body structure','Legacy',['Legacy','Solid','Sector','Sweep','Teardrop','Lens']),numeric('rimWidth','Minimum rim width',4,2,16),numeric('webWidth','Minimum spoke web',3,2,12),choice('reliefStyle','Raised details','None',['None','Hub collar','Rim rail','Hub and rim']),numeric('reliefHeight','Relief height',2,1,5)
+],[['weather','Weather wheel',{}],['tactile','Large tactile cog',{teeth:12,diameter:100,thickness:10}],['pulley','Grooved pulley',{wheelStyle:'Pulley',spokes:5}],['flower','Rounded flower cog',{wheelStyle:'Rounded lobes',teeth:9,spokes:5,holeStyle:'Oval'}],['cam','Eccentric cam',{wheelStyle:'Cam',inlayStyle:'Hub ring'}],['crown-open','Openwork crown',{wheelStyle:'Crown',webStyle:'Sector',teeth:12,spokes:5,diameter:100,reliefStyle:'Rim rail'}],['turbine','Swept turbine',{wheelStyle:'Rotor',webStyle:'Sweep',teeth:11,spokes:7,diameter:100,reliefStyle:'Hub collar'}],['petal-web','Petal rosette',{wheelStyle:'Petal',webStyle:'Teardrop',teeth:9,spokes:5,diameter:100}],['scallop-lace','Scalloped lace wheel',{wheelStyle:'Scallop',webStyle:'Lens',teeth:13,spokes:7,diameter:105}],['solid-crown','Solid crown with raised hub',{wheelStyle:'Crown',webStyle:'Solid',teeth:8,diameter:92,reliefStyle:'Hub collar'}],['rail-pulley','Layered pulley wheel',{wheelStyle:'Pulley',webStyle:'Sector',spokes:4,diameter:100,reliefStyle:'Hub and rim'}],['mechanical','Module 2 mechanical',{mode:'Mechanical',teeth:24,module:2,bore:6}]],p=>{
  const diameter=p.mode==='Mechanical'?(Math.round(p.teeth)+2)*p.module:p.diameter;
  const radiusOuter=diameter/2;
  const decorative=p.mode!=='Mechanical';
- const outline=!decorative||p.wheelStyle==='Involute'?gearOutline(p):circle(radiusOuter,Math.max(120,Math.round(p.teeth)*12)).map(([x,z])=>{
+ const outline=!decorative||p.wheelStyle==='Involute'?gearOutline(p):['Crown','Rotor','Scallop','Petal'].includes(p.wheelStyle)?creativeGearOutline(p,radiusOuter):circle(radiusOuter,Math.max(120,Math.round(p.teeth)*12)).map(([x,z])=>{
   const angle=Math.atan2(z,x),wave=(1+Math.cos(angle*Math.round(p.teeth)))/2;
   const shape=p.wheelStyle==='Rounded lobes'?wave:p.wheelStyle==='Angular teeth'?Math.pow(wave,.35):1;
   const scale=p.wheelStyle==='Cam'?.79+.21*Math.cos(angle):1-(1-shape)*p.toothDepth/100;
@@ -60,7 +105,10 @@ export const gearGenerator=define('gears','Cogs & Gears','Mechanical',[
  if(p.mode==='Mechanical'&&p.teeth<Math.ceil(2/Math.sin(p.pressureAngle*Math.PI/180)**2))throw Error('This tooth count risks involute undercut. Increase teeth or pressure angle.');
  const holes=p.bore? [circle(p.bore/2)]:[];
  const count=Math.round(p.spokes),radius=diameter*.24,holeRadius=Math.min(diameter*.065,Math.max(1,(diameter*.4-p.hub/2)/2));
- if(count&&radius-holeRadius>Math.max(p.hub/2,p.bore/2+2))for(let i=0;i<count;i++){
+ const creativeWeb=decorative&&p.webStyle!=='Legacy';
+ const webOutline=p.wheelStyle==='Pulley'?outline.map(([x,z])=>[x*.78,z*.78]):outline;
+ if(creativeWeb)holes.push(...creativeGearWindows(p,webOutline));
+ if(!creativeWeb&&count&&radius-holeRadius>Math.max(p.hub/2,p.bore/2+2))for(let i=0;i<count;i++){
   const angle=i/count*Math.PI*2,cx=Math.cos(angle)*radius,cz=Math.sin(angle)*radius;
   const form=decorative?p.holeStyle:'Round';
   holes.push(circle(holeRadius,form==='Diamond'?4:32).map(([x,z])=>{
@@ -69,6 +117,7 @@ export const gearGenerator=define('gears','Cogs & Gears','Mechanical',[
   }));
  }
  const extra=decorative?Math.round(p.extraHoles):0;
+ if(extra&&creativeWeb&&holes.length>(p.bore?1:0))throw Error('Turn off extra fixing holes when using an openwork body.');
  for(let i=0;i<extra;i++){
   const angle=i/extra*Math.PI*2,candidate=circle(1.4,24,Math.cos(angle)*radiusOuter*.58,Math.sin(angle)*radiusOuter*.58);
   if(holes.some(h=>h.some(a=>candidate.some(b=>Math.hypot(a[0]-b[0],a[1]-b[1])<1.6))))throw Error('Extra fixing holes are too close to the bore or spoke windows.');
@@ -83,8 +132,26 @@ export const gearGenerator=define('gears','Cogs & Gears','Mechanical',[
  const hubRadius=Math.min(radiusOuter*.27,p.hub/2);
  const inlay=decorative&&p.inlayStyle==='Hub ring';
  if(inlay&&p.bore/2>=hubRadius-1.5)throw Error('The hub ring needs more space around the bore.');
+ const relief=decorative&&p.reliefStyle!=='None';
+ if(relief){
+  const overlap=Math.min(.4,p.thickness*.1);
+  const height=p.reliefHeight+overlap,y=p.thickness-overlap;
+  if(p.reliefStyle!=='Rim rail'){
+   const collar=Math.min(p.hub/2,Math.min(...outline.map(([x,z])=>Math.hypot(x,z)))*.4);
+   if(collar<=p.bore/2+1.2)throw Error('The raised hub collar needs more space around the bore.');
+   positive.push(extrusion(circle(collar),height,[0,y,0],p.bore?[circle(p.bore/2)]:[]));
+  }
+  if(p.reliefStyle!=='Hub collar'){
+   const outer=outline.map(([x,z])=>[x*.985,z*.985]);
+   const inner=outline.map(([x,z])=>[x*.94,z*.94]);
+   const maxWindow=Math.max(0,...holes.flat().map(([x,z])=>Math.hypot(x,z)));
+   if(maxWindow>=Math.min(...inner.map(([x,z])=>Math.hypot(x,z)))-.2)throw Error('The raised rim needs space outside the cutouts. Increase the rim width.');
+   positive.push(extrusion(outer,height,[0,y,0],[inner]));
+  }
+ }
+ if((creativeWeb||relief)&&!inlay)return {positive,secondary:[],negative:[],materialSplitHeight:p.thickness-.8,bounds:{width:diameter,depth:diameter,height:p.thickness+(relief?p.reliefHeight:0)},warnings:['Decorative wheel. Check wheel clearances before using moving parts.']};
  const secondary=[extrusion(inlay?circle(hubRadius):outline,.8,[0,p.thickness-.8,0],inlay?(p.bore?[circle(p.bore/2)]:[circle(hubRadius*.55)]):holes)];
- return {positive,secondary,negative:[],bounds:{width:diameter,depth:diameter,height:p.thickness},warnings:['Pinch points and moving parts require guarding and physical checks. Mechanical meshing still requires a mating-gear test.']};
+ return {positive,secondary,negative:[],bounds:{width:diameter,depth:diameter,height:p.thickness+(relief?p.reliefHeight:0)},warnings:['Pinch points and moving parts require guarding and physical checks. Mechanical meshing still requires a mating-gear test.']};
 },{supportsMechanisms:true});
 export const waveGenerator=define('waves','Waves & Organic Forms','Organic',[
  numeric('width','Length',110,30,200),numeric('depth','Width',65,20,160),numeric('thickness','Minimum base thickness',4,2,15),numeric('amplitude','Wave height',12,1,40),numeric('frequency','Wave count',2,0.5,6,'',.1),numeric('phase','Phase',0,0,360,'degrees'),numeric('direction','Direction',0,0,360,'degrees'),numeric('variation','Organic variation',.25,0,1,'',.05)
@@ -310,3 +377,5 @@ export function applyBuildModules(recipe,build={},capabilities={}){
  addPixelHoleCuts(r,build.pixelHoles);
  return r;
 }
+
+gearGenerator.visualFields=['wheelStyle','webStyle','reliefStyle','diameter','teeth','spokes','rimWidth','webWidth','reliefHeight'];

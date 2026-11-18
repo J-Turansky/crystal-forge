@@ -4,6 +4,21 @@
 
 Version `0.16.0-dev.4` introduces the shell and current-model-first Quick Print. Use `?layout=legacy` for the classic Studio layout with the same data. Visual Design parity, advanced direct manipulation, shared 3D Build placement, SVG then STL/OBJ importing, and mature Library and Print workflows remain follow-up milestones.
 
+## Creative expansion after Stage B
+
+Use the shared visual palette and existing geometry/preparation contracts for all six families. Each family must ship at least three visibly distinct real previews, a structural choice and a continuous geometry control, saved-project and legacy round-trip tests, and connected Manifold/STL/3MF fixtures in supported materials.
+
+| Family | Next structural styles | Manufacturing acceptance |
+| --- | --- | --- |
+| Crystal Clusters | Basalt columns, fan clusters, broad truncated prisms | Preserve root seats, spacing, light cavities and cable routes |
+| Tactile Texture Tiles | Basket weave, rounded pebble fields, directional scales | Continuous backing and minimum printable pitch and relief |
+| Waves & Organic Forms | Sweeping swell, concentric ripples, saddle or vortex surfaces | Positive base thickness and distinct surface curvature |
+| Buttons & Control Caps | Scalloped grips, recessed pointers, stepped caps | Preserve measured shaft fit and connected material bodies |
+| Characters & Silhouettes | Distinct poses, embossed features, stepped relief | Minimum limb bridges and closed single/dual geometry |
+| Glowing Pebbles & Light Pods | Flattened pebble, faceted lantern, ribbed shell | Preserve shell thickness, light access and cable clearance |
+
+SVG extrusion remains scheduled ahead of validated STL/OBJ import. Physical fit, optical behaviour and tactile comfort remain manual checks.
+
 ## Current sequence
 
 1. Stabilise fabrication and require release metadata before Pages deployment.

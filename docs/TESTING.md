@@ -1,5 +1,9 @@
 # Crystal Forge — verification strategy and commands
 
+## Creative Stage B checks
+
+The unified browser suite checks the real palette, parameter mutation and gallery previews. The catalogue suite prepares and exports decorative gear presets through Manifold in both material modes. The CI screenshot artifact includes a comparable baseline and the new gear gallery.
+
 ## Stability checks
 
 Run `node tests/release-metadata.mjs <base SHA>` to check the release heading, toolbar and What's New entry against the previous production revision. Run static, browser and fabrication CI on the same head. Manifold checks the joystick in single- and two-material mode and then continues through the full catalogue. Existing fixture tests exercise legacy migrations and simulated private-vault data. A live cross-device vault restore, installed Cura import and physical printing are separate manual acceptance steps.

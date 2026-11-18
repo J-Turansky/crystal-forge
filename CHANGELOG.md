@@ -1,5 +1,11 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.5 — Contextual design tools and creative gears
+
+- Edit model geometry directly from the visual palette.
+- Combine new decorative gear silhouettes, openwork and relief.
+- Keep earlier projects and mechanical gear behaviour available.
+
 ## v0.16.0-dev.4 — Unified Wonder Trunks Studio workspace
 
 - Add Creative Home, a model rail and a split 3D workspace with searchable precision settings.
