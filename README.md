@@ -1,4 +1,8 @@
-# Crystal Forge — Browser Studio v0.15.0 consolidated software candidate
+# Crystal Forge / Sensory Model Studio
+
+## Current milestone
+
+Sensory Model Studio contains seven model families and a shared Print Centre. The stability draft targets joystick STL export and production release metadata. See the [acceptance record](docs/SENSORY_MODEL_STUDIO_V016_ACCEPTANCE.md) for verification and remaining work.
 
 **PR12 [#18](https://github.com/connorturansky-svg/crystal-forge/pull/18) was merged.** The current [PR13/#19](https://github.com/connorturansky-svg/crystal-forge/pull/19) consolidates the final software stage: orphan-free routed pixels across old/new projects, no double-rendered ghost tracks, fail-closed cable manufacturing, optional automatic printer-bed splitting, keyboard nudges and stronger export/QA. **Real Cura and physical LED/optical/mounting tests remain required.** [Final release acceptance](docs/FINAL_PHASE_ACCEPTANCE.md).
 

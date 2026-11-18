@@ -1,12 +1,15 @@
 # Crystal Forge — Changelog
 
-## Unreleased — Sensory Model Studio v0.16.0 in progress
+## v0.16.0-dev.3 — Studio stability and release foundations
 
-- Add model/project document operations, pinned library revisions, print-job ownership guards and additive legacy migration modules.
-- Add tactile tile reference geometry, two material partitions, a Manifold preparation adapter and aligned STL / multi-object 3MF export modules.
-- Add regression tests and preserve the complete development brief plus an explicit outstanding acceptance matrix.
-- These modules are not yet connected to the production editor. The seven-generator application, full shared UI and sync remain incomplete; the running app remains v0.15.1.
+- Rebuild the thumb joystick as one closed solid for print preparation.
+- Keep visual model picking, part offsets, pixel bores and fit-test downloads available.
+- Check that the app version and release notes match before production deployment.
 
+## v0.16.0-dev.2 — Sensory Model Studio preview
+
+- Add seven model families, a visual picker, shared pixel bores and a global Print Centre.
+- Add linked library revisions, part offsets and a pixel fit-test download.
 
 ## v0.15.1 — PR14 measured physical cable-length snapping (draft)
 

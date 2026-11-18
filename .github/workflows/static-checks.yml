@@ -26,8 +26,19 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Verify release metadata against main
+        if: github.event_name == 'pull_request'
+        env:
+          RELEASE_BASE: ${{ github.event.pull_request.base.sha }}
+        run: node tests/release-metadata.mjs "$RELEASE_BASE"
+      - name: Verify release metadata
+        if: github.event_name != 'pull_request'
+        run: node tests/release-metadata.mjs
       - name: Syntax, local import and HTML wiring checks
         run: npm run test:static

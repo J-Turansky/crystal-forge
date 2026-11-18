@@ -1,10 +1,32 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import Module from 'manifold-3d';
-import {capGenerator,generators,applyBuildModules} from '../studio-catalogue.js';
+import {capGenerator,pebbleGenerator,generators,applyBuildModules} from '../studio-catalogue.js';
 import {prepareRecipe} from '../studio-geometry.js';
 import {exportMaterialBodies} from '../studio-material-export.js';
 const wasm=await Module();wasm.setup();
+const joystick=capGenerator.presets.find(preset=>preset.id==='joystick');
+assert.equal(joystick.parameters.controlStyle,'Thumb joystick');
+for(const dualMaterial of [false,true]){
+ const prepared=prepareRecipe(THREE,wasm,capGenerator.recipe({...joystick.parameters,dualMaterial}));
+ const exported=exportMaterialBodies(prepared,{name:'thumb-joystick-regression'});
+ assert.equal(exported.stls.length,dualMaterial?2:1);
+ assert(exported.threeMF.length>100);
+}
+const indicator=capGenerator.presets.find(preset=>preset.id==='indicator');
+const lens=prepareRecipe(THREE,wasm,capGenerator.recipe({...indicator.parameters,dualMaterial:false}));
+const splitLens=prepareRecipe(THREE,wasm,capGenerator.recipe({...indicator.parameters,dualMaterial:true}));
+assert.deepEqual(splitLens.bodies.map(body=>body.role),['primary','secondary']);
+assert(Math.abs(splitLens.bodies.reduce((volume,body)=>volume+body.volume,0)-lens.bodies[0].volume)<1e-4,
+ 'The indicator material split must preserve the lens volume.');
+assert.equal(exportMaterialBodies(splitLens,{name:'indicator-lens-regression'}).stls.length,2);
+console.log('Indicator lens regression: connected material bodies, conserved volume and STL export passed.');
+const river=pebbleGenerator.presets.find(preset=>preset.id==='river');
+const riverSingle=prepareRecipe(THREE,wasm,pebbleGenerator.recipe({...river.parameters,dualMaterial:false}));
+const riverDual=prepareRecipe(THREE,wasm,pebbleGenerator.recipe({...river.parameters,dualMaterial:true}));
+assert.equal(exportMaterialBodies(riverDual,{name:'river-pod-regression'}).stls.length,2);
+assert(Math.abs(riverDual.bodies.reduce((volume,body)=>volume+body.volume,0)-riverSingle.bodies[0].volume)<1e-4);
+console.log('River pod regression: connected material bodies, conserved volume and STL export passed.');
 for(const generator of generators){
  assert(generator.presets.length>=3,generator.displayName+' requires three meaningful presets.');
  for(const preset of generator.presets){

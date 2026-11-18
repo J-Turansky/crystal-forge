@@ -153,13 +153,23 @@ function panelControlRecipe(p){
    secondary.push(...raisedControlSymbol(p.symbol,w*.42,top,-w*.06));
    if(secondary.length)top+=1.2;
   }
- }else if(shape==='Toggle lever'||shape==='Thumb joystick'){
+ }else if(shape==='Thumb joystick'){
+  // One closed shell avoids Boolean seams between the stem and grip.
+  const stem=Math.min(w,d)*.22,base=h*.28,tip=h*1.1,radius=stem*1.8;
+  const rings=[[0,w/2,d/2],[base*.8,w/2,d/2],[base,stem,stem],[tip-h*.17,stem,stem]];
+  for(let i=-2;i<=5;i++){
+   const angle=i*Math.PI/12,size=radius*Math.cos(angle);
+   rings.push([tip+Math.sin(angle)*h*.21,size,size]);
+  }
+  top=tip+h*.21;
+  positive.push({kind:'ring-solid',rings,top});
+ }else if(shape==='Toggle lever'){
   const stem=Math.min(w,d)*.22,base=h*.28;
-  const angle=shape==='Toggle lever'?p.leverAngle*Math.PI/180:0;
+  const angle=p.leverAngle*Math.PI/180;
   const length=h*.82,tip=[Math.sin(angle)*length,base+Math.cos(angle)*length,0];
   positive.push(extrusion(oval(),base));
   positive.push({...cylinder(stem,length+1),rotation:[0,0,-angle],position:[tip[0]/2,base+Math.cos(angle)*length/2-.45,0]});
-  const radius=shape==='Thumb joystick'?stem*1.8:stem*1.15;
+  const radius=stem*1.15;
   positive.push(sphere([radius,h*.21,radius],tip));
   width=Math.max(w,2*(Math.abs(tip[0])+radius));
   top=tip[1]+h*.21;
@@ -187,7 +197,9 @@ function panelControlRecipe(p){
    :cylinder(socket/2,p.socketDepth+.2,[0,(p.socketDepth-.2)/2,0]));
  }
  const band=Math.min(2,h*.16);
- return {positive,negative,secondary,materialBand:secondary.length?undefined:box([width+2,band,depth+2]),
+ return {positive,negative,secondary,
+  materialSplitHeight:shape==='Indicator lens'?band:undefined,
+  materialBand:secondary.length||shape==='Indicator lens'?undefined:box([width+2,band,depth+2]),
   bounds:{width,depth,height:top},warnings:['Printed control shell. Measure the actual hardware and check fit and movement with a physical sample.']};
 }
 
@@ -231,7 +243,7 @@ export const pebbleGenerator=define('light-pods','Glowing Pebbles & Light Pods',
  if(p.illuminated){negative.push(sphere(radii.map(r=>r-p.wall),centre),cylinder(p.opening/2,p.height/2,[0,p.height/4-1,0]),{...cylinder(p.cable/2,p.depth),rotation:[Math.PI/2,0,0],position:[0,p.cable/2,p.depth/2]});}
  const bandHeight=Math.max(3,p.wall,p.illuminated?p.cable+.5:0);
  return {positive:[outer],secondary:[],negative,
-  materialBand:box([p.width+2,bandHeight,p.depth+2]),bounds:{width:p.width,depth:p.depth,height:p.height*.93},warnings:p.illuminated?[lightingWarning,'Inspect access opening, cable exit and curved roof in Cura.']:['Non-illuminated solid variant.']};
+  materialSplitHeight:bandHeight,bounds:{width:p.width,depth:p.depth,height:p.height*.93},warnings:p.illuminated?[lightingWarning,'Inspect access opening, cable exit and curved roof in Cura.']:['Non-illuminated solid variant.']};
 },{supportsLEDs:true});
 // Characters lie flat as extruded, connected silhouettes with broad features.
 export const characterGenerator=define('characters','Characters & Silhouettes','Characters',[

@@ -1,5 +1,9 @@
 # Crystal Forge — verification strategy and commands
 
+## Stability checks
+
+Run `node tests/release-metadata.mjs <base SHA>` to check the release heading, toolbar and What's New entry against the previous production revision. Run static, browser and fabrication CI on the same head. Manifold checks the joystick in single- and two-material mode and then continues through the full catalogue. Existing fixture tests exercise legacy migrations and simulated private-vault data. A live cross-device vault restore, installed Cura import and physical printing are separate manual acceptance steps.
+
 ## Sensory Model Studio v0.16.0 — active draft work
 
 The user approved the full seven-generator expansion, global Print Centre, local-first visual library, copy/linked models, private-vault evolution and actual dual-material exports. [Full brief](SENSORY_MODEL_STUDIO_V016_BRIEF.md). **Implementation is incomplete.** [Current acceptance and module map](SENSORY_MODEL_STUDIO_V016_ACCEPTANCE.md) distinguishes source modules, integration still needed and unrun tests. Keep all remaining stages in the same draft PR; do not mark this checkpoint as the finished v0.16.0 release.
