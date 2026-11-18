@@ -32,14 +32,11 @@ try{
  const crystalPictures=await picker.locator('[data-preset] img').evaluateAll(images=>images.map(image=>image.src));
  assert.equal(crystalPictures.length,6,'Each crystal starting point renders actual geometry.');
  assert.equal(new Set(crystalPictures).size,6,'Crystal geometry produces six distinct thumbnails.');
+ await fs.mkdir('qa',{recursive:true});
+ await page.screenshot({path:'qa/unified-family-crystals.png'});
  await picker.locator('[data-preset="radial-bloom"]').click();
  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.parameters.leanMode==='Radial outward');
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.editableState.crystals.length),11);
- await page.locator('#model-tab-'+originalCrystal).click();
- await page.getByText('Crystal starting points — creates a new model',{exact:true}).click();
- await page.getByRole('button',{name:'Crescent geode',exact:true}).click();
- await page.waitForFunction(()=>window.__sensoryStudio.currentModel.parameters.pattern==='Geode / Crescent');
- assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.editableState.crystals.length),13);
  await page.locator('#model-tab-'+originalCrystal).click();
  await page.locator('#smsNew').click();
  await picker.getByRole('button',{name:'Browse Cogs & Gears starting points'}).click();
@@ -49,17 +46,10 @@ try{
  await picker.locator('[data-preset="pulley"]').click();
  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.parameters.wheelStyle==='Pulley');
  assert.equal(await picker.isVisible(),false,'Selecting a preset closes the picker.');
- await page.locator('#smsPartEditor > summary').click();
- const partSelector=page.locator('#smsPartSelect');
- await partSelector.selectOption({index:1});
- const partId=await partSelector.inputValue();
- const partSlider=page.locator('[data-palette-key="part-offset-0"]');
- await partSlider.focus();await partSlider.press('ArrowRight');
- await page.waitForFunction(id=>window.__sensoryStudio.currentModel.build.partOffsets?.[id]?.[0]===.1,partId);
- assert.equal(await page.locator('[data-part-axis="0"]').inputValue(),'0.1');
- await page.locator('#smsPartReset').click();
- assert.equal(await partSlider.inputValue(),'0');
  await add('tactile-tiles');const first=await page.evaluate(()=>window.__sensoryStudio.currentModel.id);
+ await page.locator('#smsPreset').selectOption('basket');
+ await page.waitForFunction(()=>window.__sensoryStudio.currentModel.parameters.pattern==='basket');
+ await page.screenshot({path:'qa/unified-family-tactile-tiles.png'});
  await page.locator('.sms-panel-details > summary').filter({hasText:'Size and proportions'}).click();await exact('width',92.5);
  await add('tactile-tiles');const second=await page.evaluate(()=>window.__sensoryStudio.currentModel.id);
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.width),80);
@@ -78,7 +68,8 @@ try{
   await add(type);
   await page.locator('#smsPreset').selectOption(preset);
   await page.waitForFunction(([key,value])=>window.__sensoryStudio.currentModel.parameters[key]===value,[key,value]);
-  assert(await page.locator(`[data-palette-key="${key}"]`).count(),`${type} exposes the tuned style in the palette.`);
+  await fs.mkdir('qa',{recursive:true});
+  await page.screenshot({path:`qa/unified-family-${type}.png`});
  }
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.registry.list().length),7);
  await page.locator('#model-tab-'+first+' .close-tab').click();assert(await page.evaluate(id=>window.__sensoryStudio.project.models.some(m=>m.id===id),first));

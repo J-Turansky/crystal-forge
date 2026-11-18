@@ -48,6 +48,11 @@ for(const diameter of [100,110]){
  const hole=findPixelPosition(uncut,[]);
  assert(hole,'Openwork turbine needs a printable pixel position.');
  assert.notDeepEqual([hole.x,hole.z],[diameter*.23,0],'The original candidate was in the window.');
+ if(diameter===100){
+  const misplaced={...hole,x:23,z:0};
+  assert.throws(()=>prepareRecipe(THREE,wasm,applyBuildModules(uncut,{pixelHoles:[misplaced]},gearGenerator.capabilities)),
+   /does not cut the model/, 'The reviewed placement must still fail fabrication.');
+ }
  const cut=prepareRecipe(THREE,wasm,applyBuildModules(uncut,{pixelHoles:[hole]},gearGenerator.capabilities));
  const original=prepareRecipe(THREE,wasm,uncut);
  assert(original.bodies[0].volume-cut.bodies[0].volume>1);

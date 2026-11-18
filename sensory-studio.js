@@ -482,7 +482,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    if(crystal)presets.addEventListener('toggle',()=>{if(presets.open)populate();});
    else populate();
   }
-  const part=build?null:$('smsPartSelect');
+  const part=build||family.typeId==='crystals'?null:$('smsPartSelect');
   if(part?.value){
    const region=document.createElement('section'), title=document.createElement('h3');
    region.className='sms-context-controls';region.setAttribute('aria-label','Selected part');controls.before(region);
