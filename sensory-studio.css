@@ -67,3 +67,5 @@ body.sms-unified .layout{height:auto;min-height:0;flex:1;position:relative;grid-
  .sms-settings{overflow:visible}
  .sms-unified[data-studio-view=home] .sms-settings{display:none}
 }
+
+.sms-unified #smsFocus{pointer-events:auto;position:relative;z-index:1}
