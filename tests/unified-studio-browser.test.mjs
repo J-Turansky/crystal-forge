@@ -203,7 +203,7 @@ try{
  await page.locator('#smsLibrary').click();
  const savedModels=await snapshot();
  assert(savedModels.length>=2);
- const thumbnail=await page.evaluate(()=>window.__sensoryStudio.project.models.find(model=>/^data:image\\//.test(model.thumbnail))?.thumbnail);
+ const thumbnail=await page.evaluate(()=>window.__sensoryStudio.project.models.find(model=>model.thumbnail?.startsWith('data:image/'))?.thumbnail);
  assert(thumbnail);
  await page.locator('#smsSaveProject').click();
  const projects=page.locator('#smsSavedProjects');
