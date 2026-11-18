@@ -135,15 +135,19 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
   if(recipe.secondary?.length&&!recipe.partitioned)total=hold(total.add(union(recipe.secondary)));
   if(recipe.nativeRouting?.ready){
    onProgress('Cutting serial LED channels');
-   const cuts=[];
+   // Collapse Boolean slivers below the precision of a printable channel.
+   // STL still checks every exported triangle after this bounded simplification.
+   const tolerance=.0001,cuts=[];
+   total=hold(total.setTolerance(tolerance));
    for(const part of recipe.negative){
-    const cut=convert(part);
+    const cut=hold(convert(part).setTolerance(tolerance));
     if(hold(total.intersect(cut)).volume()<.1)
      throw Error((part.pixelHole||part.wireChannel||'Cut')+' does not cut the model.');
     cuts.push(cut);
    }
    const originalVolume=total.volume();
-   total=hold(total.subtract(hold(wasm.Manifold.union(cuts))));
+   const routed=hold(total.subtract(hold(wasm.Manifold.union(cuts))));
+   total=hold(routed.simplify(tolerance));
    if(originalVolume-total.volume()<.1)throw Error('Serial channels did not remove material.');
   }else for(const part of recipe.negative||[]){
    const before=total;
