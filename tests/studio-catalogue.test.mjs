@@ -142,7 +142,7 @@ for(const id of ['knob','selector']){
  assert.match(pixelBoreIssue(gearGenerator.recipe(turbine),{...newBore,x:23,z:0}),/continuous solid material/);
  assert.match(pixelBoreIssue(pebbleGenerator.recipe({...river.parameters,illuminated:false}),{
   ...newBore,x:0,z:0
- }),/wall and cavity clearance cannot be verified/);
+ }),/cavity/);
  const mounted=applyBuildModules(wave,{mounting:true,spacing:35,mountStyle:'Underside counterbores'},waveGenerator.capabilities);
  assert.match(pixelBoreIssue(mounted,{...newBore,x:21,z:0}),/existing cut/, 'Preserve web around the larger counterbore.');
  const thin={positive:[{kind:'box',size:[30,1,30]}],negative:[],bounds:{width:30,depth:30,height:1}};

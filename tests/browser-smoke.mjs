@@ -410,11 +410,14 @@ try{
   const p=JSON.parse(localStorage.getItem('crystal-forge-v3')).settings.manualPixelHoles.find(p=>p.id===id);
   return {x:p.x,z:p.z};
  },draggedId);
- await page.mouse.move(markerRect.x+markerRect.width/2,markerRect.y+markerRect.height/2);
- await page.mouse.down();
- await page.mouse.move(contextPoint.x,contextPoint.y);
- await page.mouse.up();
- assert.deepEqual(await readDraggedPixel(),start,'A quick drag does not move the selected fitting');
+ await marker.evaluate((button,target)=>{
+  const box=button.getBoundingClientRect(),start={clientX:box.x+box.width/2,clientY:box.y+box.height/2};
+  const send=(node,type,point)=>node.dispatchEvent(new PointerEvent(type,{...point,bubbles:true,cancelable:true,pointerId:91,button:0}));
+  send(button,'pointerdown',start);
+  send(document,'pointermove',{clientX:target.x,clientY:target.y});
+  send(document,'pointerup',{clientX:target.x,clientY:target.y});
+ },contextPoint);
+ assert.deepEqual(await readDraggedPixel(),start,'Motion before the hold threshold does not move the selected fitting');
  // A held drag previews a candidate but Escape retains the accepted placement.
  await page.mouse.move(markerRect.x+markerRect.width/2,markerRect.y+markerRect.height/2);
  await page.mouse.down();

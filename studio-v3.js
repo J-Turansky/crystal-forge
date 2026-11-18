@@ -24,7 +24,7 @@ import {GitHubVault,captureVault,mergeVault} from './github-vault.js';
 import {manufacturingFingerprint} from './manufacturing-fingerprint.js';
 import {saveNamedProject,listSavedProjects,loadNamedProject,deleteNamedProject} from './project-library.js';
 import {installTooltips,describeControl} from './tooltips.js';
-import {PIXEL_PRESETS,allPixelProfiles,normalisePixelProfile,resolvePixelProfile} from './pixel-profiles.js';
+import {PIXEL_PRESETS,allPixelProfiles,normalisePixelProfile,resolvePixelProfile,resolveSocketProfile} from './pixel-profiles.js';
 import {renderPixelProfileDiagram,PIXEL_DIMENSIONS} from './pixel-profile-diagram.js';
 import {createCuraProfile,calculateCuraSettings} from './cura-profiles.js';
 import {adviseCuraForModel} from './cura-model-advisor.js';
@@ -1237,7 +1237,7 @@ hardwareUI=createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,getBase
  getSettings:()=>s,getCrystals:()=>crystals,canEdit:()=>!window.__sensoryStudio?.currentModel?.link,
  onSelectionChange:()=>document.dispatchEvent(new Event('studio-crystal-pixel-selection')),
  getManufacturingVisible:()=>!!manufacturingMesh?.visible,onStatus:setStatus,
- onEdit:()=>{disposeManufacturing();syncForm();updateLEDs();hardwareUI.refresh();renderInfo();snapshot()}
+ onEdit:()=>{disposeManufacturing();syncForm();updateLEDs();hardwareUI.refresh();renderInfo();snapshot();document.dispatchEvent(new Event('studio-crystal-pixel-selection'));}
 });
 
 $('detachablePlateBtn').onclick=()=>{
@@ -1530,7 +1530,21 @@ if(studioBootstrap&&!new URLSearchParams(location.search).has('legacy'))studioBr
  capture:()=>({settings:clone(s),crystals:clone(crystals),selectedId}),
  bounds:()=>{const size=modelBounds().getSize(new THREE.Vector3());return {width:size.x,depth:size.z,height:size.y};},
  status:setStatus,download,undo,canUndo:delta=>historyIndex+delta>=0&&historyIndex+delta<history.length,vault:()=>cloudVault,
- crystalSelectedPixel:()=>hardwareUI.getSelectedPixel(),
+ crystalSelectedPixel:()=>{
+  const pixel=hardwareUI.getSelectedPixel();
+  return pixel?{...pixel,fitting:resolveSocketProfile(s,pixel),profiles:allPixelProfiles(s)}:null;
+ },
+ crystalPixelFitCoupon:async format=>{
+  const pixel=hardwareUI.getSelectedPixel();
+  if(!pixel)throw Error('Select a Crystal pixel first.');
+  const profile=resolveSocketProfile(s,pixel);
+  const coupon=makePixelSeatCoupon(await loadManifold(),{...s,pixelProfileId:profile.id,pixelDiameter:profile.bodyDiameter});
+  try{
+   const save=format==='3mf'?save3MF:saveSTL;
+   save(coupon.geometry,'pixel-fit-crystal-p'+(pixel.index+1)+'.'+format);
+   return coupon.diameters;
+  }finally{coupon.geometry.dispose();}
+ },
  updateCrystalPixel:(id,fields)=>hardwareUI.updatePixel(id,fields),
  removeCrystalPixel:()=>hardwareUI.removeSelectedPixel(),
  pixelFitProfiles:()=>readPixelFitProfiles(),
