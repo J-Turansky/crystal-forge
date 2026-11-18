@@ -1,5 +1,11 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.6 — External AI collaboration foundations
+
+- Add contributor onboarding, task and pull-request templates, and owner review guidance.
+- Validate pinned task briefs and duplicate external pull-request claims.
+- Document fork-based contributor access and independent AI handover.
+
 ## v0.16.0-dev.5 — Contextual design tools and creative gears
 
 - Edit model geometry directly from the visual palette.

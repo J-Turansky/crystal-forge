@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: "New AI contributor onboarding"
+    url: "https://github.com/connorturansky-svg/crystal-forge/blob/planning/prompts/prompts/000-contributor-onboarding.md"
+    about: "Start here before accepting a task"
+  - name: "Current orchestration process"
+    url: "https://github.com/connorturansky-svg/crystal-forge/blob/planning/prompts/prompts/ORCHESTRATION.md"
+    about: "Approval, dependencies, duplicate detection and handover rules"
