@@ -105,7 +105,10 @@ function shell(p, bottom, top, {rings=24, segments=96}={}) {
   triangle(baseCentre,base[i],base[j]);
   triangle(rim[i],rim[j],base[j]); triangle(rim[i],base[j],base[i]);
  }
- return {points: new Float32Array(points), triangles: new Uint32Array(faces)};
+ const meshPoints = new Float32Array(points);
+ // Use the exact faceted backing boundary represented by the manufacturing mesh.
+ const boreOutline = base.map(i => [meshPoints[i * 3], meshPoints[i * 3 + 2]]);
+ return {points: meshPoints, triangles: new Uint32Array(faces), boreOutline};
 }
 export function generateTile(input, resolution) {
  const checked=validateTileParameters(input);

@@ -1,6 +1,6 @@
 import {layeredCharacter} from './studio-character-relief.js';
 import {createPodShell} from './wt002-pod-shell.js';
-import {addPixelHoleCuts} from './studio-pixel-builder.js';
+import {addPixelHoleCuts,checkedPixelBore} from './studio-pixel-builder.js';
 import {generateTile,tactileTileGenerator} from './tactile-tile-generator.js';
 import {createGeneratorRegistry} from './studio-generator-registry.js';
 import {circle,heightField} from './studio-geometry.js';
@@ -177,8 +177,10 @@ export const waveGenerator=define('waves','Waves & Organic Forms','Organic',[
   return p.thickness+p.amplitude*relief;
  };
  const mesh=heightField(p.width,p.depth,top);
+ const w = p.width / 2, d = p.depth / 2;
+ const pixelBoreSupport = {outline:[[-w,-d],[w,-d],[w,d],[-w,d]],minThickness:p.thickness};
  const material=p.flowStyle==='Parallel'?{secondary:[box([p.width,.8,p.depth],[0,.4,0])]}:{secondary:[],materialSplitHeight:.8,materialSplitRole:'top'};
- return {positive:[{kind:'mesh',mesh}],...material,negative:[],bounds:{width:p.width,depth:p.depth,height:p.thickness+p.amplitude},warnings:['Review the wave slopes in Cura; the flat underside is the intended bed face.']};
+ return {positive:[{kind:'mesh',mesh}],...material,pixelBoreSupport,negative:[],bounds:{width:p.width,depth:p.depth,height:p.thickness+p.amplitude},warnings:['Review the wave slopes in Cura; the flat underside is the intended bed face.']};
 });
 function raisedControlSymbol(symbol,width,surface,offset=0){
  const h=2.4,y=surface, size=width*.34;
@@ -438,7 +440,7 @@ export const characterGenerator=define('characters','Characters & Silhouettes','
  return {positive,secondary,negative:[],bounds:{width:w,depth:h,height:t+1.2},warnings:['Broad joined features reduce fragility; inspect printed horns, ears, legs and edges before participant use.']};
 });
 export const tileGenerator={...tactileTileGenerator,parameterSchema:tactileTileGenerator.parameterSchema.map(s=>({...s,label:s.label||s.key.replace(/[A-Z]/g,c=>' '+c.toLowerCase()),step:s.key==='seed'?1:s.key==='randomness'?.05:.5})),
- recipe(input){const r=generateTile(input);return {positive:[{kind:'mesh',mesh:r.bodies[0].mesh}],partitioned:r.parameters.dualMaterial,secondary:r.bodies.length===2?[{kind:'mesh',mesh:r.bodies[1].mesh}]:[],negative:[],dualMaterial:r.parameters.dualMaterial,bounds:this.estimateBounds(input),warnings:['Tactile feel, cleanability and edge comfort require a printed sample.']};}};
+ recipe(input){const r=generateTile(input);return {pixelBoreSupport:{outline:r.bodies[0].mesh.boreOutline,minThickness:r.parameters.thickness},positive:[{kind:'mesh',mesh:r.bodies[0].mesh}],partitioned:r.parameters.dualMaterial,secondary:r.bodies.length===2?[{kind:'mesh',mesh:r.bodies[1].mesh}]:[],negative:[],dualMaterial:r.parameters.dualMaterial,bounds:this.estimateBounds(input),warnings:['Tactile feel, cleanability and edge comfort require a printed sample.']};}};
 export const generators=[tileGenerator,gearGenerator,waveGenerator,capGenerator,characterGenerator,pebbleGenerator];
 export function makeCatalogue(crystalAdapter){const registry=createGeneratorRegistry();for(const g of [crystalAdapter,...generators].filter(Boolean))registry.register(g);return registry;}
 export function applyBuildModules(recipe,build={},capabilities={}){
@@ -472,6 +474,13 @@ export function applyBuildModules(recipe,build={},capabilities={}){
   r.warnings.push('Through mounting holes are un-rated; test actual mounting loads.');
  }
  if(build.base&&capabilities.supportsBase){const thickness=Number(build.baseThickness||3);if(thickness<2||thickness>15)throw Error('Base thickness must be 2-15 mm.');r.positive.push(box([b.width+6,thickness,b.depth+6]));r.bounds={...b,width:b.width+6,depth:b.depth+6};if(r.materialBand)r.materialBand={...r.materialBand,size:[r.bounds.width+2,r.materialBand.size[1],r.bounds.depth+2]};}
+ if(build.pixelBuilderVersion===1){
+  const holes=build.pixelHoles||[];
+  for(const [index,hole] of holes.entries())if(hole.checked){
+   const reason=checkedPixelBore(r,hole,holes.filter((_,i)=>i!==index));
+   if(reason)throw Error('P'+(index+1)+': '+reason);
+  }
+ }
  addPixelHoleCuts(r,build.pixelHoles);
  return r;
 }

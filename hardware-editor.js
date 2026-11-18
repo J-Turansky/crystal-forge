@@ -1,6 +1,6 @@
 /* Build-stage placement/inspection: same authoritative plan as fabrication. */
 import {planHardware} from './hardware-layout.js';
-import {resolvePixelProfile,allPixelProfiles} from './pixel-profiles.js';
+import {resolvePixelProfile,resolveSocketProfile,allPixelProfiles} from './pixel-profiles.js';
 import {snapHardwarePoint,snapHardwareCoordinate} from './design-workflows.js';
 import {nearestEdgePosition} from './edge-tabs.js';
 import {ensureHardwareIds,movePixelInString,hardwareName} from './hardware-identity.js';
@@ -8,7 +8,7 @@ import {snapPixelsToWireLength} from './pixel-spacing-snap.js';
 import {setPixelEdgeMode,pixelEdgeMode,solvePixelMove,repairPixelRouting} from './pixel-motion.js';
 import {routingSummary,renderFeedback} from './routing-feedback.js';
 
-export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,getBaseMesh,getSettings,getCrystals,getManufacturingVisible=()=>false,onEdit,onStatus}){
+export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,getBaseMesh,getSettings,getCrystals,getManufacturingVisible=()=>false,onEdit,onStatus,onSelectionChange=()=>{},canEdit=()=>true}){
  const $=id=>document.getElementById(id),guides=new THREE.Group();
  guides.name='Live hardware holes';scene.add(guides);
  // A true cursor in the 3D scene, always visible above the intersected base
@@ -58,6 +58,58 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
  const numeric=v=>Number(v).toFixed(1);
  const isBuild=()=>!!document.querySelector('[data-tab="build"].active')&&!document.body.classList.contains('sms-generic-mode');
  const getPlan=()=>planHardware(getCrystals(),getSettings());
+ function getSelectedPixel(){
+  if(!isBuild()||selectedHardware?.kind!=='pixel')return null;
+  const index=getSettings().manualPixelHoles?.findIndex(pixel=>String(pixel.id)===selectedHardware.id)??-1;
+  if(index<0)return null;
+  const pixel=getSettings().manualPixelHoles[index];
+  return {...pixel,index,label:hardwareName('pixel',index)};
+ }
+ function updatePixel(id,changes){
+  if(!isBuild()||!canEdit())return {valid:false,reason:'Open an editable model in Build to change a pixel.'};
+  const state=getSettings();
+  const index=state.manualPixelHoles?.findIndex(pixel=>String(pixel.id)===String(id))??-1;
+  if(index<0)return {valid:false,reason:'The selected pixel no longer exists.'};
+  const current=state.manualPixelHoles[index],pixel={...current};
+  for(const key of ['x','z','wireAngle']){
+   if(!Object.hasOwn(changes,key))continue;
+   if(!Number.isFinite(changes[key])||(key==='wireAngle'&&Math.abs(changes[key])>180))
+    return {valid:false,reason:key==='wireAngle'?'Enter an angle from −180° to 180°.':'Enter a finite position.'};
+   pixel[key]=changes[key];
+  }
+  if(Object.hasOwn(changes,'profileId')){
+   if(!allPixelProfiles(state).some(profile=>profile.id===changes.profileId))return {valid:false,reason:'Choose a saved pixel profile.'};
+   pixel.profileId=changes.profileId;
+  }
+  const positionOnly=(Object.hasOwn(changes,'x')||Object.hasOwn(changes,'z'))&&!Object.hasOwn(changes,'wireAngle')&&!Object.hasOwn(changes,'profileId');
+  if(positionOnly&&state.constrainPixelMotion){
+   const solved=solvePixelMove(getCrystals(),state,{pixelId:id,point:pixel});
+   if(!solved.valid)return solved;
+   applyWireDraft(solved.settings);
+  }else{
+   const draft={...state,manualPixelHoles:state.manualPixelHoles.map((item,i)=>i===index?pixel:item)};
+   const plan=planHardware(getCrystals(),draft);
+   if(!plan.sockets.some(item=>String(item.id)===String(id)))return {valid:false,reason:'The fitting does not clear the base or nearby hardware.'};
+   if(plan.wirePlan?.enabled&&!plan.wirePlan.ready&&state.constrainPixelMotion)
+    return {valid:false,reason:plan.wirePlan.messages.join(' ')||'The cable route is blocked.'};
+   state.manualPixelHoles[index]=pixel;
+  }
+  onEdit();
+  requestMovementGuide({pixelId:String(id)});
+  return {valid:true};
+ }
+ function removeSelectedPixel(){
+  const pixel=getSelectedPixel();
+  if(!pixel||!canEdit())return false;
+  const state=getSettings();
+  state.manualPixelHoles.splice(pixel.index,1);
+  if(state.lightingMode==='multi')state.pixelCount=state.manualPixelHoles.length;
+  selectedHardware=null;
+  onEdit();
+  onSelectionChange(null);
+  onStatus('Removed '+pixel.label+' · Undo restores the fitting.');
+  return true;
+ }
  function clear(preserveHardwareMarkers=false){
   for(const m of [...guides.children]){guides.remove(m);m.traverse(node=>{
    node.geometry?.dispose();
@@ -74,10 +126,11 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
  }
  function showSelection(kind,id,index,scroll=true){
   selectedHardware={kind,id,index};
-  if(kind==='pixel'&&getSettings().pixelPlacement!=='manual'){
+  if(kind==='pixel'&&canEdit()&&getSettings().pixelPlacement!=='manual'){
    const state=getSettings(),plan=getPlan();state.manualPixelHoles=plan.sockets.map(p=>({id:p.id,x:p.x,z:p.z,profileId:p.profileId,wireAngle:p.wireAngle??0}));state.pixelPlacement='manual';state.pixelCount=state.manualPixelHoles.length;onEdit();
   }
   refresh();
+  onSelectionChange(getSelectedPixel());
   if(scroll){
    const card=[...document.querySelectorAll('[data-hw-card-kind]')].find(el=>el.dataset.hwCardKind===kind&&el.dataset.hwCardId===id);
    for(let parent=card?.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
@@ -92,21 +145,26 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
   const button=document.createElement('button');
   button.type='button';button.className='hardware-marker'+(invalid?' invalid':'')+(selectedHardware?.kind===kind&&selectedHardware.id===id?' selected':'');
   button.textContent=label;button.title=label+' · click to edit '+kind;
+  button.setAttribute('aria-pressed',String(selectedHardware?.kind===kind&&selectedHardware.id===id));
   button.dataset.hwKind=kind;button.dataset.hwId=id;button.dataset.hwIndex=String(index);
   button.setAttribute('aria-label','Select '+label+' '+kind);
   button.onclick=e=>{e.stopPropagation();if(!markerDrag?.moved)showSelection(kind,id,index)};
   button.addEventListener('pointerdown',e=>{
-   if(e.button!==0||!isBuild()||placing)return;
+   if(e.button!==0||!isBuild()||placing||!canEdit())return;
    e.stopPropagation();
    if(selectedHardware?.kind!==kind||selectedHardware?.id!==id)return;
+   if(kind==='tab'||invalid||markerDrag)return;
    const cfg=getSettings(),isPixel=kind==='pixel',key=isPixel?'manualPixelHoles':'manualMountHoles';
-   if(kind==='tab')return;
-   if((isPixel?cfg.pixelPlacement:cfg.mountPlacement)!=='manual'){
-    const plan=getPlan(),items=isPixel?plan.sockets:plan.mounts;
-    cfg[key]=items.map(t=>({id:t.id,x:t.x,z:t.z,profileId:t.profileId,wireAngle:t.wireAngle??0}));
-    cfg[isPixel?'pixelPlacement':'mountPlacement']='manual';
-   }
-   markerDrag={kind,id,key,startX:e.clientX,startY:e.clientY,moved:false,lastValid:null,lastPreview:0};
+   const mode=isPixel?'pixelPlacement':'mountPlacement';
+   const plan=getPlan();
+   const items=isPixel?plan.sockets:plan.mounts;
+   const manual=cfg[mode]==='manual';
+   const holes=(manual?cfg[key]||[]:items).map(t=>({...t}));
+   const index=holes.findIndex(t=>String(t.id)===id);
+   if(index<0)return;
+   markerDrag={kind,id,key,mode,index,holes,crystals:getCrystals(),pointerId:e.pointerId,
+    startX:e.clientX,startY:e.clientY,armedAt:performance.now()+(isPixel?180:0),
+    moved:false,endingValid:false,lastPreview:0};
    e.preventDefault();
   });
   button.ondblclick=e=>{e.preventDefault();e.stopPropagation();showSelection(kind,id,index)};
@@ -130,6 +188,7 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
  requestAnimationFrame(positionMarkers);
  function draw(plan,preserveHardwareMarkers=false){
   const s=getSettings();
+  const focusedMarker=markerLayer.contains(document.activeElement)?document.activeElement.dataset:null;
   clear(preserveHardwareMarkers);
   if(!preserveHardwareMarkers){
    plan.sockets.forEach((p,i)=>addMarker('pixel',p,i));
@@ -138,6 +197,12 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
    for(const p of plan.invalidManualPixels||[])addMarker('pixel',{...p,id:'invalid-pixel-'+p.index},p.index,true);
    for(const p of plan.invalidManualMounts||[])addMarker('mount',{...p,id:'invalid-mount-'+p.index},p.index,true);
    for(const [kind,point] of [['input',plan.wirePlan?.entryPoint],['output',plan.wirePlan?.exitPoint]])if(point)addEdgeMarker(kind,point);
+   if(focusedMarker){
+    const focused=markerObjects.find(({button:{dataset}})=>focusedMarker.hwId
+     ?dataset.hwId===focusedMarker.hwId&&dataset.hwKind===focusedMarker.hwKind
+     :focusedMarker.edgeWire&&dataset.edgeWire===focusedMarker.edgeWire);
+    focused?.button.focus({preventScroll:true});
+   }
   }else{
    for(const item of markerObjects){
     if(item.button.dataset.edgeWire){const point=item.button.dataset.edgeWire==='input'?plan.wirePlan?.entryPoint:plan.wirePlan?.exitPoint;if(point)item.p=point;continue;}
@@ -377,17 +442,24 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
    const item=s[key]?.[Number(input.dataset.holeIndex)],value=Number(input.value);
    if(!item||!Number.isFinite(value))return;
    const coordinate=snapHardwareCoordinate(value,s.hardwareSnap,s.hardwareSnapStep);
-   if(key==='manualPixelHoles'&&s.constrainPixelMotion){const result=solvePixelMove(getCrystals(),s,{pixelId:item.id,point:{x:item.x,z:item.z,[input.dataset.holeAxis]:coordinate}});if(result.valid){applyWireDraft(result.settings);onEdit();}else{onStatus('Movement blocked: '+result.reason);refresh();}return;}
+   if(key==='manualPixelHoles'){
+    const result=updatePixel(item.id,{[input.dataset.holeAxis]:coordinate});
+    if(!result.valid){input.value=item[input.dataset.holeAxis];onStatus(result.reason);}
+    return;
+   }
    item[input.dataset.holeAxis]=coordinate;onEdit();
   });
   list.querySelectorAll('[data-hole-profile]').forEach(select=>select.onchange=()=>{
    const item=s.manualPixelHoles?.[Number(select.dataset.holeProfile)];
    if(!item)return;
-   item.profileId=select.value;onEdit();
+   const result=updatePixel(item.id,{profileId:select.value});
+   if(!result.valid){select.value=item.profileId||'';onStatus(result.reason);}
   });
   list.querySelectorAll('[data-wire-angle]').forEach(input=>input.onchange=()=>{
-   const p=s.manualPixelHoles?.[Number(input.dataset.wireAngle)];if(!p)return;
-   p.wireAngle=Math.max(-180,Math.min(180,Number(input.value)||0));onEdit();
+   const pixel=s.manualPixelHoles?.[Number(input.dataset.wireAngle)];
+   if(!pixel)return;
+   const result=updatePixel(pixel.id,{wireAngle:input.valueAsNumber});
+   if(!result.valid){input.value=pixel.wireAngle??0;onStatus(result.reason);}
   });
   for(const axis of ['x','z'])list.querySelectorAll('[data-wire-end-'+axis+']').forEach(input=>input.onchange=()=>{
    const p=s.manualPixelHoles?.[Number(axis==='x'?input.dataset.wireEndX:input.dataset.wireEndZ)];if(!p)return;
@@ -419,8 +491,7 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
   if(result.valid){applyWireDraft(result.settings);onEdit();onStatus('Routing fixed. Pixel positions, fixings and measured cable lengths were kept. Prepare the print mesh again.');}
   else{renderFeedback($('wireRouteStatus'),{severity:'error',title:'The route needs a manual adjustment.',body:result.reason,details:getPlan().wirePlan?.messages||[]});onStatus('Routing needs a manual adjustment. Review the red box in Build.');}
  }
- function placementValid(kind,pos,replaceIndex=null){
-  const s=getSettings();
+ function placementValid(kind,pos,replaceIndex=null,s=getSettings()){
   if(kind==='tab'){
    const edge=nearestEdgePosition(getPlan().polygon,pos);
    const tabs=[...(s.manualEdgeTabs||[])];
@@ -434,7 +505,7 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
   if(kind==='pixel'){
    const holes=(s.manualPixelHoles||[]).map(p=>({...p}));
    if(replaceIndex===null){if(holes.length>=60)return false;holes.push(pos)}
-   else if(holes[replaceIndex])holes[replaceIndex]=pos;
+   else if(holes[replaceIndex])holes[replaceIndex]={...holes[replaceIndex],...pos};
    else return false;
    const next=planHardware(getCrystals(),{...s,cutSockets:true,lightingMode:'multi',pixelPlacement:'manual',manualPixelHoles:holes,pixelCount:holes.length});
    return !next.invalidManualPixels.some(p=>p.index===(replaceIndex===null?holes.length-1:replaceIndex));
@@ -586,61 +657,63 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
   onStatus(drag.endingValid?'Moved '+drag.kind+' perimeter opening; pixel rotation and curved length checked.':'Invalid release: original edge opening restored.');
  },true);
  document.addEventListener('pointercancel',()=>{if(edgeDrag){const drag=edgeDrag;edgeDrag=null;applyWireDraft(drag.original);orbit.enabled=!placing&&!gizmo.dragging;onEdit();}},true);
- document.addEventListener('pointermove',e=>{
-  if(!markerDrag)return;
-  if(Math.hypot(e.clientX-markerDrag.startX,e.clientY-markerDrag.startY)<5&&!markerDrag.moved)return;
-  const data=findPoint(e);
-  if(!data)return;
-  const state=getSettings(),key=markerDrag.key;
-  const i=state[key]?.findIndex(p=>p.id===markerDrag.id);
-  if(i<0)return;
-  const old=state[key][i];
-  if(!markerDrag.moved){
-   markerDrag.original={x:old.x,z:old.z};
-   if(markerDrag.kind==='pixel'&&state.constrainPixelMotion)markerDrag.originalWire=copy(state);
-   markerDrag.moved=true;orbit.enabled=false;
+ function updateMarkerDrag(e,final=false){
+  const drag=markerDrag;
+  if(!drag||e.pointerId!==drag.pointerId)return;
+  if(!drag.moved){
+   if(Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)<5)return;
+   if(performance.now()<drag.armedAt){markerDrag=null;return;}
+   drag.moved=true;
+   orbit.enabled=false;
   }
-  const solved=markerDrag.kind==='pixel'&&state.constrainPixelMotion?solvePixelMove(getCrystals(),state,{pixelId:markerDrag.id,point:data.pos}):null;
-  const valid=data.insideBase&&(solved?solved.valid:placementValid(markerDrag.kind,data.pos,i));
-  markerDrag.endingValid=valid;
+  const data=findPoint(e);
+  drag.endingValid=false;
+  if(!data||drag.crystals!==getCrystals()||!isBuild()||!canEdit()){preview.visible=false;return;}
+  const state=getSettings(),draft={...state,[drag.key]:drag.holes,[drag.mode]:'manual'};
+  if(drag.kind==='pixel')draft.pixelCount=drag.holes.length;
+  const solved=drag.kind==='pixel'&&state.constrainPixelMotion&&data.insideBase
+   ?solvePixelMove(getCrystals(),draft,{pixelId:drag.id,point:data.pos}):null;
+  const valid=data.insideBase&&(solved?solved.valid:placementValid(drag.kind,data.pos,drag.index,draft));
+  drag.endingValid=valid;
   const side=camera.position.y<data.y?-1:1;
   preview.position.set(data.pos.x,data.y+side*.8,data.pos.z);
-  preview.scale.setScalar(Math.max(2,markerDrag.kind==='pixel'?resolvePixelProfile(state).maxDiameter/2:3));
+  preview.scale.setScalar(Math.max(2,drag.kind==='pixel'?resolveSocketProfile(state,drag.holes[drag.index]).maxDiameter/2:3));
   preview.visible=true;rim.material.color.setHex(valid?0x32dbb3:0xff536b);disc.material.color.copy(rim.material.color);
   if(valid){
-   if(solved?.valid)applyWireDraft(solved.settings);
-   old.x=data.pos.x;old.z=data.pos.z;markerDrag.lastValid={...data.pos};
+   drag.draft=solved?.settings??{...draft,[drag.key]:drag.holes.map((hole,i)=>i===drag.index?{...hole,...data.pos}:hole)};
    const now=performance.now();
-   if(now-markerDrag.lastPreview>90){
-    markerDrag.lastPreview=now;
-    const plan=getPlan();
-    draw(plan,true); // keep marker DOM node alive and under the dragged pointer
-    $('wireRouteDetails').textContent=plan.wirePlan?.messages?.join(' ')||'';
+   if(!final&&now-drag.lastPreview>90){
+    drag.lastPreview=now;
+    const plan=solved?.plan??planHardware(getCrystals(),drag.draft);
+    draw(plan,true);
+    if($('wireRouteDetails'))$('wireRouteDetails').textContent=plan.wirePlan?.messages?.join(' ')||'';
    }
   }
   e.preventDefault();
- },true);
- document.addEventListener('pointerup',e=>{
-  if(!markerDrag)return;
-  const drag=markerDrag;markerDrag=null;preview.visible=false;
+ }
+ function finishMarkerDrag(commit){
+  const drag=markerDrag;
+  if(!drag)return;
+  markerDrag=null;preview.visible=false;
   if(!drag.moved)return;
   orbit.enabled=!placing&&!gizmo.dragging;
-  const state=getSettings(),index=state[drag.key]?.findIndex(p=>p.id===drag.id);
-  if(index>=0){
-   const p=state[drag.key][index];
-   if(!drag.endingValid||!drag.lastValid){
-    if(drag.originalWire)applyWireDraft(drag.originalWire);else{p.x=drag.original.x;p.z=drag.original.z;}
-   }
+  const accepted=commit&&drag.endingValid&&drag.draft&&drag.crystals===getCrystals()&&canEdit();
+  if(accepted){
+   if(drag.kind==='pixel')applyWireDraft(drag.draft);
+   else{const state=getSettings();state[drag.key]=drag.draft[drag.key];state[drag.mode]='manual';}
    onEdit();
-   if(drag.kind==='pixel')requestMovementGuide({pixelId:drag.id});
-   onStatus(drag.endingValid&&drag.lastValid?'Moved '+hardwareName(drag.kind,index)+' · routes recalculated':'Invalid release: original hole restored');
-  }
+  }else refresh();
+  if(drag.kind==='pixel'&&drag.crystals===getCrystals())requestMovementGuide({pixelId:drag.id});
+  onStatus(accepted?'Moved '+hardwareName(drag.kind,drag.index)+' · routes recalculated':'Move cancelled · original hole kept');
+ }
+ document.addEventListener('pointermove',updateMarkerDrag,true);
+ document.addEventListener('pointerup',e=>{
+  if(e.pointerId!==markerDrag?.pointerId)return;
+  if(markerDrag.moved)updateMarkerDrag(e,true);
+  finishMarkerDrag(true);
  },true);
- document.addEventListener('pointercancel',()=>{
-  if(!markerDrag)return;
-  const drag=markerDrag;markerDrag=null;preview.visible=false;orbit.enabled=!placing&&!gizmo.dragging;
-  const state=getSettings(),p=state[drag.key]?.find(x=>x.id===drag.id);
-  if(p&&drag.original){if(drag.originalWire)applyWireDraft(drag.originalWire);else{p.x=drag.original.x;p.z=drag.original.z;}onEdit()}
+ document.addEventListener('pointercancel',e=>{
+  if(e.pointerId===markerDrag?.pointerId)finishMarkerDrag(false);
  },true);
  canvas.addEventListener('pointermove',e=>updateCursor(e),true);
  canvas.addEventListener('pointerleave',()=>{preview.visible=false;lastCursor=null},true);
@@ -730,14 +803,18 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
  });
  document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
+   if(markerDrag){finishMarkerDrag(false);e.preventDefault();return;}
    if(!contextMenu.hidden)clearContext();
    if(placing)cancel();
+  }
+  if((e.key==='Delete'||e.key==='Backspace')&&e.target?.closest?.('[data-hw-kind="pixel"]')&&removeSelectedPixel()){
+   e.preventDefault();return;
   }
   // Fine positioning: Arrow = 1 mm, Shift+Arrow = 5 mm.
   // Keep all form fields and text editing completely unaffected.
   const delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];
-  if(!delta||!isBuild()||placing||markerDrag||!selectedHardware||e.altKey||e.ctrlKey||e.metaKey||
-    e.target?.closest?.('input,select,textarea,[contenteditable="true"]'))return;
+  if(!delta||!isBuild()||!canEdit()||placing||markerDrag||!selectedHardware||e.altKey||e.ctrlKey||e.metaKey||
+    e.target?.closest?.('input,select,textarea,[contenteditable="true"],[data-edge-wire]'))return;
   const kind=selectedHardware.kind,id=selectedHardware.id;
   if(kind!=='pixel'&&kind!=='mount')return;
   const cfg=getSettings(),key=kind==='pixel'?'manualPixelHoles':'manualMountHoles',mode=kind+'Placement';
@@ -761,7 +838,7 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
   onStatus('Moved '+hardwareName(kind,i)+' by '+step+' mm; rerouted pixel string.');
  },true);
  document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{
-  if(b.dataset.tab!=='build'&&placing)cancel();
+  if(b.dataset.tab!=='build'){if(placing)cancel();if(markerDrag)finishMarkerDrag(false);}
   requestAnimationFrame(refresh);
  }));
  for(const kind of ['pixel','mount']){
@@ -782,6 +859,7 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
   worldPosition:lastCursor?.pos??null,orbitEnabled:orbit.enabled,
   routeGuidesVisible:guides.visible,manufacturingVisible:!!getManufacturingVisible()});
 
- return {refresh,cancel};
+ return {refresh,cancel,getSelectedPixel,updatePixel,removeSelectedPixel};
 }
+
 

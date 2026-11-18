@@ -11,7 +11,11 @@ export function normalisePixelProfile(p){
  const kind=['seed','bullet','gumdrop'].includes(p?.kind)?p.kind:'gumdrop';
  const bodyDiameter=clamp(Number(p?.bodyDiameter)||12,2,30);
  const bodyHeight=clamp(Number(p?.bodyHeight)||22,3,50);
- return {id,name,kind,bodyDiameter,bodyHeight,
+ const measuredBody=p?.measuredFit?.bodyDiameter,printedBore=p?.measuredFit?.printedBoreDiameter;
+ const fitDelta=Math.round((printedBore-measuredBody)*100)/100;
+ const measuredFit=id.startsWith('custom-')&&measuredBody===bodyDiameter&&Number.isFinite(printedBore)&&fitDelta>=-.5&&fitDelta<=.8
+  ?{measuredFit:{bodyDiameter:measuredBody,printedBoreDiameter:printedBore}}:{};
+ return {id,name,kind,bodyDiameter,bodyHeight,...measuredFit,
   flangeDiameter:clamp(Number(p?.flangeDiameter??bodyDiameter)||bodyDiameter,bodyDiameter,38),
   flangeHeight:clamp(Number(p?.flangeHeight??0)||0,0,10),
   capHeight:clamp(Number(p?.capHeight??2)||0,0,12),

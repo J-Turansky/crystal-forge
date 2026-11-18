@@ -1,3 +1,4 @@
+import {pixelBoreIssue} from '../studio-pixel-bore-validation.js';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import Module from 'manifold-3d';
@@ -128,3 +129,44 @@ for(const id of ['knob','selector']){
  }
  assert.equal(symbols.size,symbolOptions.length,'Every '+id+' symbol has distinct geometry');
 }
+
+// Append to tests/studio-catalogue.test.mjs and import pixelBoreIssue from
+// ../studio-pixel-bore-validation.js. Runs with the existing Manifold setup.
+{
+ const newBore={id:'fixture-pixel',x:10.7,z:9.4,profileId:'seed',diameter:5,clearance:.3};
+ const tactile=tileGenerator.recipe({outline:'circle',dualMaterial:true});
+ const wave=waveGenerator.recipe({flowStyle:'Saddle',dualMaterial:true});
+ assert.match(pixelBoreIssue(tactile,{...newBore,x:32,z:32}),/continuous solid material/, 'Bounds corners are outside the real disc.');
+ assert.match(pixelBoreIssue(tactile,newBore,[{...newBore,id:'other-pixel'}]),/another pixel/);
+ assert.match(pixelBoreIssue(wave,{...newBore,x:54}),/model edge/);
+ assert.match(pixelBoreIssue(gearGenerator.recipe(turbine),{...newBore,x:23,z:0}),/continuous solid material/);
+ assert.match(pixelBoreIssue(pebbleGenerator.recipe({...river.parameters,illuminated:false}),{
+  ...newBore,x:0,z:0
+ }),/cavity/);
+ const mounted=applyBuildModules(wave,{mounting:true,spacing:35,mountStyle:'Underside counterbores'},waveGenerator.capabilities);
+ assert.match(pixelBoreIssue(mounted,{...newBore,x:21,z:0}),/existing cut/, 'Preserve web around the larger counterbore.');
+ const thin={positive:[{kind:'box',size:[30,1,30]}],negative:[],bounds:{width:30,depth:30,height:1}};
+ assert.match(pixelBoreIssue(thin,newBore),/continuous solid material/);
+ for(const [recipe,capabilities] of [[tactile,tileGenerator.capabilities],[wave,waveGenerator.capabilities]]){
+  assert.equal(pixelBoreIssue(recipe,newBore),null);
+  const cutRecipe=applyBuildModules(recipe,{pixelHoles:[newBore]},capabilities);
+  const manufactured=prepareRecipe(THREE,wasm,cutRecipe);
+  const nominal=(newBore.diameter+newBore.clearance)/2;
+  const original=prepareRecipe(THREE,wasm,recipe);
+  assert.equal(manufactured.bodies.length,2);
+  for(const [index,body] of manufactured.bodies.entries()){
+   const {vertProperties,numProp}=body.mesh, ring=[];
+   for(let i=0;i<vertProperties.length;i+=numProp){
+    const distance=Math.hypot(vertProperties[i]-newBore.x,vertProperties[i+2]-newBore.z);
+    if(Math.abs(distance-nominal)<.007)ring.push(distance);
+   }
+   assert(ring.length>=12,'Prepared material has a measured ring at the actual requested bore radius.');
+   assert(original.bodies[index].volume-body.volume>1,'The bore removes material from both bodies.');
+  }
+  const files=exportMaterialBodies(manufactured,{name:'verified-pixel-bore'});
+  assert.equal(files.stls.length,2);
+  assert(files.threeMF.length>100);
+ }
+ console.log('WT-006 bore: fabricable calibrated radius, strict void/mount/web rejection and dual material exports.');
+}
+
