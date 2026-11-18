@@ -1,5 +1,9 @@
 # AI handover — read immediately after AGENTS.md
 
+## WT-007 · Visual saved projects
+
+Built on merged WT-006 / PR #41. Library project cards use the first stored thumbnail or the established placeholder. Project-title search is case-insensitive and independent of the model-type filter. Open uses the existing confirmation, backup and project replacement flow. Saved snapshots and thumbnail generation retain their existing formats and paths. See the WT-007 draft PR for exact-head checks and desktop and mobile screenshots.
+
 ## WT-006 · Interactive Build
 
 [Draft PR #41](https://github.com/connorturansky-svg/crystal-forge/pull/41) records exact-head workflow results and interaction screenshots. [Baseline WT-002 screenshots](https://github.com/connorturansky-svg/crystal-forge/actions/runs/44346201182/artifacts/14447240625) cover the pre-WT-006 workspace.

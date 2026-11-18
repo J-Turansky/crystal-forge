@@ -285,8 +285,9 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   }catch{return null;}
   finally{if(group)disposeGroup(group);}
  }
+ const isModelThumbnail=src=>typeof src==='string'&&/^data:image\/(png|jpeg|webp);base64,/.test(src);
  function modelPicture(src){
-  if(typeof src==='string'&&/^data:image\/(png|jpeg|webp);base64,/.test(src)){
+  if(isModelThumbnail(src)){
    const img=document.createElement('img');img.alt='';img.src=src;img.loading='lazy';img.decoding='async';return img;
   }
   const placeholder=document.createElement('span');placeholder.className='sms-picture-empty';placeholder.textContent='Preview unavailable';return placeholder;
@@ -996,7 +997,21 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   }
   project.models.filter(matches).forEach(m=>card(m,$('smsProjectModels')));
   state.library.filter(r=>matches(r.versions.at(-1).model)).forEach(r=>card(r.versions.at(-1).model,$('smsSavedModels'),r));
-  for(const saved of state.savedProjects){const button=document.createElement('button');button.textContent=saved.title+' · '+saved.models.length+' models';button.onclick=()=>{if(!confirm('Open this saved project? Your current project will be kept as a saved copy.'))return;remember();state.savedProjects.push(copy(project));replaceProject(saved);};$('smsSavedProjects').append(button);}
+  for(const saved of state.savedProjects){
+   if(!saved.title.toLowerCase().includes(search.toLowerCase()))continue;
+   const tile=document.createElement('article');tile.className='sms-tile';
+   const thumbnail=saved.models.find(model=>isModelThumbnail(model.thumbnail))?.thumbnail;
+   const count=saved.models.length;
+   tile.innerHTML='<h3>'+esc(saved.title)+'</h3><p class="sms-descriptor">'+count+' '+(count===1?'model':'models')+'</p><div class="sms-actions"><button type="button">Open project</button></div>';
+   tile.prepend(modelPicture(thumbnail));
+   const button=tile.querySelector('button');
+   button.setAttribute('aria-label','Open project '+saved.title);
+   button.onclick=()=>{
+    if(!confirm('Open this saved project? Your current project will be kept as a saved copy.'))return;
+    remember();state.savedProjects.push(copy(project));replaceProject(saved);
+   };
+   $('smsSavedProjects').append(tile);
+  }
  }
  async function syncStudio(pull){
   const label=$('smsSyncState');
