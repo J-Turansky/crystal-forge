@@ -1,3 +1,4 @@
+import {addPixelHoleCuts} from './studio-pixel-builder.js';
 import {generateTile,tactileTileGenerator} from './tactile-tile-generator.js';
 import {createGeneratorRegistry} from './studio-generator-registry.js';
 import {circle,heightField} from './studio-geometry.js';
@@ -265,6 +266,20 @@ export const generators=[tileGenerator,gearGenerator,waveGenerator,capGenerator,
 export function makeCatalogue(crystalAdapter){const registry=createGeneratorRegistry();for(const g of [crystalAdapter,...generators].filter(Boolean))registry.register(g);return registry;}
 export function applyBuildModules(recipe,build={},capabilities={}){
  const r={...recipe,positive:[...recipe.positive],negative:[...(recipe.negative||[])],secondary:[...(recipe.secondary||[])],warnings:[...(recipe.warnings||[])]};
+ // The same recipe reaches both preview and the fabrication worker.
+ if(!r.partitioned){
+  for(const role of ['positive','secondary']){
+   r[role]=r[role].map((part,index)=>{
+    if(part.kind==='mesh')return part;
+    const partId=role+'-'+index+'-'+part.kind;
+    const offset=build.partOffsets?.[partId];
+    const position=part.position||[0,0,0];
+    if(!offset)return {...part,partId};
+    if(!Array.isArray(offset)||offset.length!==3||!offset.every(value=>Number.isFinite(value)&&Math.abs(value)<=50)||offset[1]<0)throw Error('Part offsets must be within 50 mm. Lift a part above its original position.');
+    return {...part,partId,position:position.map((value,axis)=>value+offset[axis])};
+   });
+  }
+ }
  const b=r.bounds;
  if(build.mounting&&capabilities.supportsMounting){
   const spacing=Math.min(build.spacing||b.width*.55,b.width*.65),diameter=build.holeDiameter||3.4;
@@ -280,5 +295,6 @@ export function applyBuildModules(recipe,build={},capabilities={}){
   r.warnings.push('Through mounting holes are un-rated; test actual mounting loads.');
  }
  if(build.base&&capabilities.supportsBase){const thickness=Number(build.baseThickness||3);if(thickness<2||thickness>15)throw Error('Base thickness must be 2–15 mm.');r.positive.push(box([b.width+6,thickness,b.depth+6]));r.bounds={...b,width:b.width+6,depth:b.depth+6};if(r.materialBand)r.materialBand={...r.materialBand,size:[r.bounds.width+2,r.materialBand.size[1],r.bounds.depth+2]};}
+ addPixelHoleCuts(r,build.pixelHoles);
  return r;
 }
