@@ -164,19 +164,28 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  function designSections(generator,model){
   const groups=[
    ['Form and silhouette','Choose the outline, teeth or surface pattern.',/mode|outline|pattern|character|top|symbol|style/i],
-   ['Size and proportions','Set the overall size and depth.',/width|height|depth|thickness|diameter|head|legs/i],
-   ['Edges and surface feel','Change the relief, curves and edge profile.',/corner|relief|density|variation|amplitude|frequency|orientation|phase|facets|direction|round|tooth/i],
+   ['Size and proportions','Set the overall size and depth.',/^(?!grip|socket).*?(width|height|depth|thickness|diameter|head|legs)/i],
+   ['Edges and surface feel','Change the relief, curves and edge profile.',/corner|relief|density|variation|amplitude|frequency|orientation|phase|facets|direction|round|tooth|grip|leverAngle/i],
    ['Holes and fittings','Make space for shafts, spokes or other hardware.',/shaft|bore|hub|spokes|socket|tolerance|opening|cable|hole/i],
    ['Light and materials','Choose material regions and lighting options.',/dualMaterial|illuminated|wall|inlay/i]
   ];
-  const remaining=new Set(generator.parameterSchema);
+  const family=generator.parameterSchema.find(field=>field.key==='controlStyle');
+  const style=model.parameters.controlStyle||'Pushbutton';
+  const familyFields={
+   outline:['Pushbutton'],top:['Pushbutton'],
+   symbol:['Pushbutton','Rotary knob'],
+   gripProfile:['Rotary knob','Rotary selector'],gripCount:['Rotary knob','Rotary selector'],gripDepth:['Rotary knob','Rotary selector'],
+   leverAngle:['Toggle lever','Rocker'],
+   socketProfile:['Rotary knob','Rotary selector','Toggle lever','Rocker','Fader cap','Thumb joystick','Directional pad','Indicator lens']
+  };
+  const remaining=new Set(generator.parameterSchema.filter(field=>field!==family&&(!family||!familyFields[field.key]||familyFields[field.key].includes(style))));
   const output=groups.map(([title,description,pattern])=>{
    const controls=[...remaining].filter(field=>pattern.test(field.key));
    controls.forEach(field=>remaining.delete(field));
    return controls.length?details(title,description,controls.map(field=>control(field,model.parameters)).join('')):'';
   });
   if(remaining.size)output.push(details('Fine adjustments','Adjust the seed or other generator settings.',[...remaining].map(field=>control(field,model.parameters)).join('')));
-  return output.join('');
+  return (family?control(family,model.parameters):'')+output.join('');
  }
  function renderEditor(){
   if(mode!=='model'||!active())return;const model=active(),g=registry.get(model.generator.typeId);
@@ -200,6 +209,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if($('smsPreset'))$('smsPreset').onchange=e=>{const preset=g.presets.find(p=>p.id===e.target.value);if(preset){commit({parameters:copy(preset.parameters)});renderEditor();}};
   panel.querySelectorAll('[data-model-param]').forEach(input=>input.oninput=()=>{
    const schema=g.parameterSchema.find(s=>s.key===input.dataset.modelParam),value=input.type==='checkbox'?input.checked:schema.type==='number'?Number(input.value):input.value;
+   if(schema.key==='controlStyle'){
+    const preset=g.presets.find(item=>item.parameters.controlStyle===value);
+    if(preset)commit({parameters:{...preset.parameters,seed:model.parameters.seed,dualMaterial:model.parameters.dualMaterial}});
+    renderEditor();
+    return;
+   }
    const output=panel.querySelector('[data-value-for="'+schema.key+'"]');if(output)output.textContent=value+' '+(schema.unit||'');commit({parameters:{...model.parameters,[schema.key]:value}});
   });
   panel.querySelectorAll('[data-build]').forEach(input=>input.onchange=()=>commit({build:{...model.build,[input.dataset.build]:input.type==='checkbox'?input.checked:Number(input.value)}}));
