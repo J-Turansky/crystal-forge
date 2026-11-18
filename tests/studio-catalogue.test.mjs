@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import Module from 'manifold-3d';
-import {gearGenerator,capGenerator,pebbleGenerator,generators,applyBuildModules} from '../studio-catalogue.js';
-import {prepareRecipe} from '../studio-geometry.js';
+import {waveGenerator,tileGenerator,gearGenerator,capGenerator,pebbleGenerator,generators,applyBuildModules} from '../studio-catalogue.js';
+import {findPixelPosition} from '../studio-pixel-builder.js';
+import {previewRecipe,disposeGroup,prepareRecipe} from '../studio-geometry.js';
 import {exportMaterialBodies} from '../studio-material-export.js';
 const wasm=await Module();wasm.setup();
 const joystick=capGenerator.presets.find(preset=>preset.id==='joystick');
@@ -41,6 +42,64 @@ const sweeping=gearGenerator.recipe(turbine);
 assert.notDeepEqual(gearGenerator.recipe({...turbine,webStyle:'Solid'}).positive,sweeping.positive);
 assert.notDeepEqual(gearGenerator.recipe({...turbine,wheelStyle:'Crown'}).positive,sweeping.positive);
 assert.notDeepEqual(gearGenerator.recipe({...turbine,reliefHeight:4}).positive,sweeping.positive);
+for(const diameter of [100,110]){
+ const parameters={...turbine,diameter,dualMaterial:false};
+ const uncut=gearGenerator.recipe(parameters);
+ const hole=findPixelPosition(uncut,[]);
+ assert(hole,'Openwork turbine needs a printable pixel position.');
+ assert.notDeepEqual([hole.x,hole.z],[diameter*.23,0],'The original candidate was in the window.');
+ if(diameter===100){
+  const misplaced={...hole,x:23,z:0};
+  assert.throws(()=>prepareRecipe(THREE,wasm,applyBuildModules(uncut,{pixelHoles:[misplaced]},gearGenerator.capabilities)),
+   /does not cut the model/, 'The reviewed placement must still fail fabrication.');
+ }
+ const cut=prepareRecipe(THREE,wasm,applyBuildModules(uncut,{pixelHoles:[hole]},gearGenerator.capabilities));
+ const original=prepareRecipe(THREE,wasm,uncut);
+ assert(original.bodies[0].volume-cut.bodies[0].volume>1);
+ assert.equal(exportMaterialBodies(cut).stls.length,1);
+}
+for(const id of ['turbine','crown-open']){
+ const p=gearGenerator.presets.find(item=>item.id===id).parameters;
+ for(const thickness of [p.thickness,11]){
+  const recipe=gearGenerator.recipe({...p,thickness,dualMaterial:true});
+  const preview=previewRecipe(THREE,recipe);
+  const face=preview.children.find(mesh=>mesh.userData.materialRole==='secondary');
+  assert.equal(face.material.clippingPlanes[0].distanceToPoint(new THREE.Vector3(0,recipe.materialSplitHeight,0)),0);
+  assert(face.material.clippingPlanes[0].distanceToPoint(new THREE.Vector3(0,thickness,0))>0);
+  disposeGroup(preview);
+  const result=prepareRecipe(THREE,wasm,recipe);
+  for(const body of result.bodies){
+   const positions=body.mesh.vertProperties??body.mesh.points,stride=body.mesh.numProp??3;
+   for(let i=1;i<positions.length;i+=stride){
+    if(body.role==='secondary')assert(positions[i]>=recipe.materialSplitHeight-1e-5);
+    else assert(positions[i]<=recipe.materialSplitHeight+1e-5);
+   }
+  }
+  const output=exportMaterialBodies(result);
+  assert.equal(output.stls.length,2);
+  assert(output.threeMF.length>100);
+ }
+}
+for(const [generator,ids] of [[waveGenerator,['river','rings','eddy','saddle','dune']],[tileGenerator,['grass','basket','pebbles','scales']]]){
+ const signatures=ids.map(id=>{
+  const preset=generator.presets.find(item=>item.id===id);
+  assert(preset,id);
+  const {points}=generator.recipe(preset.parameters).positive[0].mesh;
+  return JSON.stringify(Array.from(points).filter((_,index)=>index%93===1));
+ });
+ assert.equal(new Set(signatures).size,ids.length);
+}
+const presetParameters=(family,id)=>family.presets.find(preset=>preset.id===id).parameters;
+const legacyKnob=presetParameters(capGenerator,'knob');
+const rotaryDish=capGenerator.recipe({...legacyKnob,rotaryTop:'Dish',rotaryMark:'Recessed pointer'});
+assert.equal(rotaryDish.positive[0].kind,'mesh');
+assert.deepEqual(rotaryDish.negative.at(-1),capGenerator.recipe(legacyKnob).negative.at(-1),
+ 'The new face retains the measured socket cutter.');
+const lantern=presetParameters(pebbleGenerator,'lantern');
+const unlitLantern=prepareRecipe(THREE,wasm,pebbleGenerator.recipe({...lantern,illuminated:false}));
+const litLantern=prepareRecipe(THREE,wasm,pebbleGenerator.recipe(lantern));
+assert(unlitLantern.bodies[0].volume-litLantern.bodies[0].volume>100,'Lantern subtracts a real internal cavity.');
+
 for(const generator of generators){
  assert(generator.presets.length>=3,generator.displayName+' requires three meaningful presets.');
  for(const preset of generator.presets){

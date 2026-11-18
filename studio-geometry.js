@@ -50,6 +50,13 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
  for(const [role,parts] of [['primary',recipe.positive],['secondary',recipe.secondary||[]]])for(const part of parts){
   const mesh=new THREE.Mesh(recipeGeometry(THREE,part),new THREE.MeshStandardMaterial({color:colours[role==='primary'?0:1],roughness:.55,flatShading:false}));
   mesh.userData.materialRole=role;mesh.userData.partId=part.partId;group.add(mesh);
+  if(role==='primary'&&recipe.dualMaterial&&recipe.materialSplitRole==='top'){
+   const y=recipe.materialSplitHeight;
+   mesh.material.clippingPlanes=[new THREE.Plane(new THREE.Vector3(0,-1,0),y)];
+   const face=new THREE.Mesh(mesh.geometry.clone(),new THREE.MeshStandardMaterial({color:colours[1],roughness:.55,
+    clippingPlanes:[new THREE.Plane(new THREE.Vector3(0,1,0),-y)]}));
+   face.userData.materialRole='secondary';face.userData.partId=part.partId;group.add(face);
+  }
  }
  for(const hole of recipe.negative||[])if(hole.pixelHole){
   const ring=new THREE.Mesh(new THREE.TorusGeometry(hole.radius,.18,6,48),
@@ -104,7 +111,8 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
    // Split the existing solid once so both bodies use the same interface.
    // Subtracting its Boolean intersection with a band can leave coincident shells.
    const [above,below]=total.splitByPlane([0,1,0],recipe.materialSplitHeight);
-   regions=[{role:'primary',solid:hold(above)},{role:'secondary',solid:hold(below)}];
+   const top=hold(above),bottom=hold(below),face=recipe.materialSplitRole==='top';
+   regions=[{role:'primary',solid:face?bottom:top},{role:'secondary',solid:face?top:bottom}];
   }else if(recipe.dualMaterial&&(recipe.materialBand||recipe.secondary?.length)){
    let secondary=recipe.materialBand?convert(recipe.materialBand):union(recipe.secondary);
    if(recipe.partitioned){

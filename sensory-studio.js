@@ -8,16 +8,18 @@ import {exportMaterialBodies} from './studio-material-export.js';
 import {installExactValueEditors} from './exact-value-editors.js';
 import {createCuraProfile,zipProfileEntries,curaFallbackText,calculateCuraSettings} from './cura-profiles.js';
 import {StudioVault} from './studio-vault.js';
+import {crystalStartingPoints,crystalStartingPointPreview} from './studio-crystal-presets.js';
 const copy=x=>JSON.parse(JSON.stringify(x));
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const $=id=>document.getElementById(id);
 export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstrap,adapter}){
  const state=bootstrap,project=state.project;
+ renderer.localClippingEnabled=true;
  const unified=new URLSearchParams(location.search).get('layout')!=='legacy';
  let printExpanded=false;
  state.savedProjects??=[];project.printer={printer:'Ultimaker 3 Extended',curaNozzle:.4,curaMaterial:'PLA',curaQuality:60,curaIntent:'balanced',...project.printer};
  const crystalAdapter={typeId:'crystals',typeVersion:1,displayName:'Crystal Clusters',category:'Lighting',defaultParameters:adapter.capture().settings,
-  parameterSchema:[],presets:[],capabilities:{supportsBase:true,supportsLEDs:true,supportsMounting:true,supportsTactileSurfaces:false,supportsMechanisms:false,supportsDualMaterial:false,supportsPartSplitting:true},
+  parameterSchema:[],presets:crystalStartingPoints(adapter.formationDefaults()),capabilities:{supportsBase:true,supportsLEDs:true,supportsMounting:true,supportsTactileSurfaces:false,supportsMechanisms:false,supportsDualMaterial:false,supportsPartSplitting:true},
   validateParameters:p=>({valid:!!p,errors:[],parameters:p}),generatePreview:()=>adapter.capture(),
   generateManufacturingGeometry:()=>adapter.capture(),estimateBounds:()=>adapter.bounds(),migrateParameters:(_,p)=>p};
  const registry=makeCatalogue(crystalAdapter),cache=new Map(),histories=new Map(),prepared=new Map(),workers=new Map();
@@ -58,7 +60,56 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const undoButton=button('↶ Undo',()=>shellUndo(-1),'smsGlobalUndo');
   const redoButton=button('↷ Redo',()=>shellUndo(1),'smsGlobalRedo');
   const styleNav=document.querySelector('.workspace-tabs');
-  styleNav.prepend(home,$('smsLibrary'));bar.append(undoButton,redoButton);
+  const top=document.querySelector('.topbar');
+  styleNav.prepend(home,$('smsLibrary'));styleNav.setAttribute('aria-label','Workspaces');
+  top.after(styleNav);styleNav.classList.add('sms-workspace-nav');
+  const utility=top.querySelector('.utility');
+  const more=document.createElement('details');more.className='sms-more';
+  const moreLabel=document.createElement('summary');moreLabel.textContent='More';more.append(moreLabel);
+  for(const item of [utility.querySelector('.modebar'),$('themeBtn'),$('helpBtn'),$('descriptionsBtn'),$('changelogBtn')])more.append(item);
+  top.querySelector('.topcluster').append($('smsProjectTitle'),$('smsSaveState'));
+  utility.append($('smsReload'),undoButton,redoButton,more,$('smsPrint'));bar.remove();
+
+  const preferenceKey='wt-workspace-panels-v1';
+  let saved={};try{saved=JSON.parse(localStorage.getItem(preferenceKey))||{};}catch{}
+  const view={rail:['icons','hidden'].includes(saved.rail)?saved.rail:'expanded',settings:saved.settings!==false,palette:saved.palette!==false,
+   railWidth:Number.isFinite(saved.railWidth)?Math.min(240,Math.max(140,saved.railWidth)):176,
+   settingsWidth:Number.isFinite(saved.settingsWidth)?Math.min(490,Math.max(250,saved.settingsWidth)):300};
+  const menus=document.createElement('details');menus.className='sms-more';
+  const menuLabel=document.createElement('summary');menuLabel.textContent='Panels';menus.append(menuLabel);utility.append(menus);
+  const toggleRail=button('Collapse model rail',()=>{view.rail=view.rail==='expanded'?'icons':'expanded';applyPanels();},'smsToggleRail');
+  const hideRail=button('',()=>{view.rail=view.rail==='hidden'?'expanded':'hidden';applyPanels();menuLabel.focus();},'smsHideRail');
+  const toggleSettings=button('',()=>{view.settings=!view.settings;applyPanels();},'smsToggleSettings');
+  const togglePalette=button('',()=>{view.palette=!view.palette;applyPanels();},'smsTogglePalette');
+  rail.prepend(toggleRail);menus.append(hideRail,toggleSettings,togglePalette);
+  const resizePanel=(key,label,min,max)=>{
+   const row=document.createElement('label');row.textContent=label;
+   const slider=document.createElement('input');slider.type='range';slider.min=min;slider.max=max;slider.value=view[key];slider.setAttribute('aria-label',label);
+   slider.oninput=()=>{view[key]=Number(slider.value);applyPanels();};row.append(slider);menus.append(row);
+  };
+  resizePanel('railWidth','Model rail width',140,240);
+  resizePanel('settingsWidth','Settings width',250,490);
+  for(const [region,id] of [[rail,'smsModelRail'],[settings,'smsPrecision'],[palette,'smsVisualPalette']])region.id=id;
+  for(const [control,region] of [[toggleRail,rail],[hideRail,rail],[toggleSettings,settings],[togglePalette,palette]])control.setAttribute('aria-controls',region.id);
+  const describe=(control,expanded,label)=>{control.setAttribute('aria-expanded',String(expanded));control.textContent=label;control.title=label;control.setAttribute('aria-label',label);};
+  function applyPanels(){
+   layout.dataset.rail=view.rail;layout.dataset.settings=view.settings?'visible':'hidden';centre.dataset.palette=view.palette?'visible':'hidden';
+   layout.style.setProperty('--sms-rail-width',view.rail==='hidden'?'0px':view.rail==='icons'?'56px':view.railWidth+'px');
+   layout.style.setProperty('--sms-settings-width',view.settings?view.settingsWidth+'px':'0px');
+   rail.hidden=view.rail==='hidden';settings.hidden=!view.settings;palette.hidden=!view.palette;split.hidden=!view.palette;
+   describe(toggleRail,view.rail==='expanded',view.rail==='expanded'?'Collapse model rail':'Expand model rail');
+   describe(hideRail,view.rail!=='hidden',view.rail==='hidden'?'Show model rail':'Hide model rail');
+   describe(toggleSettings,view.settings,view.settings?'Hide settings':'Show settings');
+   describe(togglePalette,view.palette,view.palette?'Hide visual palette':'Show visual palette');
+   try{localStorage.setItem(preferenceKey,JSON.stringify(view));}catch{}
+  }
+  applyPanels();
+  document.addEventListener('keydown',event=>{
+   if(event.key!=='Escape')return;
+   const opened=[menus,more].filter(menu=>menu.open);
+   if(opened.length){opened.forEach(menu=>{menu.open=false;menu.querySelector('summary').focus();});return;}
+   if(mode!=='model'&&!document.querySelector('dialog[open]')&&currentId)document.querySelector('.workspace-tabs [data-tab=design]').click();
+  });
   $('smsPrint').hidden=true;$('smsPrint').classList.add('sms-replaced-print');
   const focus=button('Focus 3D',()=>{
    const full=document.body.classList.toggle('sms-focused');focus.textContent=full?'Exit focus':'Focus 3D';focus.setAttribute('aria-pressed',String(full));
@@ -69,7 +120,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  function shellUndo(delta){
   if(mode!=='model'||active()?.link)return;
-  if(active()?.generator.typeId==='crystals')adapter.undo(delta);else undo(delta);
+  if(active()?.generator.typeId==='crystals'){adapter.undo(delta);renderTabs();renderPalette();}else undo(delta);
  }
  const picker=document.createElement('dialog');picker.id='smsPicker';picker.setAttribute('aria-labelledby','smsPickerTitle');
  picker.innerHTML='<h2 id="smsPickerTitle">Create a model</h2><div class="sms-grid"></div><form method="dialog"><button>Close</button></form>';
@@ -90,7 +141,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    if(preset)button.dataset.preset=preset.id;else button.dataset.generator=family.typeId;
    const label=document.createElement('span');label.textContent=preset?.name||family.displayName;
    const key=family.typeId+':'+(preset?.id||'default');
-   if(!presetThumbnails.has(key)){
+   if(!preset&&!presetThumbnails.has(key)){
     let preview=null;
     if(family.typeId==='crystals'){
      const cluster=project.models.find(model=>model.generator.typeId==='crystals');
@@ -98,7 +149,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     }else preview=recipeThumbnail(family,preset?.parameters||family.defaultParameters);
     if(preview)presetThumbnails.set(key,preview);
    }
-   button.append(modelPicture(presetThumbnails.get(key)),label);
+   button.append(preset?presetPicture(family,preset):modelPicture(presetThumbnails.get(key)),label);
    button.onclick=()=>{picker.close();add(family.typeId,preset?.parameters,preset?.name);};
    tile.append(button);
    if(!preset&&family.presets.length){
@@ -201,7 +252,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  let thumbRenderer=null;
  function thumbnail(group){
   try{
-   thumbRenderer??=new THREE.WebGLRenderer({antialias:true,alpha:false});thumbRenderer.setSize(200,150);thumbRenderer.setPixelRatio(1);
+   thumbRenderer??=new THREE.WebGLRenderer({antialias:true,alpha:false});thumbRenderer.localClippingEnabled=true;thumbRenderer.setSize(200,150);thumbRenderer.setPixelRatio(1);
    const thumbScene=new THREE.Scene();thumbScene.background=new THREE.Color(0xeaf0f7);thumbScene.add(new THREE.AmbientLight(0xffffff,2));
    const light=new THREE.DirectionalLight(0xffffff,3);light.position.set(80,140,100);thumbScene.add(light);
    const clone=group.clone(true);thumbScene.add(clone);const box=new THREE.Box3().setFromObject(clone);if(box.isEmpty())return null;
@@ -209,6 +260,20 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    view.position.copy(centre).addScaledVector(new THREE.Vector3(1,1.3,1).normalize(),Math.max(40,size.length()*1.9));view.lookAt(centre);thumbRenderer.render(thumbScene,view);
    return thumbRenderer.domElement.toDataURL('image/png');
   }catch{return null;}
+ }
+ function crystalPresetThumbnail(settings){
+  let group;
+  try{group=crystalStartingPointPreview(THREE,settings);return thumbnail(group);}
+  catch{return null;}
+  finally{if(group)disposeGroup(group);}
+ }
+ function presetPicture(family,preset){
+  const key=family.typeId+':'+preset.id;
+  if(!presetThumbnails.has(key)){
+   const picture=family.typeId==='crystals'?crystalPresetThumbnail(preset.parameters):recipeThumbnail(family,preset.parameters);
+   if(picture)presetThumbnails.set(key,picture);
+  }
+  return modelPicture(presetThumbnails.get(key));
  }
  function recipeThumbnail(generator,parameters,build={},colours){
   let group;
@@ -225,19 +290,20 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const placeholder=document.createElement('span');placeholder.className='sms-picture-empty';placeholder.textContent='Preview unavailable';return placeholder;
  }
  function renderTabs(){
-  if(shell){$('smsGlobalUndo').disabled=mode!=='model'||!!active()?.link;$('smsGlobalRedo').disabled=$('smsGlobalUndo').disabled;document.body.dataset.studioView=mode;shell.home.toggleAttribute('aria-current',mode==='home');$('smsLibrary').toggleAttribute('aria-current',mode==='library');if(mode!=='model'&&document.body.classList.contains('sms-focused'))shell.focus.click();}
+  if(shell){const history=histories.get(currentId),crystal=active()?.generator.typeId==='crystals';const blocked=mode!=='model'||!!active()?.link;$('smsGlobalUndo').disabled=blocked||!(crystal?adapter.canUndo(-1):history?.index>0);$('smsGlobalRedo').disabled=blocked||!(crystal?adapter.canUndo(1):history?.index<history?.items.length-1);document.body.dataset.studioView=mode;shell.home.toggleAttribute('aria-current',mode==='home');$('smsLibrary').toggleAttribute('aria-current',mode==='library');if(mode!=='model'&&document.body.classList.contains('sms-focused'))shell.focus.click();}
   const type=mode==='model'?active()?.generator.typeId:null;
   document.body.dataset.modelTheme=type||'workspace';
   document.body.classList.add('sms-workspace');
-  for(const button of document.querySelectorAll('.topbar [data-tab]')){
+  for(const button of document.querySelectorAll('.workspace-tabs [data-tab]')){
    const step=button.dataset.tab;
-   button.textContent={design:'1 · Design',build:'2 · Build',print:'3 · Print Centre'}[step];
-   const selected=mode==='print'?step==='print':mode==='model'&&step===(type==='crystals'?document.querySelector('.topbar [data-tab].active')?.dataset.tab:stage);
+   button.textContent=shell?{design:'Design',build:'Build',print:'Print Centre'}[step]:{design:'1 · Design',build:'2 · Build',print:'3 · Print Centre'}[step];
+   const selected=mode==='print'?step==='print':mode==='model'&&step===(type==='crystals'?document.querySelector('.workspace-tabs [data-tab].active')?.dataset.tab:stage);
    if(selected)button.setAttribute('aria-current','step');else button.removeAttribute('aria-current');
   }
   const root=$('smsTabs');root.replaceChildren();
   for(const id of project.tabs){const model=findModel(project,id),button=document.createElement('button');button.role='tab';button.dataset.modelTheme=model.generator.typeId;button.id='model-tab-'+id;button.setAttribute('aria-selected',String(currentId===id&&mode==='model'));button.tabIndex=currentId===id?0:-1;
    button.textContent=model.name+(project.printJobs.some(j=>j.modelId===id&&j.status==='preparing')?' ⏳':'');button.draggable=true;
+   button.setAttribute('aria-label',model.name);
    if(shell)button.prepend(modelPicture(model.thumbnail||(model.id===currentId&&model.generator.typeId==='crystals'?thumbnail(adapter.previewGroup()):null)));
    const close=document.createElement('span');close.textContent='×';close.className='close-tab';close.setAttribute('aria-hidden','true');button.append(close);
    button.onclick=e=>{if(e.target===close){closeModel(id);return;}switchModel(id);};
@@ -277,7 +343,9 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const style=model.parameters.controlStyle||'Pushbutton';
   const familyFields={
    outline:['Pushbutton'],top:['Pushbutton'],
-   symbol:['Pushbutton','Rotary knob','Rotary selector'],
+   symbol:model.parameters.rotaryMark==='Recessed pointer'?['Pushbutton','Rotary selector']:['Pushbutton','Rotary knob','Rotary selector'],
+   rotaryTop:['Rotary knob'],rotaryMark:['Rotary knob'],
+   controlGrip:['Thumb joystick','Toggle lever','Rocker','Fader cap','Directional pad'],
    cornerRound:style==='Pushbutton'&&model.parameters.outline==='Square'?['Pushbutton']:[],
    gripProfile:['Rotary knob','Rotary selector'],gripCount:['Rotary knob','Rotary selector'],gripDepth:['Rotary knob','Rotary selector'],
    leverAngle:['Toggle lever','Rocker'],
@@ -313,6 +381,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(hit){
    panel.querySelector('#smsPartEditor').open=true;
    selectRecipePart(model,hit.object.userData.partId);
+   renderPalette();
   }
  });
  function partEditor(model){
@@ -344,20 +413,22 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    mesh.material.emissive?.setHex(id&&mesh.userData.partId===id?0x116047:0);
   }
  }
+ function applyPartOffset(model,id,offset){
+  if(!id)return false;
+  const partOffsets={...model.build.partOffsets};
+  if(offset.some(Boolean))partOffsets[id]=offset;
+  else delete partOffsets[id];
+  if(!commit({build:{...model.build,partOffsets}}))return false;
+  selectRecipePart(model,id);
+  renderPalette();
+  return true;
+ }
  function bindPartEditor(model){
   const selector=$('smsPartSelect');
   if(!selector)return;
   selectRecipePart(model,selectedParts.get(model.id)||'');
-  selector.onchange=()=>selectRecipePart(model,selector.value);
-  function apply(offset){
-   const id=selector.value;
-   if(!id)return;
-   const partOffsets={...model.build.partOffsets};
-   if(offset.some(Boolean))partOffsets[id]=offset;
-   else delete partOffsets[id];
-   commit({build:{...model.build,partOffsets}});
-   selectRecipePart(model,id);
-  }
+  selector.onchange=()=>{selectRecipePart(model,selector.value);renderPalette();};
+  const apply=offset=>applyPartOffset(model,selector.value,offset);
   $('smsPartApply').onclick=()=>{
    const fields=[...panel.querySelectorAll('[data-part-axis]')];
    if(fields.every(input=>input.reportValidity()&&Number.isFinite(input.valueAsNumber)))apply(fields.map(input=>input.valueAsNumber));
@@ -386,20 +457,46 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  function renderPalette(){
   if(!shell||mode!=='model')return;
   const model=active(),family=registry.get(model.generator.typeId);
-  const build=model.generator.typeId==='crystals'?document.querySelector('.topbar [data-tab=build]').classList.contains('active'):stage==='build';
+  const build=model.generator.typeId==='crystals'?document.querySelector('.workspace-tabs [data-tab=build]').classList.contains('active'):stage==='build';
   const root=shell.palette;root.replaceChildren();
   const heading=document.createElement('h2');heading.textContent=build?'Build tools':'Design choices';root.append(heading);
   const controls=document.createElement('div');controls.className='sms-context-controls';root.append(controls);
   if(!build&&family.presets.length){
+   const crystal=family.typeId==='crystals';
    const cards=document.createElement('div');cards.className='sms-preset-strip';
-   for(const preset of visualPresets(family)){
-    const key=family.typeId+':'+preset.id;
-    if(!presetThumbnails.has(key))presetThumbnails.set(key,recipeThumbnail(family,preset.parameters));
-    const card=document.createElement('button');card.append(modelPicture(presetThumbnails.get(key)),preset.name);card.disabled=!!model.link;
-    card.onclick=()=>{commit({parameters:copy(preset.parameters)});renderEditor();};cards.append(card);
-   }
    const presets=document.createElement('details'),summary=document.createElement('summary');
-   summary.textContent='Illustrated starting points';presets.append(summary,cards);root.append(presets);
+   summary.textContent=crystal?'Crystal starting points — creates a new model':'Illustrated starting points';
+   presets.append(summary,cards);controls.before(presets);
+   const populate=()=>{
+    if(cards.childElementCount)return;
+    for(const preset of visualPresets(family)){
+     const card=document.createElement('button');card.type='button';card.append(presetPicture(family,preset),preset.name);
+     card.disabled=!crystal&&!!model.link;
+     card.onclick=()=>{
+      if(crystal){add(family.typeId,preset.parameters,preset.name);return;}
+      commit({parameters:copy(preset.parameters)});renderEditor();
+     };
+     cards.append(card);
+    }
+   };
+   if(crystal)presets.addEventListener('toggle',()=>{if(presets.open)populate();});
+   else populate();
+  }
+  const part=build||family.typeId==='crystals'?null:$('smsPartSelect');
+  if(part?.value){
+   const region=document.createElement('section'), title=document.createElement('h3');
+   region.className='sms-context-controls';region.setAttribute('aria-label','Selected part');controls.before(region);
+   title.textContent=part.selectedOptions[0].textContent;region.append(title);
+   const id=part.value,offset=model.build.partOffsets?.[id]||[0,0,0];
+   for(const [axis,label] of ['Left / right','Lift','Front / back'].entries()){
+    const key='part-offset-'+axis;
+    visualRange(region,{key,label,min:axis===1?0:-50,max:50,step:.1,unit:'mm'},offset[axis],value=>{
+     const next=[...offset];next[axis]=Number(value);
+     if(!applyPartOffset(model,id,next))return false;
+     shell.palette.querySelector('[data-palette-key="'+key+'"]')?.focus({preventScroll:true});
+     return true;
+    },!!model.link);
+   }
   }
   const addAction=(label,target)=>{
    if(!target)return;
@@ -431,9 +528,20 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     ...(!['Solid','Legacy'].includes(parameters.webStyle)&&parameters.spokes?['rimWidth','webWidth','hub']:[]),
     ...(parameters.reliefStyle!=='None'?['reliefHeight']:[])
    ];
-   const keys=(family.typeId==='gears'?gearKeys():family.visualFields)||{
+   const controlKeys=()=>{
+    const style=parameters.controlStyle;
+    return ['controlStyle','diameter','height',
+     ...(['Rotary knob','Rotary selector'].includes(style)?['gripProfile','gripCount','gripDepth']:[]),
+     ...(style==='Rotary knob'?['rotaryTop','rotaryMark']:[]),
+     ...(['Thumb joystick','Toggle lever','Rocker','Fader cap','Directional pad'].includes(style)?['controlGrip']:[])
+    ];
+   };
+   const characterKeys=()=>['character','construction','width','depth',...(parameters.construction==='Layered'?[
+    ...(['Goat','Sheep','Boat'].includes(parameters.character)?['silhouettePose']:[]),'outlineRoundness','reliefFinish',
+    ...(parameters.reliefFinish!=='Plain'?['reliefRise']:[])]:[])];
+   const keys=({gears:gearKeys,'control-caps':controlKeys,characters:characterKeys}[family.typeId]?.()||family.visualFields)||{
     'tactile-tiles':['pattern','width','height','relief'],
-    waves:['amplitude','frequency','width'],
+    waves:['flowStyle','amplitude','frequency','width'],
     'control-caps':['diameter','height','gripDepth'],
     characters:['character','width','depth'],
     'light-pods':['width','height','facets']
@@ -510,7 +618,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     renderEditor();
     return;
    }
-   const output=panel.querySelector('[data-value-for="'+schema.key+'"]');if(output)output.textContent=value+' '+(schema.unit||'');commit({parameters:{...model.parameters,[schema.key]:value}});
+   const accepted=commit({parameters:{...model.parameters,[schema.key]:value}});
+   const current=model.parameters[schema.key]??schema.default;
+   if(input.type==='checkbox')input.checked=!!current;else input.value=current;
+   const output=panel.querySelector('[data-value-for="'+schema.key+'"]');
+   if(output)output.textContent=current+' '+(schema.unit||'');
+   if(accepted)renderPalette();
   });
   const coupon=$('smsPixelCoupon');
   if(coupon)coupon.onclick=async()=>{
@@ -524,7 +637,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const pixelSection=$('smsPixelAdd')?.closest('details');
   if(pixelSection)bindPixelBuilder(panel,{
    holes:Array.isArray(model.build.pixelHoles)?model.build.pixelHoles:[],
-   getBounds:()=>applyBuildModules(g.recipe(model.parameters),{...model.build,pixelHoles:[]},g.capabilities).bounds,
+   getRecipe:()=>applyBuildModules(g.recipe(model.parameters),{...model.build,pixelHoles:[]},g.capabilities),
    onChange:pixelHoles=>commit({build:{...model.build,pixelHoles}}),
    onError:message=>{$('smsModelError').textContent=message;},
    reopen:()=>{renderEditor();$('smsPixelAdd').closest('details').open=true;}

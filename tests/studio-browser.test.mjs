@@ -27,6 +27,18 @@ try{
  await page.locator('#smsNew').click();
  const picker=page.locator('#smsPicker');
  assert.equal(await picker.locator('[data-generator] img').count(),7,'Each model family has a preview.');
+ const originalCrystal=await page.evaluate(()=>window.__sensoryStudio.currentModel.id);
+ await picker.getByRole('button',{name:'Browse Crystal Clusters starting points'}).click();
+ const crystalPictures=await picker.locator('[data-preset] img').evaluateAll(images=>images.map(image=>image.src));
+ assert.equal(crystalPictures.length,6,'Each crystal starting point renders actual geometry.');
+ assert.equal(new Set(crystalPictures).size,6,'Crystal geometry produces six distinct thumbnails.');
+ await fs.mkdir('qa',{recursive:true});
+ await page.screenshot({path:'qa/unified-family-crystals.png'});
+ await picker.locator('[data-preset="radial-bloom"]').click();
+ await page.waitForFunction(()=>window.__sensoryStudio.currentModel.parameters.leanMode==='Radial outward');
+ assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.editableState.crystals.length),11);
+ await page.locator('#model-tab-'+originalCrystal).click();
+ await page.locator('#smsNew').click();
  await picker.getByRole('button',{name:'Browse Cogs & Gears starting points'}).click();
  assert(await picker.locator('[data-preset] img').count()>2,'Gear starting points have distinct preview cards.');
  await picker.getByRole('button',{name:'All model types'}).click();
@@ -35,6 +47,9 @@ try{
  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.parameters.wheelStyle==='Pulley');
  assert.equal(await picker.isVisible(),false,'Selecting a preset closes the picker.');
  await add('tactile-tiles');const first=await page.evaluate(()=>window.__sensoryStudio.currentModel.id);
+ await page.locator('#smsPreset').selectOption('basket');
+ await page.waitForFunction(()=>window.__sensoryStudio.currentModel.parameters.pattern==='basket');
+ await page.screenshot({path:'qa/unified-family-tactile-tiles.png'});
  await page.locator('.sms-panel-details > summary').filter({hasText:'Size and proportions'}).click();await exact('width',92.5);
  await add('tactile-tiles');const second=await page.evaluate(()=>window.__sensoryStudio.currentModel.id);
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.width),80);
@@ -43,7 +58,19 @@ try{
  await page.locator('#model-tab-'+second).click();await page.locator('#model-tab-'+first).click();assert.equal(await page.evaluate(()=>window.__sensoryStudio.metrics.previewBuilds),builds,'Unchanged tabs reuse their preview resources.');
  await page.locator('#smsSaveModel').click();await page.locator('#smsLibrary').click();await page.locator('#smsSavedModels button').filter({hasText:'Linked copy'}).first().click();
  assert(await page.evaluate(()=>!!window.__sensoryStudio.currentModel.link));await page.locator('#smsBreak').click();assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.link),null);
- for(const type of ['gears','waves','control-caps','characters','light-pods'])await add(type);
+ await add('gears');
+ for(const [type,preset,key,value] of [
+  ['waves','eddy','flowStyle','Vortex'],
+  ['control-caps','dish-dial','rotaryTop','Dish'],
+  ['characters','goat-alert','construction','Layered'],
+  ['light-pods','lantern','shellForm','Lantern']
+ ]){
+  await add(type);
+  await page.locator('#smsPreset').selectOption(preset);
+  await page.waitForFunction(([key,value])=>window.__sensoryStudio.currentModel.parameters[key]===value,[key,value]);
+  await fs.mkdir('qa',{recursive:true});
+  await page.screenshot({path:`qa/unified-family-${type}.png`});
+ }
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.registry.list().length),7);
  await page.locator('#model-tab-'+first+' .close-tab').click();assert(await page.evaluate(id=>window.__sensoryStudio.project.models.some(m=>m.id===id),first));
  await page.locator('#smsLibrary').click();await page.locator('#smsProjectModels .sms-tile').filter({hasText:'Tactile Texture Tiles'}).first().getByRole('button',{name:'Open',exact:true}).click();

@@ -2,7 +2,7 @@
  * Coordinates are millimetres, Y-up. Conversion to slicer Z-up belongs to export.
  * Returned triangles are preview/source geometry until Manifold preparation.
  */
-export const tilePatterns = ['grass', 'wool', 'river', 'mineral', 'rain', 'dots'];
+export const tilePatterns = ['grass', 'wool', 'river', 'mineral', 'rain', 'dots', 'basket', 'pebbles', 'scales'];
 export const tileOutlines = ['square', 'rounded', 'circle', 'hexagon'];
 const defaults = {width: 80, depth: 80, thickness: 4, cornerRadius: 8,
  outline: 'rounded', pattern: 'grass', relief: 3, density: 5,
@@ -57,6 +57,19 @@ function reliefAt(p, x, z, fraction) {
  if (p.pattern === 'mineral') h = .5 + .25*Math.sin(u+jitter) + .25*Math.cos(v*.83+phase);
  if (p.pattern === 'rain') h = Math.pow(Math.max(0, Math.cos(u+jitter)*Math.cos(v+phase)), 4);
  if (p.pattern === 'dots') h = Math.pow(Math.max(0, Math.cos(u)*Math.cos(v)), 2);
+ if (p.pattern === 'basket') {
+  const crossOver=.5+.5*Math.cos(u)*Math.cos(v);
+  const warp=Math.pow(.5+.5*Math.cos(v*2),3),weft=Math.pow(.5+.5*Math.cos(u*2),3);
+  h=crossOver*warp+(1-crossOver)*weft;
+ }
+ if (p.pattern === 'pebbles') {
+  const xCell=Math.sin((u+jitter)*.5),zCell=Math.sin((v+phase*.2)*.5);
+  h=Math.pow(Math.max(0,1-xCell*xCell-zCell*zCell),1.4);
+ }
+ if (p.pattern === 'scales') {
+  const arc=Math.cos(u+jitter)*.85;
+  h=Math.pow(.5+.5*Math.cos(v+arc),3)*(.8+.2*Math.cos(u));
+ }
  // Raised border transition is continuous and never vanishes to a zero-height
  // secondary shell. It is a full connected contrasting top, not floating islands.
  const edge = smooth((1-fraction) * Math.min(p.width,p.depth)/2 / p.border);

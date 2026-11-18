@@ -43,19 +43,48 @@ export function pixelBuilderMarkup(model,escape){
   '>Add pixel hole</button><button id="smsPixelCoupon" type="button">Download pixel fit test STL</button></div>';
 }
 
-export function bindPixelBuilder(panel,{holes=[],getBounds,onChange,onError,reopen}){
+function insideWithMargin(contour,x,z,margin){
+ let inside=false;
+ for(let i=0,j=contour.length-1;i<contour.length;j=i++){
+  const [ax,az]=contour[j],[bx,bz]=contour[i],dx=bx-ax,dz=bz-az;
+  const length=dx*dx+dz*dz;
+  const t=length?Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/length)):0;
+  if(Math.hypot(x-ax-t*dx,z-az-t*dz)<margin)return null;
+  if((az>z)!==(bz>z)&&x<(bx-ax)*(z-az)/(bz-az)+ax)inside=!inside;
+ }
+ return inside;
+}
+
+export function findPixelPosition(recipe,holes){
+ const {width,depth}=recipe.bounds;
+ const samples=[[.23,0],[0,.23],[-.23,0],[0,-.23],[0,0],[.23,.23],[-.23,.23],[.23,-.23],[-.23,-.23]];
+ for(let ring=1;ring<=8;ring++)for(let step=0;step<24;step++){
+  const angle=step*Math.PI/12,r=ring*.055;
+  samples.push([r*Math.cos(angle),r*Math.sin(angle)]);
+ }
+ const extrusions=recipe.positive.filter(part=>part.kind==='extrude'&&!part.rotation);
+ const requireSolidFootprint=recipe.positive.length>0&&extrusions.length===recipe.positive.length;
+ return samples.map(([x,z])=>pilot(defaultProfile,Math.round(x*width*10)/10,Math.round(z*depth*10)/10)).find(option=>{
+  const {x,z}=option,margin=radius(option)+minimumWeb;
+  if(Math.abs(x)+margin>width/2||Math.abs(z)+margin>depth/2)return false;
+  if(holes.some(hole=>Math.hypot(x-hole.x,z-hole.z)<margin+radius(hole)))return false;
+  if(recipe.negative.some(cut=>cut.kind==='cylinder'&&!cut.rotation&&Math.hypot(x-(cut.position?.[0]||0),z-(cut.position?.[2]||0))<margin+cut.radius))return false;
+  return !requireSolidFootprint||extrusions.some(part=>{
+   const px=x-(part.position?.[0]||0),pz=z-(part.position?.[2]||0);
+   return insideWithMargin(part.outline,px,pz,margin)===true&&
+    (part.holes||[]).every(contour=>insideWithMargin(contour,px,pz,margin)===false);
+  });
+ });
+}
+
+export function bindPixelBuilder(panel,{holes=[],getRecipe,onChange,onError,reopen}){
  const add=panel.querySelector('#smsPixelAdd');
  if(!add)return;
  const update=next=>{if(onChange(next))reopen();};
  add.onclick=()=>{
-  let bounds;
-  try{bounds=getBounds();}catch(error){onError(error.message);return;}
-  const positions=[[.23,0],[0,.23],[-.23,0],[0,-.23],[0,0],[.23,.23],[-.23,.23],[.23,-.23],[-.23,-.23]];
-  const options=positions.map(([x,z])=>pilot(defaultProfile,Math.round(x*bounds.width*10)/10,Math.round(z*bounds.depth*10)/10));
-  const best=options.find(option=>Math.abs(option.x)+radius(option)+minimumWeb<=bounds.width/2&&
-   Math.abs(option.z)+radius(option)+minimumWeb<=bounds.depth/2&&
-   !holes.some(hole=>Math.hypot(option.x-hole.x,option.z-hole.z)<radius(option)+radius(hole)+minimumWeb));
-  if(!best){onError('Move an existing pixel or enlarge this model to make room for another hole.');return;}
+  let best;
+  try{best=findPixelPosition(getRecipe(),holes);}catch(error){onError(error.message);return;}
+  if(!best){onError('No clear material for this pixel hole. Move an existing hole or increase the solid area.');return;}
   update([...holes,best]);
  };
  panel.querySelectorAll('[data-pixel-remove]').forEach(button=>button.onclick=()=>update(holes.filter((_,index)=>index!==Number(button.dataset.pixelRemove))));

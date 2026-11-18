@@ -1,3 +1,5 @@
+import {layeredCharacter} from './studio-character-relief.js';
+import {createPodShell} from './wt002-pod-shell.js';
 import {addPixelHoleCuts} from './studio-pixel-builder.js';
 import {generateTile,tactileTileGenerator} from './tactile-tile-generator.js';
 import {createGeneratorRegistry} from './studio-generator-registry.js';
@@ -17,7 +19,7 @@ function define(typeId,displayName,category,schema,presets,recipe,capabilities={
   presets:presets.map(([id,name,parameters])=>({id,name,parameters:{...defaultParameters,...parameters}})),
   capabilities:{supportsBase:true,supportsMounting:true,supportsLEDs:false,supportsTactileSurfaces:false,supportsMechanisms:false,supportsDualMaterial:true,supportsPartSplitting:false,...capabilities},
   validateParameters(input){const p={...defaultParameters,...input},errors=[];
-   for(const s of parameterSchema){const v=p[s.key];if(s.type==='number'&&(!Number.isFinite(v)||v<s.min||v>s.max))errors.push(s.label+' must be '+s.min+'–'+s.max+' '+s.unit+'.');if(s.type==='select'&&!s.options.includes(v))errors.push('Choose a supported '+s.label+'.');if(s.type==='boolean'&&typeof v!=='boolean')errors.push(s.label+' must be on or off.');}
+   for(const s of parameterSchema){const v=p[s.key];if(s.type==='number'&&(!Number.isFinite(v)||v<s.min||v>s.max))errors.push(s.label+' must be '+s.min+'-'+s.max+' '+s.unit+'.');if(s.type==='select'&&!s.options.includes(v))errors.push('Choose a supported '+s.label+'.');if(s.type==='boolean'&&typeof v!=='boolean')errors.push(s.label+' must be on or off.');}
    if(!Number.isInteger(p.seed))errors.push('Seed must be a whole number.');
    return {valid:!errors.length,errors,parameters:p};},
   recipe(input){const c=this.validateParameters(input);if(!c.valid)throw Error(c.errors.join(' '));return {...recipe(c.parameters),dualMaterial:c.parameters.dualMaterial};},
@@ -149,17 +151,34 @@ export const gearGenerator=define('gears','Cogs & Gears','Mechanical',[
    positive.push(extrusion(outer,height,[0,y,0],[inner]));
   }
  }
- if((creativeWeb||relief)&&!inlay)return {positive,secondary:[],negative:[],materialSplitHeight:p.thickness-.8,bounds:{width:diameter,depth:diameter,height:p.thickness+(relief?p.reliefHeight:0)},warnings:['Decorative wheel. Check wheel clearances before using moving parts.']};
+ if((creativeWeb||relief)&&!inlay)return {positive,secondary:[],negative:[],materialSplitHeight:p.thickness-.8,materialSplitRole:'top',bounds:{width:diameter,depth:diameter,height:p.thickness+(relief?p.reliefHeight:0)},warnings:['Decorative wheel. Check wheel clearances before using moving parts.']};
  const secondary=[extrusion(inlay?circle(hubRadius):outline,.8,[0,p.thickness-.8,0],inlay?(p.bore?[circle(p.bore/2)]:[circle(hubRadius*.55)]):holes)];
  return {positive,secondary,negative:[],bounds:{width:diameter,depth:diameter,height:p.thickness+(relief?p.reliefHeight:0)},warnings:['Pinch points and moving parts require guarding and physical checks. Mechanical meshing still requires a mating-gear test.']};
 },{supportsMechanisms:true});
 export const waveGenerator=define('waves','Waves & Organic Forms','Organic',[
- numeric('width','Length',110,30,200),numeric('depth','Width',65,20,160),numeric('thickness','Minimum base thickness',4,2,15),numeric('amplitude','Wave height',12,1,40),numeric('frequency','Wave count',2,0.5,6,'',.1),numeric('phase','Phase',0,0,360,'degrees'),numeric('direction','Direction',0,0,360,'degrees'),numeric('variation','Organic variation',.25,0,1,'',.05)
-],[['river','Flowing river',{}],['wind','Wind surface',{frequency:1,amplitude:20,direction:30}],['ripples','Soft overlapping ripples',{frequency:4,amplitude:6,variation:.6}]],p=>{
+ choice('flowStyle','Flow structure','Parallel',['Parallel','Concentric','Vortex','Saddle','Dune']),numeric('width','Length',110,30,200),numeric('depth','Width',65,20,160),numeric('thickness','Minimum base thickness',4,2,15),numeric('amplitude','Wave height',12,1,40),numeric('frequency','Wave count',2,0.5,6,'',.1),numeric('phase','Phase',0,0,360,'degrees'),numeric('direction','Direction',0,0,360,'degrees'),numeric('variation','Organic variation',.25,0,1,'',.05)
+],[['river','Flowing river',{}],['wind','Wind surface',{frequency:1,amplitude:20,direction:30}],['ripples','Soft overlapping ripples',{frequency:4,amplitude:6,variation:.6}],['rings','Concentric ripple basin',{flowStyle:'Concentric',frequency:2}],['eddy','Turning river eddy',{flowStyle:'Vortex',frequency:1.5}],['saddle','Crossing saddle',{flowStyle:'Saddle',amplitude:19}],['dune','Wind-sculpted dune',{flowStyle:'Dune',amplitude:19}]],p=>{
  const a=p.direction*Math.PI/180,phase=p.phase*Math.PI/180;
- const top=(x,z)=>p.thickness+p.amplitude*(1+Math.sin((x*Math.cos(a)+z*Math.sin(a))/p.width*p.frequency*Math.PI*2+phase+Math.sin(z/p.depth*Math.PI*2+p.seed*.01)*p.variation))/2;
+ const top=(x,z)=>{
+  const u=(x*Math.cos(a)+z*Math.sin(a))/p.width,v=(-x*Math.sin(a)+z*Math.cos(a))/p.depth;
+  const r=Math.hypot(u,v),phaseRate=p.frequency*Math.PI*2;
+  let relief;
+  switch(p.flowStyle){
+   case 'Concentric': relief=(1+Math.cos(r*phaseRate+phase))/2;break;
+   case 'Vortex': {
+    // Fade angular terms at the origin, where the azimuth is undefined.
+    const strength=Math.min(1,r*6);
+    relief=.5+.5*strength*Math.sin(r*phaseRate*1.8+Math.atan2(v,u)*2+phase);break;
+   }
+   case 'Saddle': relief=.5+.45*Math.tanh((u*u-v*v)*p.frequency*4+p.variation*u);break;
+   case 'Dune': relief=Math.exp(-Math.pow((u-.18*Math.sin(v*4+phase))*p.frequency*3,2))*(.8+.2*Math.cos(v*2+phase));break;
+   default: relief=(1+Math.sin(u*phaseRate+phase+Math.sin(z/p.depth*Math.PI*2+p.seed*.01)*p.variation))/2;
+  }
+  return p.thickness+p.amplitude*relief;
+ };
  const mesh=heightField(p.width,p.depth,top);
- return {positive:[{kind:'mesh',mesh}],secondary:[box([p.width,.8,p.depth],[0,.4,0])],negative:[],bounds:{width:p.width,depth:p.depth,height:p.thickness+p.amplitude},warnings:['Review the wave slopes in Cura; the flat underside is the intended bed face.']};
+ const material=p.flowStyle==='Parallel'?{secondary:[box([p.width,.8,p.depth],[0,.4,0])]}:{secondary:[],materialSplitHeight:.8,materialSplitRole:'top'};
+ return {positive:[{kind:'mesh',mesh}],...material,negative:[],bounds:{width:p.width,depth:p.depth,height:p.thickness+p.amplitude},warnings:['Review the wave slopes in Cura; the flat underside is the intended bed face.']};
 });
 function raisedControlSymbol(symbol,width,surface,offset=0){
  const h=2.4,y=surface, size=width*.34;
@@ -194,27 +213,58 @@ function roundedSquare(radius,rounding){
  }).flat();
 }
 
+// Loft one radial outline across a profile so the grip and face share a closed shell.
+function rotaryCapMesh(outline, height, topProfile){
+ const layers=topProfile==='Dish'
+  ? [[0,1],[height*.92,1],[height,.93],[height*.98,.82],[height*.91,.63],[height*.88,.42]]
+  : [[0,1],[height*.48,1],[height*.60,.92],[height*.60,.78],[height,.78]];
+ const points=[],triangles=[],n=outline.length;
+ for(const [y,scale] of layers)for(const [x,z] of outline)points.push(x*scale,y,z*scale);
+ const bottom=points.length/3,top=bottom+1,last=(layers.length-1)*n;
+ points.push(0,0,0,0,layers.at(-1)[0],0);
+ for(let i=0;i<n;i++){
+  const next=(i+1)%n;
+  triangles.push(bottom,i,next,top,last+next,last+i);
+  for(let ring=0;ring<layers.length-1;ring++){
+   const a=ring*n+i,b=ring*n+next,c=a+n,d=b+n;
+   triangles.push(a,c,b,b,c,d);
+  }
+ }
+ return {kind:'mesh',mesh:{points:new Float32Array(points),triangles:new Uint32Array(triangles)}};
+}
+
 function panelControlRecipe(p){
  const w=p.diameter,d=p.depth,h=p.height,r=w/2;
  const oval=(scale=1)=>circle(r*scale).map(([x,z])=>[x,z*d/w]);
  const gripOutline=()=>Array.from({length:192},(_,i)=>{
   const angle=i*Math.PI/96;
-  const grip=p.gripProfile==='Smooth'?1:1-p.gripDepth/100*(1-Math.cos(angle*Math.round(p.gripCount)))/2;
+  const trough=(1-Math.cos(angle*Math.round(p.gripCount)))/2;
+  const shape=p.gripProfile==='Scalloped'?Math.sqrt(trough):trough;
+  const grip=p.gripProfile==='Smooth'?1:1-p.gripDepth/100*shape;
   return [r*grip*Math.cos(angle),r*grip*Math.sin(angle)];
  });
- const shape=p.controlStyle;
+ const shape=p.controlStyle,broad=p.controlGrip==='Broad';
  const negative=[],positive=[],secondary=[];
  let width=w,depth=d,top=h;
  if(shape==='Rotary knob'||shape==='Rotary selector'){
   depth=w;
-  positive.push(extrusion(gripOutline(),h));
+  const outline=gripOutline();
+  if(shape==='Rotary knob'&&p.rotaryTop!=='Flat')positive.push(rotaryCapMesh(outline,h,p.rotaryTop));
+  else positive.push(extrusion(outline,h));
   if(shape==='Rotary selector'){
    positive.push(box([w*.26,h*.36,w*.8],[0,h*1.12,-w*.06]));
    top=h*1.3;
   }
   if(shape==='Rotary knob'){
-   secondary.push(...raisedControlSymbol(p.symbol,w,h));
-   if(secondary.length)top=h+1.2;
+   const face=p.rotaryTop==='Dish'?h*.88:h;
+   if(p.rotaryMark==='Recessed pointer'){
+    const depth=Math.min(1,h*.09);
+    negative.push(box([w*.075,top-face+depth+.2,w*.26],[0,(face-depth+top+.2)/2,-w*.19]));
+   }else{
+    const symbolWidth=p.rotaryTop==='Dish'?w*.78:w;
+    secondary.push(...raisedControlSymbol(p.symbol,symbolWidth,face));
+    if(secondary.length)top=Math.max(top,face+1.2);
+   }
   }
   if(shape==='Rotary selector'){
    secondary.push(...raisedControlSymbol(p.symbol,w*.42,top,-w*.06));
@@ -226,9 +276,10 @@ function panelControlRecipe(p){
   const rings=[[0,w/2,d/2],[base*.8,w/2,d/2],[base,stem,stem],[tip-h*.17,stem,stem]];
   for(let i=-2;i<=5;i++){
    const angle=i*Math.PI/12,size=radius*Math.cos(angle);
-   rings.push([tip+Math.sin(angle)*h*.21,size,size]);
+   rings.push([tip+Math.sin(angle)*h*.21,size*(broad?1.3:1),size*(broad?.83:1)]);
   }
   top=tip+h*.21;
+  if(broad)width=Math.max(width,2*radius*1.3);
   positive.push({kind:'ring-solid',rings,top});
  }else if(shape==='Toggle lever'){
   const stem=Math.min(w,d)*.22,base=h*.28;
@@ -237,21 +288,23 @@ function panelControlRecipe(p){
   positive.push(extrusion(oval(),base));
   positive.push({...cylinder(stem,length+1),rotation:[0,0,-angle],position:[tip[0]/2,base+Math.cos(angle)*length/2-.45,0]});
   const radius=stem*1.15;
-  positive.push(sphere([radius,h*.21,radius],tip));
-  width=Math.max(w,2*(Math.abs(tip[0])+radius));
+  positive.push(sphere([radius*(broad?1.35:1),h*.21,radius*(broad?1.2:1)],tip));
+  width=Math.max(w,2*(Math.abs(tip[0])+radius*(broad?1.35:1)));
   top=tip[1]+h*.21;
  }else if(shape==='Rocker'||shape==='Fader cap'){
   const corners=[[-r,-d*.33],[-w*.34,-d/2],[w*.34,-d/2],[r,-d*.33],[r,d*.33],[w*.34,d/2],[-w*.34,d/2],[-r,d*.33]];
-  positive.push(extrusion(corners,h*.72));
+  const footprint=broad?roundedSquare(r,r*.4).map(([x,z])=>[x,z*d/w]):corners;
+  positive.push(extrusion(footprint,h*.72));
   if(shape==='Rocker'){
-   positive.push({...box([w*.72,h*.32,d*.73],[0,h*.73,0]),rotation:[p.leverAngle*Math.PI/180,0,0]});
+   positive.push({...box([w*(broad?.8:.72),h*.32,d*.73],[0,h*.73,0]),rotation:[p.leverAngle*Math.PI/180,0,0]});
    top=h+Math.sin(p.leverAngle*Math.PI/180)*d*.365;
   }else{
-   positive.push(box([w*.8,h*.28,d*.74],[0,h*.8,0]));
+   positive.push(box([w*.8,h*.28,d*(broad?.84:.74)],[0,h*.8,0]));
    negative.push(box([w*.72,h*.12,d*.10],[0,h*.94,0]));
   }
  }else if(shape==='Directional pad'){
-  positive.push(extrusion(oval(),h*.54),box([w*.84,h*.55,d*.3],[0,h*.71,0]),box([w*.3,h*.55,d*.84],[0,h*.71,0]));
+  const arm=broad?.4:.3;
+  positive.push(extrusion(oval(),h*.54),box([w*.84,h*.55,d*arm],[0,h*.71,0]),box([w*arm,h*.55,d*.84],[0,h*.71,0]));
  }else{
   positive.push(extrusion(oval(),h*.6),sphere([w*.36,h*.44,d*.36],[0,h*.55,0]));
  }
@@ -264,25 +317,33 @@ function panelControlRecipe(p){
    :cylinder(socket/2,p.socketDepth+.2,[0,(p.socketDepth-.2)/2,0]));
  }
  const band=Math.min(2,h*.16);
+ const separateRotaryFace=shape==='Rotary knob'&&!secondary.length&&(p.rotaryTop!=='Flat'||p.rotaryMark!=='Raised symbol');
  return {positive,negative,secondary,
-  materialSplitHeight:shape==='Indicator lens'?band:undefined,
-  materialBand:secondary.length||shape==='Indicator lens'?undefined:box([width+2,band,depth+2]),
+  materialSplitHeight:shape==='Indicator lens'||separateRotaryFace?band:undefined,
+  materialSplitRole:separateRotaryFace?'top':undefined,
+  materialBand:secondary.length||shape==='Indicator lens'||separateRotaryFace?undefined:box([width+2,band,depth+2]),
   bounds:{width,depth,height:top},warnings:['Printed control shell. Measure the actual hardware and check fit and movement with a physical sample.']};
 }
 
 export const capGenerator=define('control-caps','Buttons & Control Caps','Controls',[
  choice('controlStyle','Control family','Pushbutton',['Pushbutton','Rotary knob','Rotary selector','Toggle lever','Rocker','Fader cap','Thumb joystick','Directional pad','Indicator lens']),
- choice('gripProfile','Rotary grip','Fluted',['Smooth','Fluted']),numeric('gripCount','Rotary grip count',16,4,32,'',1),numeric('gripDepth','Rotary grip depth',10,2,25,'%',1),
+ choice('controlGrip','Grip silhouette','Classic',['Classic','Broad']),
+ choice('rotaryTop','Rotary knob face','Flat',['Flat','Dish','Stepped']),choice('rotaryMark','Rotary knob mark','Raised symbol',['Raised symbol','Recessed pointer']),
+ choice('gripProfile','Rotary grip','Fluted',['Smooth','Fluted','Scalloped']),numeric('gripCount','Rotary grip count',16,4,32,'',1),numeric('gripDepth','Rotary grip depth',10,2,25,'%',1),
  numeric('leverAngle','Lever or rocker angle',15,0,32,'degrees',1),choice('socketProfile','Socket profile','Round',['Round','Rectangular']),
  choice('outline','Cap profile','Round',['Round','Square','Oval']),choice('top','Top shape','Domed',['Flat','Domed','Concave','Stepped']),numeric('diameter','Cap width',40,20,100),numeric('depth','Oval depth',30,20,100),numeric('height','Overall height',14,6,35),numeric('shaft','Measured switch shaft diameter',6,0,20),numeric('socketDepth','Socket depth',7,2,20),numeric('tolerance','Diametral fit clearance',.25,0,1,'mm',.05),numeric('cornerRound','Square corner radius',0,0,10),choice('symbol','Raised symbol','Plus',['None','Plus','Minus','Dot','Pointer','Goat hoof','River wave','Mine crystal','Weather cloud','Sun','Lightning'])
 ],[['weather','Weather control',{}],['arcade','Arcade cover',{diameter:55,height:16,shaft:12}],['plain','Non-electronic tactile cap',{shaft:0,symbol:'Dot',top:'Flat'}],
  ['knob','Fluted dial',{controlStyle:'Rotary knob',height:19,socketDepth:6}],
+ ['dish-dial','Scalloped dish dial',{controlStyle:'Rotary knob',rotaryTop:'Dish',gripProfile:'Scalloped',gripCount:8,gripDepth:16,rotaryMark:'Recessed pointer',height:19,socketDepth:6}],
+ ['crown-dial','Stepped industrial dial',{controlStyle:'Rotary knob',rotaryTop:'Stepped',gripProfile:'Fluted',gripCount:20,gripDepth:14,rotaryMark:'Recessed pointer',height:21,socketDepth:6}],
  ['selector','Rotary selector',{controlStyle:'Rotary selector',gripProfile:'Smooth',symbol:'Pointer',height:18,socketDepth:6}],
  ['toggle','Angled toggle',{controlStyle:'Toggle lever',height:24,socketDepth:4}],
  ['rocker','Panel rocker',{controlStyle:'Rocker',height:18,socketDepth:4}],
  ['fader','Mixer fader cap',{controlStyle:'Fader cap',height:14,socketDepth:4,socketProfile:'Rectangular'}],
  ['joystick','Thumb joystick',{controlStyle:'Thumb joystick',height:30,socketDepth:5}],
  ['pad','Four-way directional pad',{controlStyle:'Directional pad',height:15,socketDepth:4}],
+ ['broad-thumb','Wide thumb joystick',{controlStyle:'Thumb joystick',controlGrip:'Broad',height:30,socketDepth:5}],
+ ['soft-fader','Rounded broad fader',{controlStyle:'Fader cap',controlGrip:'Broad',height:14,socketDepth:4,socketProfile:'Rectangular'}],
  ['indicator','Pilot-light lens',{controlStyle:'Indicator lens',shaft:0,height:12}]],p=>{
  if(p.controlStyle!=='Pushbutton')return panelControlRecipe(p);
  const d=p.outline==='Oval'?p.depth:p.diameter,r=p.diameter/2;
@@ -300,9 +361,37 @@ export const capGenerator=define('control-caps','Buttons & Control Caps','Contro
  return {positive,secondary,negative,materialBand,bounds:{width:p.diameter,depth:d,height:p.height*1.15+2},warnings:['Adapter dimensions are nominal: measure the real switch, print a fit coupon and test operation. This is a cap, not a printed click mechanism.']};
 },{supportsMechanisms:true});
 export const pebbleGenerator=define('light-pods','Glowing Pebbles & Light Pods','Lighting',[
+ choice('shellForm','Shell profile','Pebble',['Pebble','Swept stone','Lantern','Layered dome']),
+ choice('surface','Surface texture','Plain',['Plain','Ribs','Scallops']),numeric('relief','Texture depth',.16,0,.25,'',.01),
  numeric('width','Width',70,30,150),numeric('depth','Depth',55,25,140),numeric('height','Height',35,18,90),numeric('wall','Wall thickness',2.4,1.2,8,'mm',.2),numeric('facets','Circumference facets',32,12,64,'',4),boolean('illuminated','Accessible illumination cavity',true),numeric('opening','Underside access diameter',24,12,55),numeric('cable','Cable exit diameter',5,3,10)
-],[['river','River pebble',{}],['mineral','Faceted mineral pod',{facets:12,width:60,depth:50,height:45}],['solid','Solid tactile pebble',{illuminated:false,width:55,height:28}]],p=>{
+],[['river','River pebble',{}],['mineral','Faceted mineral pod',{facets:12,width:60,depth:50,height:45}],['solid','Solid tactile pebble',{illuminated:false,width:55,height:28}],
+ ['swept','Asymmetrical river stone',{shellForm:'Swept stone',depth:66,opening:22}],
+ ['lantern','Ribbed lantern diffuser',{shellForm:'Lantern',surface:'Ribs',width:74,depth:68,height:55,opening:24}],
+ ['layered','Scalloped low-profile dome',{shellForm:'Layered dome',surface:'Scallops',width:92,depth:72,height:24,opening:25}]],p=>{
  const radii=[p.width/2,p.height/2,p.depth/2],centre=[0,p.height*.43,0];
+ if(p.shellForm!=='Pebble'||p.surface!=='Plain') {
+  if(p.wall>=Math.min(...radii)-3)throw Error('Wall thickness leaves no usable inner volume.');
+  const baseDiameter=Math.min(p.width,p.depth)*Math.sqrt(1-.86**2);
+  if(p.illuminated&&p.opening+2*p.wall>baseDiameter)
+   throw Error('Increase pod width or depth, or reduce the underside opening to leave a continuous rim.');
+  if(p.illuminated&&p.cable>p.opening-2)
+   throw Error('Cable exit must fit inside the underside opening.');
+  const {bounds,...shell}=createPodShell(p),negative=[];
+  if(p.illuminated) {
+   // Scale the inner shell uniformly in its ellipsoid frame to preserve at
+   // least the requested wall in every principal direction. Keep a real
+   // floor that the access bore and cable slot open from outside.
+   const scale=Math.min(1-p.wall/Math.min(...radii),(centre[1]-1)/radii[1]);
+   negative.push(sphere(radii.map(r=>r*scale),centre),
+    cylinder(p.opening/2,centre[1]+2,[0,centre[1]/2,0]),
+    {...cylinder(p.cable/2,bounds.depth+4),rotation:[Math.PI/2,0,0],
+     position:[0,p.cable/2,(bounds.depth+4)/2]});
+  }
+  return {positive:[shell],secondary:[],negative,bounds,
+   materialSplitHeight:Math.max(3,p.wall,p.illuminated?p.cable+.5:0),
+   materialSplitRole:'top',
+   warnings:p.illuminated?[lightingWarning,'Inspect the underside opening, cable slot and roof in Cura.']:['Non-illuminated solid variant.']};
+ }
  if(p.wall>=Math.min(...radii)-3)throw Error('Wall thickness leaves no usable inner volume.');
  if(p.illuminated&&p.opening>Math.min(p.width,p.depth)-p.wall*2-2)throw Error('Access opening leaves too little wall.');
  const outer={...sphere(radii,centre),segments:Math.round(p.facets)};
@@ -314,8 +403,17 @@ export const pebbleGenerator=define('light-pods','Glowing Pebbles & Light Pods',
 },{supportsLEDs:true});
 // Characters lie flat as extruded, connected silhouettes with broad features.
 export const characterGenerator=define('characters','Characters & Silhouettes','Characters',[
- choice('character','Character','Goat',['Goat','Sheep','Cloud','Boat','Sun','Pickaxe']),numeric('width','Silhouette width',90,35,160),numeric('height','Silhouette height',65,25,140),numeric('depth','Relief depth',8,3,20),numeric('head','Head proportion',1,.65,1.3,'',.05),numeric('legs','Leg length',1,.5,1.3,'',.05)
-],[['goat','Goat Farm goat',{}],['sheep','Woolly sheep',{character:'Sheep'}],['cloud','Weather cloud',{character:'Cloud'}],['boat','River boat',{character:'Boat'}],['sun','Weather sunshine',{character:'Sun'}],['mine','Mining pickaxe',{character:'Pickaxe'}]],p=>{
+ choice('character','Character','Goat',['Goat','Sheep','Cloud','Boat','Sun','Pickaxe']),
+ choice('construction','Construction','Classic',['Classic','Layered']),choice('silhouettePose','Silhouette pose','Standing',['Standing','Alert','Resting']),choice('reliefFinish','Relief finish','Stepped',['Plain','Stepped','Domed']),numeric('reliefRise','Relief rise',2,.5,3,'mm',.1),numeric('outlineRoundness','Corner softening',.18,0,.38,'',.01),
+ numeric('width','Silhouette width',90,35,160),numeric('height','Silhouette height',65,25,140),numeric('depth','Relief depth',8,3,20),numeric('head','Head proportion',1,.65,1.3,'',.05),numeric('legs','Leg length',1,.5,1.3,'',.05)
+],[['goat','Goat Farm goat',{}],['sheep','Woolly sheep',{character:'Sheep'}],['cloud','Weather cloud',{character:'Cloud'}],['boat','River boat',{character:'Boat'}],['sun','Weather sunshine',{character:'Sun'}],['mine','Mining pickaxe',{character:'Pickaxe'}],
+ ['goat-alert','Alert goat relief',{construction:'Layered',silhouettePose:'Alert'}],
+ ['sheep-rest','Resting sheep relief',{construction:'Layered',character:'Sheep',silhouettePose:'Resting'}],
+ ['cloud-layered','Layered cloud',{construction:'Layered',character:'Cloud'}],
+ ['boat-alert','Steam riverboat relief',{construction:'Layered',character:'Boat',silhouettePose:'Alert'}],
+ ['sun-relief','Rounded sun relief',{construction:'Layered',character:'Sun',reliefFinish:'Domed'}],
+ ['pickaxe-relief','Layered pickaxe',{construction:'Layered',character:'Pickaxe'}]],p=>{
+ if(p.construction==='Layered')return layeredCharacter(p);
  const w=p.width,h=p.height,t=p.depth,positive=[],secondary=[];
  const ellipse=(rx,rz,x,z,depth=t,y=0)=>extrusion(circle(1,48).map(([a,b])=>[a*rx+x,b*rz+z]),depth,[0,y,0]);
  if(p.character==='Goat'||p.character==='Sheep'){
@@ -373,9 +471,13 @@ export function applyBuildModules(recipe,build={},capabilities={}){
   }
   r.warnings.push('Through mounting holes are un-rated; test actual mounting loads.');
  }
- if(build.base&&capabilities.supportsBase){const thickness=Number(build.baseThickness||3);if(thickness<2||thickness>15)throw Error('Base thickness must be 2–15 mm.');r.positive.push(box([b.width+6,thickness,b.depth+6]));r.bounds={...b,width:b.width+6,depth:b.depth+6};if(r.materialBand)r.materialBand={...r.materialBand,size:[r.bounds.width+2,r.materialBand.size[1],r.bounds.depth+2]};}
+ if(build.base&&capabilities.supportsBase){const thickness=Number(build.baseThickness||3);if(thickness<2||thickness>15)throw Error('Base thickness must be 2-15 mm.');r.positive.push(box([b.width+6,thickness,b.depth+6]));r.bounds={...b,width:b.width+6,depth:b.depth+6};if(r.materialBand)r.materialBand={...r.materialBand,size:[r.bounds.width+2,r.materialBand.size[1],r.bounds.depth+2]};}
  addPixelHoleCuts(r,build.pixelHoles);
  return r;
 }
 
 gearGenerator.visualFields=['wheelStyle','webStyle','reliefStyle','diameter','teeth','spokes','rimWidth','webWidth','reliefHeight'];
+
+
+
+pebbleGenerator.visualFields=['shellForm','surface','relief','width','depth','height','wall','opening','cable'];

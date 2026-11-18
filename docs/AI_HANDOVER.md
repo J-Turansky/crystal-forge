@@ -1,5 +1,25 @@
 # AI handover — read immediately after AGENTS.md
 
+## WT-002 · PR #35
+
+- Tactile Tiles and Waves add procedurally distinct surface presets. Crystal starting points create independent models using existing formation and preview machinery. Existing editable Crystal models, LED layouts and vault records keep their established paths.
+- Rotary caps add dish and stepped geometry with scalloped grip and optional fabricated recessed pointers. Broad grip alternatives cover other control families. Existing socket cutters are reused. Recessed pointer geometry appears in exported meshes and still needs a matching preview cut.
+- Characters now have opt-in layered outlines, rounded corners, raised or domed relief and pose options. Light Pods now have opt-in swept stone, lantern and layered dome shells with separate textures, underside access and cable cuts. The legacy recipes remain defaults.
+- The centre palette exposes offsets for a selected editable part and keeps the precision controls in sync. Pixel selection and movement from the centre palette remain follow-up work.
+- Review exact-head GitHub Actions logs before approval. Fit and diffusion require printed samples.
+
+## WT-002 · Stage C0 draft
+
+The new non-parallel wave profiles use a planar material split instead of unioning an overlapping base box. The first catalogue fabrication run reached the Vortex preset and rejected a degenerate export triangle. The existing strict exporter and the legacy Parallel construction are retained. The catalogue regression exercises the new profiles in single and dual materials with STL and 3MF output.
+
+The unified shell now moves existing app controls into one header and places workspace navigation below it. Panel visibility and widths use the device-local wt-workspace-panels-v1 key. Panels stay mounted during hide/show, preserving scroll, settings, renderer and project state. The classic layout remains available. Browser CI exercises the rail, panel restores, and existing model/Build routes. Verify the exact-head runs before approval. C0 and the three P1 regressions passed on checkpoint `295895f`. The catalogue draft now starts with continuous-backing basket, pebble and scale relief tiles and concentric, vortex, saddle and dune waves. Four other families, richer selected-component controls and full catalogue visuals remain outstanding.
+
+### Independent review follow-up
+
+- P1-1: precision controls refresh the contextual palette from accepted state and reset rejected edits in place. The turbine regression exercises the 110 mm exact value and the rejected 11-tooth Mechanical edit.
+- P1-2: automatic placement on contour-extruded models checks solid outlines, internal windows, edge clearance and earlier bores. Other recipe types retain the existing fallback and strict prepared-mesh check. The turbine fixture verifies material removal at 100 and 110 mm.
+- P1-3: Face means the contrasting upper region for creative gears. Clipped preview meshes and Manifold use the same split height; two gear styles and thicknesses check region position and export. Installed slicer and physical verification remain pending.
+
 ## Stage B creative editor
 
 The unified palette contains real model parameter controls and existing Build actions. Decorative gear modes extend the recipe while old saved values retain the legacy geometry. See the roadmap for the six-family acceptance gates. The current draft must pass Chromium, static and real Manifold on its exact head.

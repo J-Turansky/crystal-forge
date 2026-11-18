@@ -1516,7 +1516,7 @@ installConciseHelp();
 if(studioBootstrap&&!new URLSearchParams(location.search).has('legacy'))studioBridge=installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstrap:studioBootstrap,adapter:{
  capture:()=>({settings:clone(s),crystals:clone(crystals),selectedId}),
  bounds:()=>{const size=modelBounds().getSize(new THREE.Vector3());return {width:size.x,depth:size.z,height:size.y};},
- status:setStatus,download,undo,vault:()=>cloudVault,
+ status:setStatus,download,undo,canUndo:delta=>historyIndex+delta>=0&&historyIndex+delta<history.length,vault:()=>cloudVault,
  pixelFitCoupon:async nominal=>{
   if(!Number.isFinite(nominal)||nominal<2||nominal>30)throw Error('Enter a pixel bore diameter between 2 and 30 mm.');
   const wasm=await loadManifold(),coupon=makeCalibrationStrip(wasm,nominal);
@@ -1525,6 +1525,7 @@ if(studioBootstrap&&!new URLSearchParams(location.search).has('legacy'))studioBr
    return coupon.diameters;
   }finally{coupon.geometry.dispose();}
  },
+ formationDefaults:()=>clone(defaults),
  createCrystals:parameters=>({crystals:generateFormation({...defaults,...parameters}),selectedId:null}),
  previewGroup:()=>{const group=new THREE.Group();for(const mesh of [...crystalMeshes,...(baseMesh?[baseMesh]:[]),...baseAccents])group.add(mesh.clone());return group;},
  detach:()=>{

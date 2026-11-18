@@ -84,3 +84,35 @@ body.sms-unified .layout{height:auto;min-height:0;flex:1;position:relative;grid-
 .sms-context-controls label input{grid-column:1/-1;width:100%;accent-color:var(--teal)}
 .sms-context-controls fieldset button{margin:3px}
 .sms-context-controls button[aria-pressed=true]{outline:2px solid var(--teal);font-weight:700}
+
+/* Global controls stay above the workspace navigation. */
+.sms-unified .topbar{flex-wrap:wrap;gap:8px;padding:8px 12px;z-index:32}
+.sms-unified .topbar .utility{gap:5px}
+.sms-workspace-nav{flex:0 0 auto;padding:5px 12px;border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--panel);align-items:center}
+.sms-workspace-nav button{padding:4px 11px}
+.sms-more{position:relative}
+.sms-more summary{cursor:pointer;padding:7px;border:1px solid var(--border);border-radius:7px}
+.sms-more[open]{display:flex;gap:5px;flex-wrap:wrap;align-items:center;max-width:100%}
+.sms-more label{display:flex;gap:6px;align-items:center}
+.sms-more input{width:80px}
+body.sms-unified .layout{grid-template-columns:var(--sms-rail-width) minmax(0,1fr) var(--sms-settings-width)!important}
+.sms-unified .layout>.workspace-resizer{display:none!important}
+.sms-unified .sms-rail{grid-column:1;grid-row:1}
+.sms-unified .sms-centre{grid-column:2;grid-row:1}
+.sms-unified .sms-settings{grid-column:3;grid-row:1}
+.sms-unified [hidden]:is(.sms-rail,.sms-settings,.sms-palette,.sms-split){display:none!important}
+.sms-unified .sms-centre[data-palette=hidden]{grid-template-rows:minmax(0,1fr)}
+.sms-unified .layout[data-rail=icons] .sms-rail{padding:5px}
+.sms-unified .layout[data-rail=icons] .sms-rail button{font-size:0;padding:4px;display:block}
+.sms-unified .layout[data-rail=icons] .sms-rail button img,.sms-unified .layout[data-rail=icons] .sms-picture-empty{width:100%;display:block}
+.sms-unified .layout[data-rail=icons] .sms-rail .close-tab{display:none}
+.sms-unified .layout[data-rail=icons] #smsToggleRail::after{content:'»';font-size:16px}
+.sms-unified .layout[data-rail=icons] #smsNew::after{content:'＋';font-size:16px}
+@media(max-width:850px){
+ body.sms-unified .layout{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:auto minmax(515px,78dvh) auto}
+ .sms-unified .sms-rail,.sms-unified .sms-centre,.sms-unified .sms-settings{grid-column:1}
+ .sms-unified .sms-rail{grid-row:1}
+ .sms-unified .sms-centre{grid-row:2}
+ .sms-unified .sms-settings{grid-row:3}
+ .sms-unified .layout[data-rail=icons] .sms-rail button{min-width:46px;width:46px}
+}
