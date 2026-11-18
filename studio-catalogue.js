@@ -153,13 +153,23 @@ function panelControlRecipe(p){
    secondary.push(...raisedControlSymbol(p.symbol,w*.42,top,-w*.06));
    if(secondary.length)top+=1.2;
   }
- }else if(shape==='Toggle lever'||shape==='Thumb joystick'){
+ }else if(shape==='Thumb joystick'){
+  // One closed shell avoids Boolean seams between the stem and grip.
+  const stem=Math.min(w,d)*.22,base=h*.28,tip=h*1.1,radius=stem*1.8;
+  const rings=[[0,w/2,d/2],[base*.8,w/2,d/2],[base,stem,stem],[tip-h*.17,stem,stem]];
+  for(let i=-2;i<=5;i++){
+   const angle=i*Math.PI/12,size=radius*Math.cos(angle);
+   rings.push([tip+Math.sin(angle)*h*.21,size,size]);
+  }
+  top=tip+h*.21;
+  positive.push({kind:'ring-solid',rings,top});
+ }else if(shape==='Toggle lever'){
   const stem=Math.min(w,d)*.22,base=h*.28;
-  const angle=shape==='Toggle lever'?p.leverAngle*Math.PI/180:0;
+  const angle=p.leverAngle*Math.PI/180;
   const length=h*.82,tip=[Math.sin(angle)*length,base+Math.cos(angle)*length,0];
   positive.push(extrusion(oval(),base));
   positive.push({...cylinder(stem,length+1),rotation:[0,0,-angle],position:[tip[0]/2,base+Math.cos(angle)*length/2-.45,0]});
-  const radius=shape==='Thumb joystick'?stem*1.8:stem*1.15;
+  const radius=stem*1.15;
   positive.push(sphere([radius,h*.21,radius],tip));
   width=Math.max(w,2*(Math.abs(tip[0])+radius));
   top=tip[1]+h*.21;

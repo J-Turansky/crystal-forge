@@ -1,12 +1,36 @@
 /* Shared solid recipes. Preview components may overlap; only prepareRecipe
  * Boolean results may reach manufacturing exporters. Units mm; Y-up. */
+function ringSolidGeometry(THREE,rings,top){
+ const sides=48,vertices=[],faces=[];
+ for(const [y,rx,rz] of rings){
+  for(let side=0;side<sides;side++){
+   const angle=side*2*Math.PI/sides;
+   vertices.push(rx*Math.cos(angle),y,rz*Math.sin(angle));
+  }
+ }
+ const bottom=vertices.length/3,tip=bottom+1,last=(rings.length-1)*sides;
+ vertices.push(0,rings[0][0],0,0,top,0);
+ for(let side=0;side<sides;side++){
+  const next=(side+1)%sides;
+  faces.push(bottom,side,next,tip,last+next,last+side);
+  for(let ring=0;ring<rings.length-1;ring++){
+   const a=ring*sides+side,b=ring*sides+next,c=a+sides,d=b+sides;
+   faces.push(a,c,b,b,c,d);
+  }
+ }
+ const geometry=new THREE.BufferGeometry();
+ geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+ geometry.setIndex(faces);
+ return geometry;
+}
 export function recipeGeometry(THREE, part) {
  let geometry;
  if(part.kind==='mesh') {
   geometry=new THREE.BufferGeometry();
   geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(part.mesh.points),3));
   geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(part.mesh.triangles),1));
- } else if(part.kind==='sphere') geometry=new THREE.SphereGeometry(1,part.segments||32,20);
+ } else if(part.kind==='ring-solid') geometry=ringSolidGeometry(THREE,part.rings,part.top);
+ else if(part.kind==='sphere') geometry=new THREE.SphereGeometry(1,part.segments||32,20);
  else if(part.kind==='box') geometry=new THREE.BoxGeometry(...part.size);
  else if(part.kind==='cylinder') geometry=new THREE.CylinderGeometry(part.topRadius??part.radius,part.radius,part.height,48);
  else if(part.kind==='extrude') {

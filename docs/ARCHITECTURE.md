@@ -1,5 +1,11 @@
 # Architecture — implementation as inspected (10 November 2026)
 
+## Studio boundaries after PR #27
+
+The existing Crystal editor remains the functional benchmark. `sensory-studio.js` handles the generic workspace, rendered starter cards and numerical part offsets. `studio-catalogue.js` builds shared recipes, including `studio-pixel-builder.js` vertical cuts. The worker prepares those recipes with Manifold and the material exporter checks the resulting triangles and assigns the common Z-up coordinate frame. Preview rings indicate intended cuts. They do not validate fit or routing.
+
+The latest versioned heading and bullet list in CHANGELOG.md define production release metadata. CI checks the toolbar and first What's New entry against them. Pages checks for a new version relative to the previous main commit before uploading.
+
 ## Sensory Model Studio v0.16.0 — active draft work
 
 The user approved the full seven-generator expansion, global Print Centre, local-first visual library, copy/linked models, private-vault evolution and actual dual-material exports. [Full brief](SENSORY_MODEL_STUDIO_V016_BRIEF.md). **Implementation is incomplete.** [Current acceptance and module map](SENSORY_MODEL_STUDIO_V016_ACCEPTANCE.md) distinguishes source modules, integration still needed and unrun tests. Keep all remaining stages in the same draft PR; do not mark this checkpoint as the finished v0.16.0 release.

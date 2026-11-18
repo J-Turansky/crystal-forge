@@ -1,5 +1,16 @@
 # PR14 / v0.15.1 — physical pixel-spacing snap (draft)
 
+## Current sequence
+
+1. Stabilise fabrication and require release metadata before Pages deployment.
+2. Build the reversible three-column interface shell with a pinned 3D preview and light-mode design system.
+3. Add visual Design tools, contextual settings, direct manipulation and help.
+4. Extend shared Build with real pixel fitting and serial routing.
+5. Expand the combined Library and multi-model projects.
+6. Build the visual Print Tray and validate production exports.
+
+Each milestone requires explicit acceptance criteria, regression coverage and a demonstration with real Crystal and Control Cap models. The existing editor remains the baseline until migration and functional parity are verified.
+
 ## Sensory Model Studio v0.16.0 — active draft work
 
 The user approved the full seven-generator expansion, global Print Centre, local-first visual library, copy/linked models, private-vault evolution and actual dual-material exports. [Full brief](SENSORY_MODEL_STUDIO_V016_BRIEF.md). **Implementation is incomplete.** [Current acceptance and module map](SENSORY_MODEL_STUDIO_V016_ACCEPTANCE.md) distinguishes source modules, integration still needed and unrun tests. Keep all remaining stages in the same draft PR; do not mark this checkpoint as the finished v0.16.0 release.

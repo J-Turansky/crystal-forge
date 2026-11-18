@@ -1,5 +1,13 @@
 # Sensory Model Studio v0.16.0 — in-progress acceptance
 
+## Current acceptance after PR #27
+
+- Source and PR #27 browser coverage confirm rendered family/preset cards, numerical part offset controls, generic pixel-hole controls and an engraved fit-test download. Pixel holes are X/Z vertical bores. Full direct manipulation, shared cable routing, part-specific fit and physical validation remain open.
+- PR #27 exact head `fd58f0c7f9fe033eaa225234602d9ba81e40dea1`: [static passed](https://github.com/connorturansky-svg/crystal-forge/actions/runs/44291353290), [browser passed](https://github.com/connorturansky-svg/crystal-forge/actions/runs/44291353412), [fabrication failed](https://github.com/connorturansky-svg/crystal-forge/actions/runs/44291353345).
+- The stability draft preserves storage formats and runs the existing project, migration and private-vault suites. Use the stability PR checks for the current head result. Live private-vault restore on a separate browser, installed Cura inspection, real print and fit, and light/cable behaviour remain manual acceptance.
+
+The remaining sections document historical implementation checkpoints.
+
 **State: incomplete development checkpoint; not a release or merge candidate.**
 
 The complete user-approved scope is retained in [the development brief](SENSORY_MODEL_STUDIO_V016_BRIEF.md). All stages A–F remain in this single draft PR. This checkpoint does not reduce the scope to architecture or substitute one generator for the seven requested.

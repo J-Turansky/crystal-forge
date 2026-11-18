@@ -1,5 +1,9 @@
 # AI handover — read immediately after AGENTS.md
 
+## Current baseline and stability draft
+
+PR #27 was merged at `15808aa18518e85a33f22124824551a3c1bd7102`. Its final head passed static and browser checks and failed fabrication during STL encoding after the fader case. The current stability branch keeps the editor and storage schemas in place. It introduces a single-shell joystick recipe, a focused export fixture and a production version gate. Recheck all suites on the exact review head. The notes below describe historical checkpoints.
+
 ## PR16 production-readiness checkpoint
 
 PRs #21 and #22 are merged. The v0.16.0 acceptance matrix is historical and is not release sign-off. At `f9089c1`, static checks and Pages passed, the legacy browser smoke passed, Studio exact-entry failed on blur reentrancy, and fabrication reached the first cog before rejecting its display triangulation. PR16 starts with these two failures. Full browser, Manifold and installed Cura acceptance remain open, along with shared hardware, assemblies, parameter linking, expanded catalogue and advanced print planning.

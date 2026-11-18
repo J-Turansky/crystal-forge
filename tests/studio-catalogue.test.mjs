@@ -5,6 +5,14 @@ import {capGenerator,generators,applyBuildModules} from '../studio-catalogue.js'
 import {prepareRecipe} from '../studio-geometry.js';
 import {exportMaterialBodies} from '../studio-material-export.js';
 const wasm=await Module();wasm.setup();
+const joystick=capGenerator.presets.find(preset=>preset.id==='joystick');
+assert.equal(joystick.parameters.controlStyle,'Thumb joystick');
+for(const dualMaterial of [false,true]){
+ const prepared=prepareRecipe(THREE,wasm,capGenerator.recipe({...joystick.parameters,dualMaterial}));
+ const exported=exportMaterialBodies(prepared,{name:'thumb-joystick-regression'});
+ assert.equal(exported.stls.length,dualMaterial?2:1);
+ assert(exported.threeMF.length>100);
+}
 for(const generator of generators){
  assert(generator.presets.length>=3,generator.displayName+' requires three meaningful presets.');
  for(const preset of generator.presets){
