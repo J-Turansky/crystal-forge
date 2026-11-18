@@ -170,7 +170,15 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    ['Light and materials','Choose material regions and lighting options.',/dualMaterial|illuminated|wall|inlay/i]
   ];
   const family=generator.parameterSchema.find(field=>field.key==='controlStyle');
-  const remaining=new Set(generator.parameterSchema.filter(field=>field!==family));
+  const style=model.parameters.controlStyle||'Pushbutton';
+  const familyFields={
+   outline:['Pushbutton'],top:['Pushbutton'],
+   symbol:['Pushbutton','Rotary knob'],
+   gripProfile:['Rotary knob','Rotary selector'],gripCount:['Rotary knob','Rotary selector'],gripDepth:['Rotary knob','Rotary selector'],
+   leverAngle:['Toggle lever','Rocker'],
+   socketProfile:['Rotary knob','Rotary selector','Toggle lever','Rocker','Fader cap','Thumb joystick','Directional pad','Indicator lens']
+  };
+  const remaining=new Set(generator.parameterSchema.filter(field=>field!==family&&(!family||!familyFields[field.key]||familyFields[field.key].includes(style))));
   const output=groups.map(([title,description,pattern])=>{
    const controls=[...remaining].filter(field=>pattern.test(field.key));
    controls.forEach(field=>remaining.delete(field));
@@ -201,6 +209,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if($('smsPreset'))$('smsPreset').onchange=e=>{const preset=g.presets.find(p=>p.id===e.target.value);if(preset){commit({parameters:copy(preset.parameters)});renderEditor();}};
   panel.querySelectorAll('[data-model-param]').forEach(input=>input.oninput=()=>{
    const schema=g.parameterSchema.find(s=>s.key===input.dataset.modelParam),value=input.type==='checkbox'?input.checked:schema.type==='number'?Number(input.value):input.value;
+   if(schema.key==='controlStyle'){
+    const preset=g.presets.find(item=>item.parameters.controlStyle===value);
+    if(preset)commit({parameters:{...preset.parameters,seed:model.parameters.seed,dualMaterial:model.parameters.dualMaterial}});
+    renderEditor();
+    return;
+   }
    const output=panel.querySelector('[data-value-for="'+schema.key+'"]');if(output)output.textContent=value+' '+(schema.unit||'');commit({parameters:{...model.parameters,[schema.key]:value}});
   });
   panel.querySelectorAll('[data-build]').forEach(input=>input.onchange=()=>commit({build:{...model.build,[input.dataset.build]:input.type==='checkbox'?input.checked:Number(input.value)}}));
