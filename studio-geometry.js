@@ -25,7 +25,16 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
  const group=new THREE.Group();
  for(const [role,parts] of [['primary',recipe.positive],['secondary',recipe.secondary||[]]])for(const part of parts){
   const mesh=new THREE.Mesh(recipeGeometry(THREE,part),new THREE.MeshStandardMaterial({color:colours[role==='primary'?0:1],roughness:.55,flatShading:false}));
-  mesh.userData.materialRole=role;group.add(mesh);
+  mesh.userData.materialRole=role;mesh.userData.partId=part.partId;group.add(mesh);
+ }
+ for(const hole of recipe.negative||[])if(hole.pixelHole){
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(hole.radius,.18,6,48),
+   new THREE.MeshBasicMaterial({color:0xffbe47,depthTest:false}));
+  ring.rotation.x=-Math.PI/2;
+  ring.position.set(hole.position[0],recipe.bounds.height+.3,hole.position[2]);
+  ring.renderOrder=5;
+  ring.userData.previewOnly=true;
+  group.add(ring);
  }
  return group;
 }
@@ -59,7 +68,12 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
  try{
   onProgress('Joining physical bodies');let total=union(recipe.positive);
   if(recipe.secondary?.length&&!recipe.partitioned)total=hold(total.add(union(recipe.secondary)));
-  for(const part of recipe.negative||[])total=hold(total.subtract(convert(part)));
+  for(const part of recipe.negative||[]){
+   const before=total;
+   total=hold(total.subtract(convert(part)));
+   if(part.pixelHole&&before.volume()-total.volume()<.1)
+    throw Error(part.pixelHole+' does not cut the model. Move it onto solid material in Build.');
+  }
   if(total.status()!=='NoError'||total.isEmpty()||total.volume()<=0)throw Error('Manufacturing produced no valid material.');
   let regions=[{role:'primary',solid:total}];
   if(recipe.dualMaterial&&(recipe.materialBand||recipe.secondary?.length)){
