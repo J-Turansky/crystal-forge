@@ -177,7 +177,7 @@ const tileRoute=tileGenerator.recipe({pattern:'terraces',width:84,depth:76,thick
 const gearRoute=gearGenerator.recipe({mode:'Decorative',wheelStyle:'Rounded lobes',webStyle:'Solid',bore:0,diameter:100,teeth:12,thickness:8});
 for(const [recipe,family] of [[tileRoute,tileGenerator],[gearRoute,gearGenerator]]){
  for(const count of [1,2,3]){
-  const pixelHoles=Array.from({length:count},(_,i)=>checked('led-'+i,(i-(count-1)/2)*25));
+  const pixelHoles=Array.from({length:count},(_,i)=>checked('led-'+i,.37+(i-(count-1)/2)*25,1.23));
   const build={pixelHoles,pixelBuilderVersion:1};
   const bored=prepareRecipe(THREE,wasm,applyBuildModules(recipe,build,family.capabilities));
   const routedRecipe=applyBuildModules(recipe,{...build,serialRouting:{...serial,pitch:25}},family.capabilities);

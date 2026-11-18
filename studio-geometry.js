@@ -147,7 +147,28 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
    }
    const originalVolume=total.volume();
    const routed=hold(total.subtract(hold(wasm.Manifold.union(cuts))));
-   total=hold(routed.simplify(tolerance));
+   total=hold(hold(routed.asOriginal()).simplify(tolerance));
+   const validTriangles=mesh=>{
+    const p=mesh.vertProperties,t=mesh.triVerts,stride=mesh.numProp;
+    for(let i=0;i<t.length;i+=3){
+     const a=t[i]*stride,b=t[i+1]*stride,c=t[i+2]*stride;
+     const u=[p[b]-p[a],p[b+1]-p[a+1],p[b+2]-p[a+2]];
+     const v=[p[c]-p[a],p[c+1]-p[a+1],p[c+2]-p[a+2]];
+     const twiceArea=Math.hypot(u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]);
+     if(!Number.isFinite(twiceArea)||twiceArea<1e-12)return false;
+    }
+    return true;
+   };
+   const mesh=total.getMesh();
+   if(!validTriangles(mesh)){
+    // Round-trip through the exact float precision used by STL/3MF as a solid.
+    // Keep the repair only if it preserves volume and gives valid triangles.
+    const rebuilt=hold(new wasm.Manifold(mesh));
+    const repaired=hold(hold(rebuilt.asOriginal()).simplify(tolerance));
+    if(repaired.status()!=='NoError'||repaired.isEmpty()||Math.abs(repaired.volume()-total.volume())>.01||!validTriangles(repaired.getMesh()))
+     throw Error('The routed mesh cannot be exported at STL precision. Move a fitting slightly or change rotation and prepare again.');
+    total=repaired;
+   }
    if(originalVolume-total.volume()<.1)throw Error('Serial channels did not remove material.');
   }else for(const part of recipe.negative||[]){
    const before=total;
