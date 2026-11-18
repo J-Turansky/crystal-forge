@@ -18,3 +18,12 @@ body.theme-light.sms-workspace .left,body.theme-light.sms-workspace .right{backg
 body.sms-workspace .workspace-tabs button[aria-current=step],body.sms-workspace .sms-controls .primary{background:hsl(var(--model-hue) 52% 35%);border-color:hsl(var(--model-hue) 56% 44%);color:white}
 body.sms-workspace .workspace-tabs button.active:not([aria-current]){background:var(--panel2);border-color:var(--border);color:var(--ink)}
 body.sms-workspace .sms-panel-details{background:var(--panel);border-left:3px solid hsl(var(--model-hue) 54% 51%)}
+
+#smsPicker{width:min(860px,calc(100vw - 32px));max-height:calc(100dvh - 48px);overflow:auto}
+#smsPicker h2{margin:0 0 12px}
+#smsPicker form{margin-top:14px}
+.sms-picker-tile{padding:8px;border-top:3px solid hsl(var(--model-hue) 54% 50%)}
+.sms-picker-choice{display:grid;gap:8px;text-align:left;font-weight:700}
+.sms-picker-back{grid-column:1/-1;justify-self:start}
+.sms-picture-empty{display:grid;place-items:center;min-height:130px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;color:var(--muted);font-weight:400}
+@media(max-width:440px){#smsPicker .sms-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sms-picker-tile img,.sms-picture-empty{height:94px;min-height:94px}}
