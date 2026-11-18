@@ -258,13 +258,14 @@ try{
  assert(await page.locator('#smsHomeNew').isVisible());
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),true);
  await page.setViewportSize({width:1440,height:1000});
- const fixture=await page.evaluate(()=>{
+ const queueTileName='Café / Weather: '+ 'Printer '.repeat(12).trim();
+ const fixture=await page.evaluate(tileName=>{
   const studio=window.__sensoryStudio;
   const crystal=studio.project.models.find(model=>model.generator.typeId==='crystals');
-  const tile=studio.addModel('tactile-tiles',{width:70,dualMaterial:false},'Queue test tile');
+  const tile=studio.addModel('tactile-tiles',{width:70,dualMaterial:false},tileName);
   studio.switchModel(crystal.id);
   return {crystal:{id:crystal.id,name:crystal.name},tile:tile.id};
- });
+ },queueTileName);
  const openPrint=()=>page.locator('.sms-workspace-nav [data-tab=print]').click();
  const jobs=page.locator('#smsJobs article');
  const queue=()=>page.evaluate(()=>window.__sensoryStudio.project.printJobs);
@@ -274,12 +275,12 @@ try{
  await page.locator('#smsExpandPrint').press('Enter');
  const addCrystal=page.locator('#smsPrintModels').getByRole('button',{name:'Add '+fixture.crystal.name,exact:true});
  await addCrystal.evaluate(button=>{button.click();button.click();});
- await page.locator('#smsPrintModels').getByRole('button',{name:'Add Queue test tile',exact:true}).click();
+ await page.locator('#smsPrintModels').getByRole('button',{name:'Add '+queueTileName,exact:true}).click();
  const [crystalJob,tileJob]=await queue();
  assert.equal((await queue()).length,2);
  assert.equal(crystalJob.modelId,fixture.crystal.id);
  assert.equal(tileJob.modelId,fixture.tile);
- const card=job=>jobs.filter({has:page.getByRole('heading',{name:job===tileJob?'Queue test tile':fixture.crystal.name,exact:true})});
+ const card=job=>jobs.filter({has:page.getByRole('heading',{name:job===tileJob?queueTileName:fixture.crystal.name,exact:true})});
  const tile=card(tileJob),crystal=card(crystalJob);
  assert.equal(await crystal.locator('img,.sms-picture-empty').count(),1);
  assert.match(await tile.innerText(),/source revision/);
@@ -318,9 +319,9 @@ try{
  await crystal.getByRole('button',{name:'Retry',exact:true}).click();
  assert.notEqual((await queue()).find(job=>job.id===crystalJob.id).requestId,pending.requestId);
  await page.waitForFunction(id=>window.__sensoryStudio.project.printJobs.find(job=>job.id===id)?.status==='prepared',crystalJob.id,{timeout:120000});
- async function downloadBytes(button){
+ async function useDownload(button){
   const [download]=await Promise.all([page.waitForEvent('download'),button.click()]);
-  return fs.readFile(await download.path());
+  return {name:download.suggestedFilename(),bytes:await fs.readFile(await download.path())};
  }
  function zipEntries(bytes){
   const entries=new Map();
@@ -331,13 +332,35 @@ try{
   }
   return entries;
  }
- const threeMF=zipEntries(await downloadBytes(tile.locator('[data-job-3mf]')));
+ const modelFile=await useDownload(tile.locator('[data-job-3mf]'));
+ const printPack=await useDownload(tile.locator('[data-job-export]'));
+ const threeMF=zipEntries(modelFile.bytes),pack=zipEntries(printPack.bytes);
  assert(threeMF.has('3D/3dmodel.model'));
- const pack=zipEntries(await downloadBytes(tile.locator('[data-job-export]')));
+ const manifest=JSON.parse(pack.get('print-job-manifest.json'));
+ const preparedTile=(await queue()).find(job=>job.id===tileJob.id);
+ assert.deepEqual(manifest,{
+  schemaVersion:1,modelId:fixture.tile,modelName:queueTileName,generatorType:'tactile-tiles',
+  modelRevision:preparedTile.revision,jobId:tileJob.id,preparedRevision:preparedTile.preparedRevision,
+  printer:'Ultimaker 2+',nozzleMm:.8,material:'PETG',quality:35,curaProfile:'included',files:[...pack.keys()]
+ });
+ assert.match(printPack.name,/^cafe-weather-[a-z0-9-]+-rev[0-9]+-[0-9a-f]{16}\.zip$/);
+ assert(printPack.name.length<85);
+ assert(printPack.name.includes('-rev'+manifest.modelRevision+'-'));
+ assert.equal(modelFile.name,printPack.name.replace(/\.zip$/,'.3mf'));
+ const crystalFile=await useDownload(crystal.locator('[data-job-3mf]'));
+ assert.notEqual(crystalFile.name.match(/[0-9a-f]{16}(?=\.3mf$)/)?.[0],modelFile.name.match(/[0-9a-f]{16}(?=\.3mf$)/)?.[0]);
+ assert(zipEntries(crystalFile.bytes).has('3D/3dmodel.model'));
+ for(const name of ['editable-model.json','material-roles.json','print-report.json','cura-manual-settings.txt'])assert(pack.has(name),name);
+ assert([...pack.keys()].some(name=>name.endsWith('.stl')));
+ const inner3MF=[...pack.keys()].find(name=>name.endsWith('.3mf'));
+ assert.deepEqual(pack.get(inner3MF),modelFile.bytes);
  const profile=[...pack.keys()].find(name=>name.endsWith('.curaprofile'));
  assert.match(profile,/UM2-Plus_0p8mm_PETG_Q35/);
- assert(pack.has('cura-manual-settings.txt'));
- assert(zipEntries(await downloadBytes(page.locator('#smsCura'))).size>0);
+ const readme=pack.get('READ-ME.txt').toString();
+ for(const line of ['Model: '+queueTileName,'Revision: '+manifest.modelRevision,'Job ID: '+tileJob.id,
+  'Printer: Ultimaker 2+','Nozzle: 0.8 mm','Material: PETG','Quality: 35 / 100','The STL files share one origin.','installed Cura'])
+  assert(readme.includes(line),line);
+ assert(zipEntries((await useDownload(page.locator('#smsCura'))).bytes).size>0);
  await shot('wt008-print-queue');
  await page.setViewportSize({width:740,height:880});
  await tile.scrollIntoViewIfNeeded();
@@ -346,7 +369,21 @@ try{
  await page.setViewportSize({width:1440,height:1000});
  await setting('curaNozzle').selectOption('0.6');
  assert(await tile.locator('[data-job-3mf]').isDisabled());
+ assert(await tile.locator('[data-job-export]').isDisabled());
  assert(await crystal.locator('[data-job-3mf]').isEnabled());
+ await setting('printer').selectOption('Custom / other');
+ await tile.locator('[data-job-prepare]').click();
+ await page.waitForFunction(id=>window.__sensoryStudio.project.printJobs.find(job=>job.id===id)?.status==='prepared',tileJob.id,{timeout:120000});
+ const manualPack=zipEntries((await useDownload(tile.locator('[data-job-export]'))).bytes);
+ const manual=JSON.parse(manualPack.get('print-job-manifest.json'));
+ assert.equal(manual.curaProfile,'manual-review');
+ assert.equal(manual.printer,'Custom / other');
+ assert.equal(manual.nozzleMm,.6);
+ assert.equal(manual.material,'PETG');
+ assert.equal(manual.quality,35);
+ assert.deepEqual(manual.files,[...manualPack.keys()]);
+ assert(manualPack.has('cura-manual-review.txt'));
+ assert(![...manualPack.keys()].some(name=>name.endsWith('.curaprofile')));
  await tile.locator('[data-job-reset]').click();
  assert.deepEqual((await queue()).find(job=>job.id===tileJob.id).overrides,{});
  assert.equal(await setting('curaNozzle').inputValue(),'0.4');
