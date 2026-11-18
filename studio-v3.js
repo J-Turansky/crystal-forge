@@ -1516,6 +1516,14 @@ if(studioBootstrap&&!new URLSearchParams(location.search).has('legacy'))studioBr
  capture:()=>({settings:clone(s),crystals:clone(crystals),selectedId}),
  bounds:()=>{const size=modelBounds().getSize(new THREE.Vector3());return {width:size.x,depth:size.z,height:size.y};},
  status:setStatus,download,vault:()=>cloudVault,
+ pixelFitCoupon:async nominal=>{
+  if(!Number.isFinite(nominal)||nominal<2||nominal>30)throw Error('Enter a pixel bore diameter between 2 and 30 mm.');
+  const wasm=await loadManifold(),coupon=makeCalibrationStrip(wasm,nominal);
+  try{
+   saveSTL(coupon.geometry,'pixel-fit-'+nominal.toFixed(2).replace('.','_')+'mm.stl');
+   return coupon.diameters;
+  }finally{coupon.geometry.dispose();}
+ },
  createCrystals:parameters=>({crystals:generateFormation({...defaults,...parameters}),selectedId:null}),
  previewGroup:()=>{const group=new THREE.Group();for(const mesh of [...crystalMeshes,...(baseMesh?[baseMesh]:[]),...baseAccents])group.add(mesh.clone());return group;},
  detach:()=>{
