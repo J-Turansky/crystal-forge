@@ -6,6 +6,16 @@ try{
  const page=await browser.newPage({viewport:{width:1440,height:1000}});
  const errors=[];page.on('pageerror',error=>errors.push(error.message));
  const url=process.env.CRYSTAL_FORGE_URL||'http://127.0.0.1:4321';
+ if(process.env.CRYSTAL_FORGE_BASELINE_URL){
+  const baseline=await browser.newPage({viewport:{width:1440,height:1000}});
+  await baseline.goto(process.env.CRYSTAL_FORGE_BASELINE_URL);
+  await baseline.waitForFunction(()=>window.__sensoryStudio);
+  await baseline.locator('#smsHomeNew').click();
+  await baseline.locator('#smsPicker [data-generator=gears]').click();
+  await fs.mkdir('qa',{recursive:true});
+  await baseline.screenshot({path:'qa/unified-palette-before.png'});
+  await baseline.close();
+ }
  await page.goto(url,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__sensoryStudio);
  await fs.mkdir('qa',{recursive:true});
@@ -36,8 +46,7 @@ try{
  await palette.evaluate(node=>{node.scrollTop=0;});
  await shot('design');
  await page.locator('.topbar [data-tab=build]').click();
- await page.locator('.sms-palette').getByRole('button',{name:/Pixel holes/}).click();
- await page.locator('#smsPixelAdd').click();
+ await page.locator('.sms-palette').getByRole('button',{name:'Add pixel hole',exact:true}).click();
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles.length),1);
  await shot('build');
  await page.locator('#smsLibrary').click();await shot('library');
@@ -47,6 +56,27 @@ try{
  await shot('quick-print');
  await page.locator('#smsExpandPrint').click();assert(await page.locator('#smsPrintModels button').count());
  await page.locator('#smsExpandPrint').click();
+ await page.locator('#smsNew').click();
+ await page.getByRole('button',{name:'Browse Cogs & Gears starting points'}).click();
+ const gearIds=['crown-open','turbine','petal-web','scallop-lace','solid-crown','rail-pulley'];
+ const images=new Set();
+ for(const gear of gearIds){
+  const img=page.locator('#smsPicker [data-preset="'+gear+'"] img');
+  assert.equal(await img.count(),1,gear+' has a rendered preview');
+  images.add(await img.getAttribute('src'));
+ }
+ assert.equal(images.size,6,'Six distinct rendered gear previews');
+ await shot('gear-gallery');
+ await page.locator('#smsPicker [data-preset="turbine"]').click();
+ await page.locator('.topbar [data-tab=design]').click();
+ const range=page.locator('.sms-palette [data-palette-key=diameter]');
+ const beforeDiameter=await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.diameter);
+ await range.press('ArrowRight');
+ assert(await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.diameter)>beforeDiameter);
+ await page.locator('.sms-palette').getByRole('button',{name:'Sector',exact:true}).click();
+ assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.webStyle),'Sector');
+ await shot('palette-after');
+ await page.locator('#model-tab-'+id).click();
  await page.locator('#themeBtn').click();await page.reload();await page.waitForFunction(()=>window.__sensoryStudio);
  assert(await page.locator('body.theme-dark').count());
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.id),id);

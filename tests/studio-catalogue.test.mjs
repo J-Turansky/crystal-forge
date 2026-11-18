@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import Module from 'manifold-3d';
-import {capGenerator,pebbleGenerator,generators,applyBuildModules} from '../studio-catalogue.js';
+import {gearGenerator,capGenerator,pebbleGenerator,generators,applyBuildModules} from '../studio-catalogue.js';
 import {prepareRecipe} from '../studio-geometry.js';
 import {exportMaterialBodies} from '../studio-material-export.js';
 const wasm=await Module();wasm.setup();
@@ -27,6 +27,20 @@ const riverDual=prepareRecipe(THREE,wasm,pebbleGenerator.recipe({...river.parame
 assert.equal(exportMaterialBodies(riverDual,{name:'river-pod-regression'}).stls.length,2);
 assert(Math.abs(riverDual.bodies.reduce((volume,body)=>volume+body.volume,0)-riverSingle.bodies[0].volume)<1e-4);
 console.log('River pod regression: connected material bodies, conserved volume and STL export passed.');
+const creativeGearIds=['crown-open','turbine','petal-web','scallop-lace','solid-crown','rail-pulley'];
+const gearSignatures=new Set();
+for(const id of creativeGearIds){
+ const preset=gearGenerator.presets.find(item=>item.id===id);
+ assert(preset,'Missing creative gear '+id);
+ const recipe=gearGenerator.recipe(preset.parameters);
+ gearSignatures.add(JSON.stringify(recipe.positive));
+}
+assert.equal(gearSignatures.size,creativeGearIds.length);
+const turbine=gearGenerator.presets.find(item=>item.id==='turbine').parameters;
+const sweeping=gearGenerator.recipe(turbine);
+assert.notDeepEqual(gearGenerator.recipe({...turbine,webStyle:'Solid'}).positive,sweeping.positive);
+assert.notDeepEqual(gearGenerator.recipe({...turbine,wheelStyle:'Crown'}).positive,sweeping.positive);
+assert.notDeepEqual(gearGenerator.recipe({...turbine,reliefHeight:4}).positive,sweeping.positive);
 for(const generator of generators){
  assert(generator.presets.length>=3,generator.displayName+' requires three meaningful presets.');
  for(const preset of generator.presets){
