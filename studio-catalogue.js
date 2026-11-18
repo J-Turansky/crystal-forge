@@ -93,9 +93,80 @@ export const waveGenerator=define('waves','Waves & Organic Forms','Organic',[
  const mesh=heightField(p.width,p.depth,top);
  return {positive:[{kind:'mesh',mesh}],secondary:[box([p.width,.8,p.depth],[0,.4,0])],negative:[],bounds:{width:p.width,depth:p.depth,height:p.thickness+p.amplitude},warnings:['Review the wave slopes in Cura; the flat underside is the intended bed face.']};
 });
+function panelControlRecipe(p){
+ const w=p.diameter,d=p.depth,h=p.height,r=w/2;
+ const oval=(scale=1)=>circle(r*scale).map(([x,z])=>[x,z*d/w]);
+ const gripOutline=()=>Array.from({length:192},(_,i)=>{
+  const angle=i*Math.PI/96;
+  const grip=p.gripProfile==='Smooth'?1:1-p.gripDepth/100*(1-Math.cos(angle*Math.round(p.gripCount)))/2;
+  return [r*grip*Math.cos(angle),r*grip*Math.sin(angle)];
+ });
+ const shape=p.controlStyle;
+ const negative=[],positive=[];
+ let width=w,depth=d,top=h;
+ if(shape==='Rotary knob'||shape==='Rotary selector'){
+  depth=w;
+  positive.push(extrusion(gripOutline(),h));
+  if(shape==='Rotary selector'){
+   positive.push(box([w*.26,h*.36,w*.8],[0,h*1.12,-w*.06]));
+   top=h*1.3;
+  }else if(p.symbol!=='None'){
+   positive.push(box([w*.08,1.5,w*.26],[0,h+.45,-w*.26]));
+   top=h+1.2;
+  }
+ }else if(shape==='Toggle lever'||shape==='Thumb joystick'){
+  const stem=Math.min(w,d)*.22,base=h*.28;
+  const angle=shape==='Toggle lever'?p.leverAngle*Math.PI/180:0;
+  const length=h*.82,tip=[Math.sin(angle)*length,base+Math.cos(angle)*length,0];
+  positive.push(extrusion(oval(),base));
+  positive.push({...cylinder(stem,length+1),rotation:[0,0,-angle],position:[tip[0]/2,base+Math.cos(angle)*length/2-.45,0]});
+  const radius=shape==='Thumb joystick'?stem*1.8:stem*1.15;
+  positive.push(sphere([radius,h*.21,radius],tip));
+  width=Math.max(w,2*(Math.abs(tip[0])+radius));
+  top=tip[1]+h*.21;
+ }else if(shape==='Rocker'||shape==='Fader cap'){
+  const corners=[[-r,-d*.33],[-w*.34,-d/2],[w*.34,-d/2],[r,-d*.33],[r,d*.33],[w*.34,d/2],[-w*.34,d/2],[-r,d*.33]];
+  positive.push(extrusion(corners,h*.72));
+  if(shape==='Rocker'){
+   positive.push({...box([w*.72,h*.32,d*.73],[0,h*.73,0]),rotation:[p.leverAngle*Math.PI/180,0,0]});
+   top=h+Math.sin(p.leverAngle*Math.PI/180)*d*.365;
+  }else{
+   positive.push(box([w*.8,h*.28,d*.74],[0,h*.8,0]));
+   negative.push(box([w*.72,h*.12,d*.10],[0,h*.94,0]));
+  }
+ }else if(shape==='Directional pad'){
+  positive.push(extrusion(oval(),h*.54),box([w*.84,h*.55,d*.3],[0,h*.71,0]),box([w*.3,h*.55,d*.84],[0,h*.71,0]));
+ }else{
+  positive.push(extrusion(oval(),h*.6),sphere([w*.36,h*.44,d*.36],[0,h*.55,0]));
+ }
+ const socket=p.shaft+p.tolerance;
+ if(p.shaft){
+  const socketRoof=['Toggle lever','Thumb joystick'].includes(shape)?h*.28:h*.54;
+  if(p.socketDepth>socketRoof-1||socket>Math.min(width,depth)-4)throw Error('Reduce the socket diameter or depth, or increase the control size to leave a solid wall.');
+  negative.push(p.socketProfile==='Rectangular'
+   ?box([socket,p.socketDepth+.2,socket*.55],[0,(p.socketDepth-.2)/2,0])
+   :cylinder(socket/2,p.socketDepth+.2,[0,(p.socketDepth-.2)/2,0]));
+ }
+ const band=Math.min(2,h*.16);
+ return {positive,negative,materialBand:box([width+2,band,depth+2]),
+  bounds:{width,depth,height:top},warnings:['Printed control shell. Measure the actual hardware and check fit and movement with a physical sample.']};
+}
+
 export const capGenerator=define('control-caps','Buttons & Control Caps','Controls',[
+ choice('controlStyle','Control family','Pushbutton',['Pushbutton','Rotary knob','Rotary selector','Toggle lever','Rocker','Fader cap','Thumb joystick','Directional pad','Indicator lens']),
+ choice('gripProfile','Rotary grip','Fluted',['Smooth','Fluted']),numeric('gripCount','Rotary grip count',16,4,32,'',1),numeric('gripDepth','Rotary grip depth',10,2,25,'%',1),
+ numeric('leverAngle','Lever or rocker angle',15,0,32,'degrees',1),choice('socketProfile','Socket profile','Round',['Round','Rectangular']),
  choice('outline','Cap profile','Round',['Round','Square','Oval']),choice('top','Top shape','Domed',['Flat','Domed','Concave','Stepped']),numeric('diameter','Cap width',40,20,100),numeric('depth','Oval depth',30,20,100),numeric('height','Overall height',14,6,35),numeric('shaft','Measured switch shaft diameter',6,0,20),numeric('socketDepth','Socket depth',7,2,20),numeric('tolerance','Diametral fit clearance',.25,0,1,'mm',.05),choice('symbol','Raised symbol','Plus',['None','Plus','Minus','Dot'])
-],[['weather','Weather control',{}],['arcade','Arcade cover',{diameter:55,height:16,shaft:12}],['plain','Non-electronic tactile cap',{shaft:0,symbol:'Dot',top:'Flat'}]],p=>{
+],[['weather','Weather control',{}],['arcade','Arcade cover',{diameter:55,height:16,shaft:12}],['plain','Non-electronic tactile cap',{shaft:0,symbol:'Dot',top:'Flat'}],
+ ['knob','Fluted dial',{controlStyle:'Rotary knob',height:19,socketDepth:6}],
+ ['selector','Rotary selector',{controlStyle:'Rotary selector',gripProfile:'Smooth',height:18,socketDepth:6}],
+ ['toggle','Angled toggle',{controlStyle:'Toggle lever',height:24,socketDepth:4}],
+ ['rocker','Panel rocker',{controlStyle:'Rocker',height:18,socketDepth:4}],
+ ['fader','Mixer fader cap',{controlStyle:'Fader cap',height:14,socketDepth:4,socketProfile:'Rectangular'}],
+ ['joystick','Thumb joystick',{controlStyle:'Thumb joystick',height:30,socketDepth:5}],
+ ['pad','Four-way directional pad',{controlStyle:'Directional pad',height:15,socketDepth:4}],
+ ['indicator','Pilot-light lens',{controlStyle:'Indicator lens',shaft:0,height:12}]],p=>{
+ if(p.controlStyle!=='Pushbutton')return panelControlRecipe(p);
  const d=p.outline==='Oval'?p.depth:p.diameter,r=p.diameter/2;
  if(p.socketDepth>p.height-2&&p.shaft>0)throw Error('Socket must leave a 2 mm minimum top wall.');
  if(p.shaft+p.tolerance>Math.min(p.diameter,d)-6)throw Error('Socket leaves too little side wall.');
