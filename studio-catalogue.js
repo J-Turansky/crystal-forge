@@ -93,6 +93,39 @@ export const waveGenerator=define('waves','Waves & Organic Forms','Organic',[
  const mesh=heightField(p.width,p.depth,top);
  return {positive:[{kind:'mesh',mesh}],secondary:[box([p.width,.8,p.depth],[0,.4,0])],negative:[],bounds:{width:p.width,depth:p.depth,height:p.thickness+p.amplitude},warnings:['Review the wave slopes in Cura; the flat underside is the intended bed face.']};
 });
+function raisedControlSymbol(symbol,width,surface,offset=0){
+ const h=2.4,y=surface, size=width*.34;
+ const block=(x,z)=>box([size*x,h,size*z],[0,y,offset]);
+ const disc=(radius,x=0,z=0)=>cylinder(size*radius,h,[size*x,y,size*z+offset]);
+ const polygon=points=>extrusion(points.map(([x,z])=>[size*x,size*z]),h,[0,y-h/2,offset]);
+ switch(symbol){
+  case 'Plus': return [block(1,.25),block(.25,1)];
+  case 'Minus': return [block(1,.25)];
+  case 'Dot': return [disc(.28)];
+  case 'Pointer': return [polygon([[0,-.56],[.48,.35],[-.48,.35]])];
+  case 'River wave': return [polygon([[-.54,.02],[-.28,-.24],[0,-.24],[.28,.02],[.54,-.1],[.54,.16],[.28,.28],[0,.02],[-.28,.02],[-.54,.28]])];
+  case 'Mine crystal': return [polygon([[0,-.6],[.34,-.23],[.31,.29],[0,.55],[-.31,.29],[-.34,-.23]])];
+  case 'Weather cloud': return [disc(.25,-.30,.08),disc(.34,0,-.08),disc(.26,.30,.08)];
+  case 'Sun': return [disc(.3),block(1,.18),block(.18,1)];
+  case 'Lightning': return [polygon([[-.10,-.55],[.34,-.55],[.07,-.10],[.40,-.10],[-.25,.58],[-.08,.11],[-.37,.11]])];
+  case 'Goat hoof': return [disc(.27,-.20,-.12),disc(.27,.20,-.12),block(.50,.70)];
+  default: return [];
+ }
+}
+
+function roundedSquare(radius,rounding){
+ if(!rounding)return [[-radius,-radius],[radius,-radius],[radius,radius],[-radius,radius]];
+ return Array.from({length:4},(_,corner)=>{
+  const angle=corner*Math.PI/2;
+  const x=Math.cos(angle+Math.PI/4)*Math.SQRT2*(radius-rounding);
+  const z=Math.sin(angle+Math.PI/4)*Math.SQRT2*(radius-rounding);
+  return Array.from({length:9},(_,step)=>{
+   const a=angle+step*Math.PI/16;
+   return [x+rounding*Math.cos(a),z+rounding*Math.sin(a)];
+  });
+ }).flat();
+}
+
 function panelControlRecipe(p){
  const w=p.diameter,d=p.depth,h=p.height,r=w/2;
  const oval=(scale=1)=>circle(r*scale).map(([x,z])=>[x,z*d/w]);
@@ -102,7 +135,7 @@ function panelControlRecipe(p){
   return [r*grip*Math.cos(angle),r*grip*Math.sin(angle)];
  });
  const shape=p.controlStyle;
- const negative=[],positive=[];
+ const negative=[],positive=[],secondary=[];
  let width=w,depth=d,top=h;
  if(shape==='Rotary knob'||shape==='Rotary selector'){
   depth=w;
@@ -110,9 +143,14 @@ function panelControlRecipe(p){
   if(shape==='Rotary selector'){
    positive.push(box([w*.26,h*.36,w*.8],[0,h*1.12,-w*.06]));
    top=h*1.3;
-  }else if(p.symbol!=='None'){
-   positive.push(box([w*.08,1.5,w*.26],[0,h+.45,-w*.26]));
-   top=h+1.2;
+  }
+  if(shape==='Rotary knob'){
+   secondary.push(...raisedControlSymbol(p.symbol,w,h));
+   if(secondary.length)top=h+1.2;
+  }
+  if(shape==='Rotary selector'){
+   secondary.push(...raisedControlSymbol(p.symbol,w*.42,top,-w*.06));
+   if(secondary.length)top+=1.2;
   }
  }else if(shape==='Toggle lever'||shape==='Thumb joystick'){
   const stem=Math.min(w,d)*.22,base=h*.28;
@@ -148,7 +186,7 @@ function panelControlRecipe(p){
    :cylinder(socket/2,p.socketDepth+.2,[0,(p.socketDepth-.2)/2,0]));
  }
  const band=Math.min(2,h*.16);
- return {positive,negative,materialBand:box([width+2,band,depth+2]),
+ return {positive,negative,secondary,materialBand:secondary.length?undefined:box([width+2,band,depth+2]),
   bounds:{width,depth,height:top},warnings:['Printed control shell. Measure the actual hardware and check fit and movement with a physical sample.']};
 }
 
@@ -156,10 +194,10 @@ export const capGenerator=define('control-caps','Buttons & Control Caps','Contro
  choice('controlStyle','Control family','Pushbutton',['Pushbutton','Rotary knob','Rotary selector','Toggle lever','Rocker','Fader cap','Thumb joystick','Directional pad','Indicator lens']),
  choice('gripProfile','Rotary grip','Fluted',['Smooth','Fluted']),numeric('gripCount','Rotary grip count',16,4,32,'',1),numeric('gripDepth','Rotary grip depth',10,2,25,'%',1),
  numeric('leverAngle','Lever or rocker angle',15,0,32,'degrees',1),choice('socketProfile','Socket profile','Round',['Round','Rectangular']),
- choice('outline','Cap profile','Round',['Round','Square','Oval']),choice('top','Top shape','Domed',['Flat','Domed','Concave','Stepped']),numeric('diameter','Cap width',40,20,100),numeric('depth','Oval depth',30,20,100),numeric('height','Overall height',14,6,35),numeric('shaft','Measured switch shaft diameter',6,0,20),numeric('socketDepth','Socket depth',7,2,20),numeric('tolerance','Diametral fit clearance',.25,0,1,'mm',.05),choice('symbol','Raised symbol','Plus',['None','Plus','Minus','Dot'])
+ choice('outline','Cap profile','Round',['Round','Square','Oval']),choice('top','Top shape','Domed',['Flat','Domed','Concave','Stepped']),numeric('diameter','Cap width',40,20,100),numeric('depth','Oval depth',30,20,100),numeric('height','Overall height',14,6,35),numeric('shaft','Measured switch shaft diameter',6,0,20),numeric('socketDepth','Socket depth',7,2,20),numeric('tolerance','Diametral fit clearance',.25,0,1,'mm',.05),numeric('cornerRound','Square corner radius',0,0,10),choice('symbol','Raised symbol','Plus',['None','Plus','Minus','Dot','Pointer','Goat hoof','River wave','Mine crystal','Weather cloud','Sun','Lightning'])
 ],[['weather','Weather control',{}],['arcade','Arcade cover',{diameter:55,height:16,shaft:12}],['plain','Non-electronic tactile cap',{shaft:0,symbol:'Dot',top:'Flat'}],
  ['knob','Fluted dial',{controlStyle:'Rotary knob',height:19,socketDepth:6}],
- ['selector','Rotary selector',{controlStyle:'Rotary selector',gripProfile:'Smooth',height:18,socketDepth:6}],
+ ['selector','Rotary selector',{controlStyle:'Rotary selector',gripProfile:'Smooth',symbol:'Pointer',height:18,socketDepth:6}],
  ['toggle','Angled toggle',{controlStyle:'Toggle lever',height:24,socketDepth:4}],
  ['rocker','Panel rocker',{controlStyle:'Rocker',height:18,socketDepth:4}],
  ['fader','Mixer fader cap',{controlStyle:'Fader cap',height:14,socketDepth:4,socketProfile:'Rectangular'}],
@@ -170,19 +208,16 @@ export const capGenerator=define('control-caps','Buttons & Control Caps','Contro
  const d=p.outline==='Oval'?p.depth:p.diameter,r=p.diameter/2;
  if(p.socketDepth>p.height-2&&p.shaft>0)throw Error('Socket must leave a 2 mm minimum top wall.');
  if(p.shaft+p.tolerance>Math.min(p.diameter,d)-6)throw Error('Socket leaves too little side wall.');
- const outline=p.outline==='Square'?[[-r,-r],[r,-r],[r,r],[-r,r]]:circle(r).map(([x,z])=>[x,z*d/p.diameter]);
+ const outline=p.outline==='Square'?roundedSquare(r,Math.min(p.cornerRound,r-.1)):circle(r).map(([x,z])=>[x,z*d/p.diameter]);
  const positive=[extrusion(outline,p.height)],secondary=[];
  if(p.top==='Domed')positive.push(sphere([r,p.height*.3,d/2],[0,p.height*.8,0]));
  if(p.top==='Stepped')positive.push(cylinder(r*.72,2,[0,p.height+1,0]));
  const negative=p.shaft?[cylinder((p.shaft+p.tolerance)/2,p.socketDepth+.1,[0,p.socketDepth/2-.05,0])]:[];
  if(p.top==='Concave')negative.push(sphere([r*.8,r*.65,r*.8],[0,p.height+r*.57,0]));
- const y=p.top==='Domed'?p.height*1.07:p.top==='Stepped'?p.height+1:p.top==='Concave'?p.height-r*.08:p.height-.2;
- const marker=p.diameter*.38;
- if(p.symbol==='Dot')secondary.push(cylinder(marker/4,2,[0,y,0]));
- if(p.symbol==='Plus'||p.symbol==='Minus')secondary.push(box([marker,2,marker*.2],[0,y,0]));
- if(p.symbol==='Plus')secondary.push(box([marker*.2,2,marker],[0,y,0]));
- if(!secondary.length)secondary.push(extrusion(outline,1,[0,0,0]));
- return {positive,secondary,negative,bounds:{width:p.diameter,depth:d,height:p.height*1.15+2},warnings:['Adapter dimensions are nominal: measure the real switch, print a fit coupon and test operation. This is a cap, not a printed click mechanism.']};
+ const y=p.top==='Domed'?p.height*1.1:p.top==='Stepped'?p.height+2:p.top==='Concave'?p.height-r*.08:p.height;
+ secondary.push(...raisedControlSymbol(p.symbol,Math.min(p.diameter,d),y));
+ const materialBand=secondary.length?undefined:box([p.diameter+2,1,d+2]);
+ return {positive,secondary,negative,materialBand,bounds:{width:p.diameter,depth:d,height:p.height*1.15+2},warnings:['Adapter dimensions are nominal: measure the real switch, print a fit coupon and test operation. This is a cap, not a printed click mechanism.']};
 },{supportsMechanisms:true});
 export const pebbleGenerator=define('light-pods','Glowing Pebbles & Light Pods','Lighting',[
  numeric('width','Width',70,30,150),numeric('depth','Depth',55,25,140),numeric('height','Height',35,18,90),numeric('wall','Wall thickness',2.4,1.2,8,'mm',.2),numeric('facets','Circumference facets',32,12,64,'',4),boolean('illuminated','Accessible illumination cavity',true),numeric('opening','Underside access diameter',24,12,55),numeric('cable','Cable exit diameter',5,3,10)
@@ -234,7 +269,14 @@ export function applyBuildModules(recipe,build={},capabilities={}){
  if(build.mounting&&capabilities.supportsMounting){
   const spacing=Math.min(build.spacing||b.width*.55,b.width*.65),diameter=build.holeDiameter||3.4;
   if(diameter<2||diameter>8||spacing<diameter*3)throw Error('Mounting hole spacing or diameter is unsafe.');
-  for(const x of [-spacing/2,spacing/2])r.negative.push(cylinder(diameter/2,b.height+4,[x,b.height/2,0]));
+  const style=build.mountStyle||'Through holes';
+  for(const x of [-spacing/2,spacing/2]){
+   r.negative.push(cylinder(diameter/2,b.height+4,[x,b.height/2,0]));
+   if(style==='Underside counterbores')r.negative.push(cylinder(diameter*.75,1.6,[x,.6,0]));
+   if(style==='Underside countersinks'){
+    r.negative.push({...cylinder(diameter*.75,1.6,[x,.6,0]),topRadius:diameter/2});
+   }
+  }
   r.warnings.push('Through mounting holes are un-rated; test actual mounting loads.');
  }
  if(build.base&&capabilities.supportsBase){const thickness=Number(build.baseThickness||3);if(thickness<2||thickness>15)throw Error('Base thickness must be 2–15 mm.');r.positive.push(box([b.width+6,thickness,b.depth+6]));r.bounds={...b,width:b.width+6,depth:b.depth+6};if(r.materialBand)r.materialBand={...r.materialBand,size:[r.bounds.width+2,r.materialBand.size[1],r.bounds.depth+2]};}
