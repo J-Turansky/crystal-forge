@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import Module from 'manifold-3d';
+import {exportMaterialBodies} from '../studio-material-export.js';
 import {generateFormation,crystalGeometry,baseGeometry,baseAccentSpecs,baseSurfaceHeight,baseProfileHeight,baseEdgeHeight,crystalRootOffset,crystalOrientation,crystalEndRatios} from '../geometry-v3.js';
 import {setThreeInstance,prepareFabrication,probeLightPassageSegment,makeCalibrationStrip,makePixelSeatCoupon,splitPreparedMesh,splitPreparedMeshGrid,makeSplitPinCoupon,makeDetachablePlate,makeSteppedPixelCoupon,encodeSTL,saveSTL,save3MF} from '../fabrication-v1.js';
 setThreeInstance(THREE);
@@ -314,6 +315,53 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
  const vaultedSix=validate('vaulted six millimetre groove',{...cfg,wireWidth:6,wireVaulted:true});
  assert.equal(vaultedSix.wireChannelsCut,flatSix.wireChannelsCut);
  assert(vaultedSix.volumeMm3<flatSix.volumeMm3-1,'Vault cut adds volume above the full usable wire space');
+ // Read the exported triangles and measure the void between the two sockets.
+ const measuredCfg={...cfg,wireWidth:6,wireVaulted:true};
+ const measured=prepareFabrication({wasm,...assembly(measuredCfg),settings:measuredCfg});
+ const bytes=encodeSTL(measured.geometry);
+ const stl=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+ const vertices=[];
+ for(let i=0;i<stl.getUint32(80,true);i++){
+  for(let coordinate=0;coordinate<9;coordinate++)
+   vertices.push(stl.getFloat32(96+i*50+coordinate*4,true));
+ }
+ const {threeMF}=exportMaterialBodies({
+  report:{ready:true,engine:'Manifold',coordinateFrame:'Y-up'},
+  bodies:[{role:'primary',volume:measured.report.volumeMm3,mesh:measured.report.mesh}]
+ });
+ const zip=Buffer.from(threeMF);
+ let xml;
+ for(let i=0;zip.readUInt32LE(i)===0x04034b50;){
+  const nameLength=zip.readUInt16LE(i+26),start=i+30+nameLength+zip.readUInt16LE(i+28),size=zip.readUInt32LE(i+18);
+  if(zip.toString('utf8',i+30,i+30+nameLength)==='3D/3dmodel.model'){
+   assert.equal(zip.readUInt16LE(i+8),0);
+   xml=zip.toString('utf8',start,start+size);break;
+  }
+  i=start+size;
+ }
+ assert.match(xml,/<model unit="millimeter"/);
+ assert.match(xml,/<item objectid="2" transform="1 0 0 0 1 0 0 0 1 0 0 0"/);
+ const points=[...xml.matchAll(/<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"/g)].map(m=>m.slice(1).map(Number));
+ const indexes=[...xml.matchAll(/<triangle v1="(\d+)" v2="(\d+)" v3="(\d+)"/g)].flatMap(m=>m.slice(1).map(Number));
+ for(const [format,positions] of [['STL',vertices],['3MF',indexes.flatMap(index=>points[index])]]){
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  const section=new THREE.Mesh(geometry,material);
+  const at=(height,direction)=>{
+   const ray=new THREE.Raycaster(new THREE.Vector3(.23,0,height),new THREE.Vector3(0,direction,0));
+   const hit=ray.intersectObject(section)[0];
+   assert(hit,format+' section must hit the channel wall');
+   return hit.distance;
+  };
+  for(const [height,expected] of [[1,6],[3,4],[4,2]]){
+   const opening=at(height,1)+at(height,-1);
+   assert(Math.abs(opening-expected)<.001,format+' section at '+height+' mm measured '+opening+' mm');
+  }
+  geometry.dispose();material.dispose();
+ }
+ measured.geometry.dispose();
+ console.log('WT-021 Crystal STL and 3MF sections: 6 mm usable width, taper to 4 and 2 mm at 3 and 4 mm height');
  assert(prepared.socketCeilings.every(socket=>socket.wireReliefDepth===0),
   'PR13: two legacy-routed pixels must have no detached local relief cuts');
  assert.equal(prepared.wireChannelsCut,plan.wirePlan.routes.length,'Manufacturing uses the exact planned groove count');
