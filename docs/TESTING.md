@@ -1,5 +1,9 @@
 # Crystal Forge — verification strategy and commands
 
+## WT-013 inspection
+
+Fabrication tests intersect actual Manifold material with small route probes, including a known open and a known blocked source. Chromium checks sections, keyboard slider movement, selection, strict download rejection, package report metadata, and illuminated Pod inspection. The screenshot artifact captures prepared sections. Use installed Cura layer view and a physical coupon/print to check remaining walls, fittings, cable access and real illumination.
+
 ## Creative Stage B checks
 
 The unified browser suite checks the real palette, parameter mutation and gallery previews. The catalogue suite prepares and exports decorative gear presets through Manifold in both material modes. The CI screenshot artifact includes a comparable baseline and the new gear gallery.

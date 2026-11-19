@@ -50,7 +50,7 @@ export function createLightInspector({THREE, scene, camera, prepare, cancel}) {
  const select=(row,button)=>{
   selected=row?.id;
   results.querySelectorAll('button').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
-  const points=row.points||row.crystalPosition&&[row.crystalPosition];
+  const points=row.crystalPosition?[row.crystalPosition]:row.points;
   if(!points)return;
   const endpoint=points.at(-1),key=axis.value.toLowerCase();
   marker.position.set(...endpoint);marker.visible=true;
@@ -71,9 +71,9 @@ export function createLightInspector({THREE, scene, camera, prepare, cancel}) {
   marker=new THREE.Mesh(new THREE.SphereGeometry(1.2,12,8),new THREE.MeshBasicMaterial({color:0xffff5a,depthTest:false}));
   marker.visible=false;group.add(marker);
   for(const row of report?.rows||[]){
-   if(row.status!=='clear'||!row.points)continue;
+   if(!row.points||row.status!=='clear'&&row.status!=='blocked')continue;
    const line=new THREE.BufferGeometry().setFromPoints(row.points.map(point=>new THREE.Vector3(...point)));
-   paths.add(new THREE.Line(line,new THREE.LineBasicMaterial({color:0x007e89,depthTest:false})));
+   paths.add(new THREE.Line(line,new THREE.LineBasicMaterial({color:row.status==='clear'?0x007e89:0xb92836,depthTest:false})));
   }
   paths.visible=overlay.checked;
   cameraMask=camera.layers.mask;
@@ -94,6 +94,7 @@ export function createLightInspector({THREE, scene, camera, prepare, cancel}) {
   status.textContent=jobState==='preparing'?'Preparing the current model…':jobState==='failed'?'Preparation failed. See Print for the error and retry.':!result?'Preview only — prepare first to inspect real cuts.':report?'Prepared manufacturing mesh · '+report.mode+' · software sampling only.':'Prepared Light Pod · access geometry visible. Illumination unverified.';
   results.replaceChildren();
   if(report){
+   const key=document.createElement('p');key.textContent='Teal: sampled clear. Red: obstructed route trace.';results.append(key);
    const summary=document.createElement('p');
    summary.textContent=Object.entries(report.counts).map(([label,count])=>count+' '+label).join(' · ');
    results.append(summary);

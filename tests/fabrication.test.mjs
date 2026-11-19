@@ -12,7 +12,28 @@ import {planDetachablePlate} from '../detachable-plate.js';
 import {estimateRoofReview} from '../print-advisor.js';
 import {PIXEL_PRESETS,normalisePixelProfile,resolvePixelProfile,resolveSocketProfile} from '../pixel-profiles.js';
 
+import {auditLightPassages,lightPassageExportBlock,lightPassageReportEntries} from '../light-passage-inspection.js';
+
 const wasm=await Module();wasm.setup();
+
+{
+ const block=wasm.Manifold.cube([10,10,10]);
+ const opening=wasm.Manifold.cylinder(12,1,1).rotate([-90,0,0]).translate([5,-1,5]);
+ const open=block.subtract(opening);
+ const inspect=solid=>auditLightPassages({solid,crystals:[{id:'test-spike'}],mode:'targeted',
+  paths:new Map([['test-spike',{source:'LED socket P1',access:true,points:[[5,4,5],[5,9,5]]}]]),skipped:new Map(),
+  probe:(from,to)=>{
+   const probe=wasm.Manifold.cylinder(to[1]-from[1],.2,.2).rotate([-90,0,0]).translate(from);
+   const overlap=solid.intersect(probe),volume=overlap.volume();overlap.delete();probe.delete();return volume;
+  }});
+ const clear=inspect(open),blocked=inspect(block);
+ assert.equal(clear.rows[0].status,'clear');assert.equal(blocked.rows[0].status,'blocked');
+ assert.equal(lightPassageExportBlock(false,blocked),'');
+ assert.equal(lightPassageExportBlock(true,clear),'');
+ assert.match(lightPassageExportBlock(true,blocked),/Export blocked/);
+ assert.equal(lightPassageReportEntries(blocked).length,2);
+ open.delete();opening.delete();block.delete();
+}
 
 function geometryEdges(g){
  const p=g.attributes.position.array,edges=new Map();
@@ -445,8 +466,10 @@ assert.equal(builtTabs.edgeTabs,plannedTabs.tabs.length,'All planned tabs are fu
 assert.equal(builtTabs.mountingHolesCut,plannedTabs.tabHoles.length,'All accepted tab holes are drilled');
 assert.equal(builtTabs.disconnected,1,'Tabs and body remain connected');
 const vaultCheck=validate('zero-infill-vault',{...settings,count:8,baseHeight:25,baseDome:12,
- baseVault:true,vaultSupportPitch:25,cutSockets:true,pixelCount:1,hollowCrystals:false});
+ baseVault:true,lightPorts:true,vaultSupportPitch:25,cutSockets:true,pixelCount:1,hollowCrystals:false});
 assert(vaultCheck.vault.applied,'Zero-infill base vault is cut in the manufacturing mesh');
+assert.equal(vaultCheck.lightPassageInspection.mode,'vault');
+for(const row of vaultCheck.lightPassageInspection.rows.filter(row=>row.manufactured))assert.equal(row.source,'Open underside vault');
 assert(vaultCheck.vault.supportCount>0,'Integral support columns are generated');
 assert(vaultCheck.volumeMm3<vaultCheck.initialVolume,'Cavity removes solid material');
 assert.equal(vaultCheck.disconnected,1,'Roof buttresses stay part of the printed model');
@@ -457,6 +480,8 @@ assert.equal(domedBalloon.internalCavities,0,'Domed hollow cluster has no inacce
 assert.equal(domedBalloon.disconnected,1,'Domed balloon remains a connected printable body');
 const solidMass=validate('solid',settings);
 const hollow=validate('hollow',{...settings,hollowCrystals:true,cutSockets:true});
+assert.equal(hollow.lightPassageInspection.mode,'hollow');
+assert.equal(hollow.lightPassageInspection.counts.clear,0);
 assert(hollow.volumeMm3<solidMass.volumeMm3,'Balloon cavity with an LED port reduces material volume');
 assert.equal(hollow.internalCavities,0,'Sealed inaccessible pockets must be eliminated from exported geometry');
 console.log('balloon-material-ratio', (hollow.volumeMm3/solidMass.volumeMm3).toFixed(3),

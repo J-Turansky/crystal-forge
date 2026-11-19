@@ -323,7 +323,7 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
    assertSolid(joined,'Semicircular edge fixing tabs');
    combined=joined;
   }
-  const inspectedPaths=new Map();
+  const inspectedPaths=new Map(), inspectionSkips=new Map();
   let hollowed=0,hollowPorts=0,skippedHollowPorts=0;
   let directLightPorts=0,skippedDirectLightPorts=0,lightPortDetails=[];
   let vault={applied:false,supportCount:0,pitch:0,gapEstimate:0};
@@ -346,7 +346,7 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
     const cutters=[];
     for(const port of portPlan.ports){
      const c=crystals.find(x=>x.id===port.id),obj=live.find(m=>m.userData?.crystalId===port.id);
-     if(!c||!obj){skippedDirectLightPorts++;continue}
+     if(!c||!obj){skippedDirectLightPorts++;inspectionSkips.set(port.id,'Crystal geometry was unavailable for the vault bore.');continue}
      obj.updateMatrixWorld(true);
      const baseY=baseSurfaceHeight(crystals,s,c.x,c.z);
      const root=new THREE.Vector3(0,0,0).applyMatrix4(obj.matrixWorld);
@@ -355,7 +355,7 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
      const upper=Math.min(c.h*.72,port.reach/sy);
      const end=new THREE.Vector3((c.leanX||0)*upper,upper,(c.leanZ||0)*upper).applyMatrix4(obj.matrixWorld);
      if(!Number.isFinite(end.y)||end.y<baseY+3||end.distanceTo(start)<9){
-      skippedDirectLightPorts++;continue;
+      skippedDirectLightPorts++;inspectionSkips.set(port.id,'Vault bore endpoints did not leave enough vertical clearance.');continue;
      }
      const bore=lightTunnel(wasm,start,end,port.radius,Math.max(.5,port.radius*.65));
      if(!bore){skippedDirectLightPorts++;continue}
@@ -404,19 +404,19 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
     for(const c of crystals){
       if(c.hidden)continue;
       const obj=live.find(m=>m.userData?.crystalId===c.id);
-      if(!obj){skippedHollowPorts++;continue}
+      if(!obj){skippedHollowPorts++;inspectionSkips.set(c.id,'Crystal geometry was unavailable for a hollow conduit.');continue}
       obj.updateMatrixWorld(true);
       const shape={...s,...(c.shape||{})};
       const minScale=Math.min(c.sx||c.scale||1,c.sz||c.scale||1);
       const safeRadius=c.r*Math.min(shape.bottomScale,shape.topScale)*minScale-thickness*2.2;
-      if(safeRadius<1.25){skippedHollowPorts++;continue}
+      if(safeRadius<1.25){skippedHollowPorts++;inspectionSkips.set(c.id,'Crystal is too narrow for a conduit at this wall thickness.');continue}
       const rRoot=Math.min(4.2,Math.max(1.05,safeRadius*.43));
       const rEnd=Math.min(rRoot*.65,Math.max(.65,safeRadius*.19));
       const tipFraction=Math.min(.48,Math.max(.1,shape.tipLength||.27));
       const up=c.h*(1-tipFraction*.40);
       const root=new THREE.Vector3(0,0,0).applyMatrix4(obj.matrixWorld);
       const tip=new THREE.Vector3((c.leanX||0)*up,up,(c.leanZ||0)*up).applyMatrix4(obj.matrixWorld);
-      if(tip.y-root.y<Math.max(6,thickness*3)){skippedHollowPorts++;continue}
+      if(tip.y-root.y<Math.max(6,thickness*3)){skippedHollowPorts++;inspectionSkips.set(c.id,'Crystal is too short or too tilted for its hollow conduit.');continue}
       // Vertical base conduit joins the eroded dome; the upper conduit
       // follows the leaning / rotated crystal spine rather than cutting
       // straight through the external facets.
@@ -426,6 +426,7 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
       const shaft=lightTunnel(wasm,rootEntry,tip,rRoot,rEnd);
       if(stem)channels.push(hold(stem));
       if(shaft)channels.push(hold(shaft));
+      if(stem&&shaft)inspectedPaths.set(c.id,{source:'Shared internal cavity',points:[floor.toArray(),rootEntry.toArray(),tip.toArray()]});
       connected++;
     }
     hollowPorts=connected;
@@ -596,9 +597,10 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
   onProgress('Auditing the final manifold geometry and printer limits…');
   const inspectionMode=s.hollowCrystals?'hollow':s.targetedLightPaths?'targeted':portPlan.requested?'vault':'none';
   const lightPassageInspection=auditLightPassages({solid:combined,crystals,mode:inspectionMode,paths:inspectedPaths,
-   skipped:new Map([...portPlan.skipped,...targetedPlan.skipped].map(item=>[item.id,item.reason])),
+   skipped:new Map([...inspectionSkips,...[...portPlan.skipped,...targetedPlan.skipped].map(item=>[item.id,item.reason])]),
    required:s.requireAccessiblePassages,crystalPositions:new Map(live.filter(object=>object.userData?.crystalId!=null).map(object=>{
-    const point=new THREE.Vector3(0,(object.geometry.boundingBox?.max.y||0)*.65,0).applyMatrix4(object.matrixWorld);
+    object.geometry.computeBoundingBox();
+    const point=new THREE.Vector3(0,object.geometry.boundingBox.max.y*.65,0).applyMatrix4(object.matrixWorld);
     return [object.userData.crystalId,point.toArray()];
    })),probe:(from,to)=>{
     const a=new THREE.Vector3(...from),b=new THREE.Vector3(...to);

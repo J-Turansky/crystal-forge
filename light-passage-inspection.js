@@ -8,7 +8,8 @@ export function auditLightPassages({solid, crystals, mode, paths, skipped, probe
   const path = paths.get(crystal.id);
   let status = 'not requested', reason = 'Enable a light-passage mode to request an inspection.';
   if(mode==='hollow'){
-   status = 'unknown'; reason = 'Shared hollowing does not define a verified source-to-spike route.';
+   status=skipped.has(crystal.id)?'skipped':'unknown';
+   reason=skipped.get(crystal.id)||'Shared hollowing does not define a verified source-to-spike route.';
   }else if(mode!=='none'){
    status = 'skipped'; reason = skipped.get(crystal.id)||'No eligible passage was cut for this crystal.';
    if(path){
