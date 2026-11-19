@@ -445,6 +445,16 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
  };
  assert.throws(()=>requireExportedRoof(undefined,'deliberately missing roof fixture'),
   /missing exported channel roof/);
+ const footprintEdgeDistance=(x,z,polygon)=>{
+  let nearest=Infinity;
+  for(let j=0;j<polygon.length;j++){
+   const a=polygon[j],b=polygon[(j+1)%polygon.length];
+   const dx=b.x-a.x,dz=b.z-a.z,length2=dx*dx+dz*dz||1;
+   const t=Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/length2));
+   nearest=Math.min(nearest,Math.hypot(x-(a.x+t*dx),z-(a.z+t*dz)));
+  }
+  return nearest;
+ };
  const insideFootprint=(x,z,polygon)=>{
   let inside=false;
   for(let i=0,j=polygon.length-1;i<polygon.length;j=i++){
@@ -489,7 +499,7 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
      // An exterior IN/OUT cutter deliberately extends beyond the base;
      // outside that footprint there must be no requirement to hit stock.
      if(!insideFootprint(x,z,footprint))continue;
-     requireExportedRoof(ceiling(x,z),format+' route '+kind+' at '+x.toFixed(2)+','+z.toFixed(2));
+     requireExportedRoof(ceiling(x,z),format+' route '+kind+' offset '+offset+' edge distance '+footprintEdgeDistance(x,z,footprint).toFixed(2)+' mm at '+x.toFixed(2)+','+z.toFixed(2));
      verifiedInside++;
     }
    }
