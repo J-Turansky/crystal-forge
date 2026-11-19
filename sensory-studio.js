@@ -602,6 +602,34 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  const mountHoles=model=>stableMounts(model.build.manualMountHoles||[]);
  const fittingProfiles=()=>pixelProfiles(adapter.pixelFitProfiles?.()||[]);
  const chosenProfile=model=>fittingProfiles().find(profile=>profile.id===(pixelProfileChoices.get(model.id)||'seed'));
+ function planPixelProfileClearance(profile){
+  const fit=profile.measuredFit;
+  if(!fit)return ()=>{};
+  const clearance=Math.round((fit.printedBoreDiameter-fit.bodyDiameter)*100)/100;
+  const updates=[];
+  for(const model of project.models){
+   if(model.link||model.generator.typeId==='crystals')continue;
+   const holes=pixelHoles(model);
+   if(!holes.some(hole=>hole.followProfileClearance===true&&hole.profileId===profile.id&&hole.clearance!==clearance))continue;
+   const build={...model.build,pixelHoles:holes.map(hole=>
+    hole.followProfileClearance===true&&hole.profileId===profile.id?{...hole,clearance}:hole)};
+   const family=registry.get(model.generator.typeId);
+   try{applyBuildModules(family.recipe(model.parameters),build,family.capabilities);}
+   catch(error){throw Error(model.name+': '+error.message+' No linked clearances were changed.');}
+   updates.push({model,build});
+  }
+  return ()=>{
+   for(const {model,build} of updates){
+    const previous={parameters:copy(model.parameters),build:copy(model.build)};
+    let h=histories.get(model.id);
+    if(!h){h={items:[previous],index:0};histories.set(model.id,h);}
+    editModel(project,model.id,{build});
+    h.items.splice(h.index+1);h.items.push({parameters:copy(model.parameters),build:copy(build)});h.index=h.items.length-1;
+   }
+   if(updates.some(({model})=>model.id===active()?.id)&&mode==='model')showGeneric(active());
+   if(updates.length){renderTabs();save();}
+  };
+ }
  function pixelMarkers(model){
   return (cache.get(model.id)?.group?.children||[]).filter(mesh=>mesh.userData.pixelId);
  }
@@ -2201,5 +2229,5 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  if(shell)showHome();
  save();
  window.__sensoryStudio={project,registry,get currentModel(){return active();},get mode(){return mode;},switchModel,addModel:add,showLibrary,showPrint,send,prepare,saveImmediately,fittingPointScreen,pixelMarkerScreen:id=>{const marker=pixelMarkers(active()).find(item=>item.userData.pixelId===id);return marker?projectMarker(marker):null;},get cacheSize(){return cache.size;},get metrics(){return {previewBuilds,geometries:renderer.info.memory.geometries,activeWorkers:workers.size};}};
- return {onCrystalChange:captureCrystal,backup,nativeModelBounds};
+ return {onCrystalChange:captureCrystal,backup,nativeModelBounds,planPixelProfileClearance};
 }

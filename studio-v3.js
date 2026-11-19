@@ -1145,6 +1145,7 @@ for(const format of ['stl','3mf']){
   finally{button.disabled=false;}
  };
 }
+$('resetPixelSocketClearance').onclick=()=>{$('pixelSocketClearance').value=defaults.pixelFit;$('pixelSocketClearance').focus();};
 function savePixelProfileFromEditor(applySocketFit=false){
  const data={};
  for(const [k,id] of Object.entries(pixelFields))
@@ -1156,14 +1157,20 @@ function savePixelProfileFromEditor(applySocketFit=false){
   try{fit=socketFitFromEditor();}catch(error){$('pixelSocketStatus').textContent=error.message;return;}
   const nominal=normalisePixelProfile(data).bodyDiameter;
   data.measuredFit={bodyDiameter:nominal,printedBoreDiameter:Math.round((nominal+fit)*100)/100};
-  s.pixelFit=fit;s.fitCalibration=null;
  }else data.measuredFit=readPixelFitProfiles().find(profile=>profile.id===data.id)?.measuredFit;
  const p=normalisePixelProfile(data);
+ let applyLinked=()=>{};
+ if(applySocketFit){
+  try{applyLinked=studioBridge?.planPixelProfileClearance(p)??applyLinked;}
+  catch(error){$('pixelSocketStatus').textContent=error.message;return;}
+  s.pixelFit=socketFitFromEditor();s.fitCalibration=null;
+ }
  s.pixelProfiles=[...(s.pixelProfiles||[]).filter(x=>x.id!==p.id),p].slice(-30);
  s.pixelProfileId=p.id;s.pixelDiameter=p.bodyDiameter;
  try{localStorage.setItem(pixelLibraryKey,JSON.stringify(s.pixelProfiles))}
  catch(e){console.warn('Pixel library not writable',e)}
  closePixelEditor();syncForm();rebuild();snapshot();
+ applyLinked();
  document.dispatchEvent(new CustomEvent('studio-pixel-profile-saved',{detail:{profileId:p.id}}));
  setStatus('Custom pixel profile saved: '+p.name+'. Prepare print mesh again.');
 }

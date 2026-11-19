@@ -480,10 +480,10 @@ body.theme-light .cloud-sync-panel summary{color:#142d44}
 <p class="note warning">B is the full body length including E (curved cap). C/D describe the collar at the wire end. F/G describe each of two opposite wire outlets. The overall drilled hole adds the Build → Fit adjustment separately; these are not guaranteed manufacturer dimensions.</p>
 <fieldset><legend>Print Test Socket</legend>
 <p class="note">Print a block with the same underside cutter as Crystal fittings. Uses the current A–G dimensions and the project’s retention lip. A shallow model can limit socket depth.</p>
-<label>Diametral clearance (mm) <input id="pixelSocketClearance" type="number" min="-.5" max=".8" step=".01" required></label>
+<label>Diametral clearance (mm) <input id="pixelSocketClearance" type="number" min="-.5" max=".8" step=".01" required></label> <button id="resetPixelSocketClearance" type="button">Reset clearance to +0.15 mm</button>
 <label><input id="pixelSocketPlate" type="checkbox"> Five-socket tolerance plate</label>
 <div class="buttonrow"><button type="button" id="pixelSocketSTL">Print Test Socket · STL</button><button type="button" id="pixelSocket3MF">Print Test Socket · 3MF</button><button type="button" id="applyPixelSocketFit">Save profile and apply tested clearance</button></div>
-<p class="note">Saved clearance is used by Crystal and by new or updated fittings selecting this measured profile. Other builders currently use straight bores.</p>
+<p class="note">Saved clearance is used by the active Crystal and by fittings following this custom profile in the open project. Manually edited clearances and pinned Library revisions keep their own values. Other builders currently use straight bores.</p>
 <p id="pixelSocketStatus" role="status" aria-live="polite"></p></fieldset>
 <div class="buttonrow"><button type="button" id="pixelReplicaSTL">Download 1:1 pixel replica STL</button><button type="button" id="pixelReplica3MF">Download 1:1 pixel replica 3MF</button></div><p class="note">Uses the current A–G measurements, including unsaved edits. Socket clearance is excluded.</p><p id="pixelReplicaStatus" role="status" aria-live="polite"></p>
 <div class="buttonrow"><button class="primary" id="savePixelProfileBtn">Save to profile library</button><button id="deletePixelProfileBtn">Delete selected custom profile</button></div>

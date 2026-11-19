@@ -904,6 +904,17 @@ try{
  await wavePalette.getByRole('button',{name:'Add pixel automatically',exact:true}).click();
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].diameter),4.5);
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].clearance),.25);
+ await wavePalette.getByRole('button',{name:'Create / edit pixel profile'}).click();
+ assert.equal(Number(await page.locator('#pixelSocketClearance').inputValue()),.25);
+ await page.locator('#pixelSocketClearance').fill('0.35');
+ const recalibratedReplica=await useDownload(page.locator('#pixelReplicaSTL'));
+ assert.deepEqual(recalibratedReplica.bytes,replica.bytes,'Profile clearance never changes the positive replica');
+ await page.locator('#applyPixelSocketFit').click();
+ assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].clearance),.35);
+ await wavePalette.getByRole('button',{name:'Create / edit pixel profile'}).click();
+ await page.locator('#resetPixelSocketClearance').click();
+ assert.equal(Number(await page.locator('#pixelSocketClearance').inputValue()),.15);
+ await page.keyboard.press('Escape');
  await shot('wt017-pixel-profile-build');
  await checkNativeDoubleClick('waves',wavePalette,(await getHoles())[0]);
  const nativeFamilies=[

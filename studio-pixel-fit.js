@@ -27,7 +27,7 @@ export function resolvePixelFitting(hole,customProfiles=[]){
 export function applyPixelFittingProfile(hole,profileId,customProfiles=[]){
  const profile=pixelFittingProfiles(customProfiles).find(item=>item.id===profileId);
  if(!profile)throw Error('This pixel profile is unavailable. Select an existing profile or enter a custom diameter.');
- const next={...hole,profileId};
+ const next={...hole,profileId,followProfileClearance:profileId.startsWith('custom-')};
  delete next.fitCalibration;
  if(profile.bodyDiameter)next.diameter=profile.bodyDiameter;
  if(profile.measuredFit)next.clearance=round(profile.measuredFit.printedBoreDiameter-profile.measuredFit.bodyDiameter);
@@ -39,7 +39,7 @@ export function withMeasuredPixelFit(hole,{bodyDiameter,printedBoreDiameter}){
   throw Error('Enter the measured 2-30 mm pixel body and the bore that fit in your physical print.');
  const body=round(bodyDiameter),bore=round(printedBoreDiameter),clearance=round(bore-body);
  if(!inRange(clearance,-.5,.8))throw Error('The printed fit must be within -0.5 to 0.8 mm diameter clearance.');
- return {...hole,diameter:body,clearance,fitCalibration:{bodyDiameter:body,printedBoreDiameter:bore}};
+ return {...hole,diameter:body,clearance,followProfileClearance:false,fitCalibration:{bodyDiameter:body,printedBoreDiameter:bore}};
 }
 
 export function saveablePixelFit(hole,measurement,{name,id,customProfiles=[]}={}){
