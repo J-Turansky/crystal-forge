@@ -15,9 +15,13 @@ export const CURA_MATERIALS=['PLA','PETG'];
 export const CURA_QUALITY_TYPES=['auto','normal','high','draft','coarse','low','fast','extra coarse','fine','not_supported'];
 export function resolveCuraQualityType(machine,nozzle,selected='auto'){
  if(selected!=='auto')return selected;
- if(nozzle>=.8)return 'coarse';
- if(nozzle>=.6)return 'draft';
- if(nozzle<=.25)return 'high';
+ // Match the installed Cura 5.3 through 5.13 quality resources. The
+ // container type selects a compatible base; the quality slider edits overrides.
+ if(nozzle===.8)return 'draft';
+ if(machine==='Ultimaker 2+'){
+  if(nozzle===.6)return 'fast';
+  if(nozzle===.25)return 'high';
+ }
  return 'normal';
 }
 export function curaFallbackText(p){
@@ -101,6 +105,8 @@ export function calculateCuraSettings(options={}){
   'Support-free printing and bridge spans are not guaranteed. Always inspect Cura layer preview, especially over open bases and LED channels.',
   'These values are conservative starting points, not measured or machine-tested optimisations. Test a small calibration piece.'
  ];
+ if(o.machine==='Ultimaker 2+'&&o.material==='PETG')
+  warnings.push('Stock Cura excludes Generic PETG on Ultimaker 2+. Use the manual settings with a compatible material definition.');
  if(o.nozzle===.25)warnings.push('A 0.25 mm nozzle may clog more readily and takes longer; test fine facets and filament flow.');
  if(o.nozzle===.8)warnings.push('A 0.8 mm nozzle may swallow fine crystal tips and narrow wire slots; check that feature width exceeds your line width.');
  if(o.material==='PETG')warnings.push('PETG often needs different temperature, drying and first-layer adhesion; Cura material presets remain authoritative for temperatures.');

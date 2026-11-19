@@ -59,7 +59,16 @@ for(const machine of CURA_MACHINES){
 assert.throws(()=>createCuraProfile({machine:'Custom / other'}),/Select Ultimaker/);
 assert.throws(()=>createCuraProfile({quality:-1}),/Quality/);
 assert.throws(()=>createCuraProfile({intent:'anything'}),/intent/);
-assert.equal(resolveCuraQualityType('Ultimaker 2+',.8),'coarse','UM2+ 0.8 mm does not assume unavailable normal type');
+assert.equal(resolveCuraQualityType('Ultimaker 2+',.8),'draft');
+assert.equal(resolveCuraQualityType('Ultimaker 2+',.6),'fast');
+assert.equal(resolveCuraQualityType('Ultimaker 3 Extended',.25),'normal');
+const ownerProfile=createCuraProfile({machine:'Ultimaker 3 Extended',nozzle:.8,material:'PLA',quality:60});
+for(const {body} of inspectZip(ownerProfile.bytes)){
+ assert.match(body,/definition = ultimaker3/);
+ assert.match(body,/quality_type = draft/);
+ assert.match(body,/variant = AA 0.8/);
+}
+assert.match(calculateCuraSettings({machine:'Ultimaker 2+',material:'PETG'}).warnings.join(' '),/excludes Generic PETG/);
 assert.equal(resolveCuraQualityType('Ultimaker 3 Extended',.4),'normal');
 assert.equal(createCuraProfile({machine:'Ultimaker 2+',nozzle:.8,qualityType:'high'}).qualityType,'high');
 assert.throws(()=>createCuraProfile({qualityType:'not-a-real-quality'}),/quality type/);
