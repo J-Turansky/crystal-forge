@@ -63,8 +63,9 @@ export function nativeRouteEligibility(recipe,build){
 }
 
 export function planNativePixelString(recipe,build,{guide=false}={}){
- const settings={version:1,pitch:50,...build.serialRouting};
- const plan={enabled:settings?.enabled===true,ready:false,links:[],cutters:[],reason:nativeRouteEligibility(recipe,build)};
+ const enabled=build.serialRouting?.enabled===true;
+ const settings=enabled?build.serialRouting:{version:1,pitch:50,...build.serialRouting};
+ const plan={enabled,ready:false,links:[],cutters:[],reason:nativeRouteEligibility(recipe,build)};
  if(!plan.enabled&&!guide)return plan;
  if(settings.version!==1){plan.reason='This serial route version is unsupported. Turn routing off to prepare bores only.';return plan;}
  if(plan.reason)return plan;

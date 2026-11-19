@@ -868,7 +868,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    (model.link||(!settings.enabled&&plan.reason)?' disabled':'')+'> Cut serial channels</label>');
   block.querySelector('[data-native-route]').onchange=e=>change({enabled:e.target.checked});
   const guide=document.createElement('label'),show=document.createElement('input');
-  show.type='checkbox';show.checked=nativeGuideChoices.get(model.id)??settings.enabled;
+  show.type='checkbox';show.dataset.nativePreview='';show.checked=nativeGuideChoices.get(model.id)??settings.enabled;
   show.onchange=()=>{nativeGuideChoices.set(model.id,show.checked);refreshPixelMarkers(model);};
   guide.append(show,' Show routes and arrows');block.append(guide);
   block.insertAdjacentHTML('beforeend','<label>Physical pixel pitch<select data-native-pitch'+disabled+
