@@ -1,5 +1,11 @@
 # AI handover — read immediately after AGENTS.md
 
+## WT-014 · Pixel Model Maker workspace
+
+The unified shell uses a compact direct-action header, left Design/Build controls, centre renderer, right precision controls and a horizontal model rail. It moves the same live editor nodes. The generic editor joins the right precision panel in unified mode so exact settings and search stay together. Classic layout retains its original editor placement.
+
+Panel preferences persist under `wt-workspace-panels-v2`. A valid legacy settings width can seed the right panel. Obsolete rail visibility, palette visibility and viewport-height values have no effect. Narrow screens stack the panels and keep a horizontal bottom rail. See the draft PR for exact checks and captures.
+
 ## WT-012 · Creative catalogue and native routing
 
 Tiles add contour terraces and connected padded cells. Decorative gears add paired forked through-windows. Light pods add a fluted beacon shell with the established optional cavity and access cuts. New styles preserve existing generator identities and presets.

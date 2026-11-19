@@ -14,8 +14,16 @@ try{
   await baseline.locator('#smsPicker [data-generator=gears]').click();
   await fs.mkdir('qa',{recursive:true});
   await baseline.screenshot({path:'qa/unified-palette-before.png'});
+  await baseline.setViewportSize({width:390,height:844});
+  await baseline.screenshot({path:'qa/unified-wt014-before-narrow.png'});
   await baseline.close();
  }
+ await page.addInitScript(()=>{
+  if(!localStorage.getItem('wt-workspace-panels-v1')){
+   localStorage.setItem('wt-workspace-panels-v1',JSON.stringify({settingsWidth:335,rail:'hidden',settings:false,palette:false}));
+   localStorage.setItem('wt-viewport-height','99');
+  }
+ });
  await page.goto(url,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__sensoryStudio);
  await fs.mkdir('qa',{recursive:true});
@@ -34,39 +42,76 @@ try{
  const palette=page.locator('.sms-palette');
  await palette.evaluate(node=>{node.scrollTop=node.scrollHeight;});
  assert.deepEqual(await viewer.boundingBox(),before);
- const splitter=page.getByRole('slider',{name:'3D viewport height'});
- await splitter.press('ArrowRight');
- assert((await viewer.boundingBox()).height>before.height);
+ assert.equal(await page.locator('.sms-split,.sms-more').count(),0);
+ assert.equal(await page.locator('.brand').innerText(),'Pixel Model Maker');
+ assert((await page.locator('.version').boundingBox()).y>(await page.locator('.brand').boundingBox()).y);
+ for(const id of ['simpleBtn','advancedBtn','themeBtn','helpBtn','descriptionsBtn','changelogBtn','saveBtn','loadBtn','smsReload','smsGlobalUndo','smsGlobalRedo','smsLibrary','smsHome','smsNew'])
+  assert(await page.locator('#'+id).isVisible(),id+' is directly available');
+ const leftPanel=page.locator('#smsTools'),rightPanel=page.locator('#smsPrecision'),bottom=page.locator('#smsModelRail');
+ assert.equal(Math.round((await rightPanel.boundingBox()).width),335);
+ assert((await leftPanel.boundingBox()).x<(await viewer.boundingBox()).x);
+ assert((await rightPanel.boundingBox()).x>(await viewer.boundingBox()).x);
+ assert((await bottom.boundingBox()).y>=(await viewer.boundingBox()).y+(await viewer.boundingBox()).height-1);
+ assert.equal(await viewer.locator('.sms-palette').count(),0);
+ const leftEdge=page.getByRole('separator',{name:'Resize design and build'});
+ const rightEdge=page.getByRole('separator',{name:'Resize precision settings'});
+ async function dragEdge(edge,dx){
+  const box=await edge.boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
+  await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+dx,y,{steps:5});await page.mouse.up();
+ }
+ const leftWidth=(await leftPanel.boundingBox()).width,rightWidth=(await rightPanel.boundingBox()).width;
+ await dragEdge(leftEdge,35);await dragEdge(rightEdge,-30);
+ assert((await leftPanel.boundingBox()).width>leftWidth);
+ assert((await rightPanel.boundingBox()).width>rightWidth);
+ const resized=(await leftPanel.boundingBox()).width;
+ await leftEdge.press('ArrowLeft');
+ assert((await leftPanel.boundingBox()).width<resized);
+ assert((await viewer.boundingBox()).width>=420);
+ await shot('wt014-resized');
+ const leftToggle=leftPanel.locator('header button'),rightToggle=rightPanel.locator('header button');
+ await leftToggle.click();await rightToggle.press('Enter');
+ assert.equal(await leftToggle.getAttribute('aria-expanded'),'false');
+ assert.equal(await rightToggle.getAttribute('aria-expanded'),'false');
+ assert.equal(await palette.isVisible(),false);
+ assert(await viewer.locator('canvas').isVisible());
+ await shot('wt014-collapsed');
+ const savedPanels=await page.evaluate(()=>localStorage.getItem('wt-workspace-panels-v2'));
+ await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+ await page.reload();await page.waitForFunction(()=>window.__sensoryStudio);
+ await page.locator('.sms-workspace-nav [data-tab=design]').click();
+ assert.equal(await page.evaluate(()=>localStorage.getItem('wt-workspace-panels-v2')),savedPanels);
+ assert.equal(await leftToggle.getAttribute('aria-expanded'),'false');
+ assert.equal(await rightToggle.getAttribute('aria-expanded'),'false');
+ await leftToggle.click();await rightToggle.click();
+ assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.id),id);
+ await page.locator('#advancedBtn').click();
+ await page.locator('#simpleBtn').click();
+ for(const id of ['helpBtn','changelogBtn']){
+  await page.locator('#'+id).click();
+  assert(await page.locator('#infoOverlay').isVisible());
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#infoOverlay').isVisible(),false);
+ }
+ const descriptions=page.locator('#descriptionsBtn');
+ const described=await descriptions.getAttribute('aria-pressed');
+ await descriptions.click();assert.notEqual(await descriptions.getAttribute('aria-pressed'),described);
+ await descriptions.click();
+ const [savedBackup]=await Promise.all([page.waitForEvent('download'),page.locator('#saveBtn').click()]);
+ assert.match(savedBackup.suggestedFilename(),/\.json$/);
+ await Promise.all([page.waitForEvent('filechooser'),page.locator('#loadBtn').click()]);
  await page.locator('#smsFocus').click();
  assert(await page.locator('body.sms-focused').count());await page.keyboard.press('Escape');
  assert.equal(await page.locator('body.sms-focused').count(),0);
  await page.getByRole('searchbox',{name:'Search settings'}).fill('not a real setting');
  assert(await page.locator('.sms-settings [data-filtered]').count());
  await page.getByRole('searchbox',{name:'Search settings'}).clear();
- await palette.evaluate(node=>{node.scrollTop=0;});
- await shot('design');
- const width=await page.locator('#smsModelRail').boundingBox();
- assert(width.width<=190);
- await page.locator('#smsToggleRail').click();
- assert((await page.locator('#smsModelRail').boundingBox()).width<=60);
- await shot('rail-icons');
- await page.locator('#smsToggleRail').click();
- assert.equal((await page.locator('#smsModelRail').boundingBox()).width,width.width);
- await page.locator('.topbar summary').filter({hasText:'Panels'}).click();
- await page.locator('#smsToggleSettings').click();
- assert.equal(await page.locator('#smsPrecision').isVisible(),false);
- await shot('settings-hidden');
- await page.locator('#smsTogglePalette').click();
- assert.equal(await page.locator('#smsVisualPalette').isVisible(),false);
- await shot('palette-hidden');
- assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.id),id);
- await page.locator('#smsTogglePalette').click();
- await page.locator('#smsToggleSettings').click();
- await page.keyboard.press('Escape');
- assert(await page.locator('#smsPrecision').isVisible());
- assert(await page.locator('#smsVisualPalette').isVisible());
+ await shot('wt014-desktop');
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
  await page.locator('.sms-palette').getByRole('button',{name:'Add pixel hole',exact:true}).click();
+ assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles.length),1);
+ await page.locator('#smsGlobalUndo').click();
+ assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length||0),0);
+ await page.locator('#smsGlobalRedo').click();
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles.length),1);
  await shot('build');
  await page.locator('#smsLibrary').click();await shot('library');
@@ -283,7 +328,6 @@ try{
  assert.equal(await projects.locator('article').count(),savedCount+1);
  assert(await projects.getByRole('button',{name:'Open project Current unsaved title'}).isVisible());
  await page.locator('#model-tab-'+id).click();
- await page.locator('.topbar summary').filter({hasText:'More'}).click();
  await page.locator('#themeBtn').click();await page.reload();await page.waitForFunction(()=>window.__sensoryStudio);
  assert(await page.locator('body.theme-dark').count());
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.id),id);
@@ -521,6 +565,21 @@ try{
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
   assert(await serial.locator('[data-native-route]').isDisabled());
  }
+ await page.setViewportSize({width:390,height:844});
+ await page.locator('.sms-workspace-nav [data-tab=design]').click();
+ assert(await page.locator('#smsModelRail #smsNew').isVisible());
+ assert(await page.locator('#smsTools header button').isVisible());
+ assert(await page.locator('#smsPrecision header button').isVisible());
+ const bottomTabs=page.locator('#smsModelRail #smsTabs');
+ assert(await bottomTabs.evaluate(node=>node.scrollWidth>node.clientWidth));
+ const last=bottomTabs.getByRole('tab').last(),lastId=await last.getAttribute('id');
+ await last.press('Alt+ArrowLeft');
+ assert.equal(await bottomTabs.getByRole('tab').nth(-2).getAttribute('id'),lastId);
+ await bottomTabs.locator('#'+lastId).press('Alt+ArrowRight');
+ await bottomTabs.evaluate(node=>{node.scrollLeft=node.scrollWidth;});
+ assert(await bottomTabs.evaluate(node=>node.scrollLeft>0));
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
+ await shot('wt014-narrow');
  assert.deepEqual(errors,[]);
  console.log('Unified Home, Design, Build, Library and Quick Print screenshots captured.');
 }catch(error){
