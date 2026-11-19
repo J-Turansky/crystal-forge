@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.35 — Direct prepared-job print downloads
+
+- Download STL or a registered multi-part STL archive and the matching Cura profile directly from a prepared job.
+
 ## v0.16.0-dev.34 — Native camera and wiring feedback
 
 - Centre native camera presets on the active solid.
