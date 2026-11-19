@@ -60,6 +60,10 @@ try{
  const strictSection=strict.locator('xpath=ancestor::details[1]');
  if(!await strictSection.evaluate(node=>node.open))await strictSection.locator(':scope > summary').click();
  await strict.check();
+ await inspectionPage.locator('#smsGlobalUndo').click();
+ assert.equal(await strict.isChecked(),false,'Undo restores optional passage enforcement');
+ await inspectionPage.locator('#smsGlobalRedo').click();
+ assert.equal(await strict.isChecked(),true,'Redo restores strict passage enforcement');
  await inspector.locator('summary').press('Enter');
  await inspector.getByText('Preview only').waitFor();
  await inspector.getByRole('button',{name:'Prepare inspection'}).click();

@@ -362,6 +362,17 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
  }finally{impossibleAssembly.meshes.forEach(m=>m.geometry.dispose())}
  const serialTwoMesh=validate('PR9 two-pixel serial cable grooves',serialTwo);
  assert.equal(serialTwoMesh.wireChannelsCut,serialTwoPlan.wirePlan.routes.length);
+ const combined=validate('WT-013 multiple sources with mounts and wiring',{
+  ...serialTwo,targetedLightPaths:true,lightReach:100,lightBoreDiameter:3,mount:'Wall screws'
+ });
+ const combinedAudit=combined.lightPassageInspection;
+ assert.equal(combinedAudit.mode,'targeted');
+ assert.equal(combined.socketsCut,2);
+ assert(combined.mountingHolesCut>0);
+ assert(combined.wireChannelsCut>0);
+ assert(combinedAudit.rows.length>=6);
+ assert.equal(new Set(combinedAudit.rows.map(row=>row.id)).size,combinedAudit.rows.length);
+ assert.equal(Object.values(combinedAudit.counts).reduce((sum,count)=>sum+count,0),combinedAudit.rows.length);
  assert(serialTwoMesh.socketCeilings.every(p=>p.wireReliefDepth===0),
   'Every socket in a multi-pixel string must have only planned string routes');
 
@@ -404,6 +415,7 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
  assert(ready.targetedLightCount>0,'Manifold actually subtracts a physical optical passage');
  const inspection=ready.lightPassageInspection;
  assert.equal(inspection.mode,'targeted');
+ assert.equal(inspection.counts.clear,1,'The one-LED fixture has a clear route through the final material solid');
  assert(Number.isFinite(inspection.samplingMs));
  console.log('WT-013 targeted inspection',JSON.stringify({counts:inspection.counts,samplingMs:inspection.samplingMs,meshTriangles:inspection.meshTriangles}));
  assert.equal(inspection.physicalOpticalVerification,false);
