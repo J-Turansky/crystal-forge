@@ -42,3 +42,7 @@ The active native solid bounds drive view presets and orbit centring. Hardware o
 ## WT-020 openwork Gear acceptance
 
 `tests/unified-studio-browser.test.mjs` exercises four automatically fitted pixels on the Forked Sun Gear, explicit unavailable wiring, workspace reload and bore-only STL and 3MF exports. The solid Gear scenario separately exercises underside viewport placement and routed geometry. Keep these cells L pending exact-head evidence and manual four-fitting workflow, face/cutaway and published-site verification.
+
+## WT-021 shared manufacturing downloads
+
+Print Centre exposes STL, 3MF, Cura profile and the production pack on each prepared job. A multi-material STL download groups the aligned STL parts with material assignments. Each action uses the existing freshness and geometry export gate. Cura uses the selected job's effective settings. The browser test compares the standalone Tile STL and Cura profile byte-for-byte with the corresponding production-pack entries. Keep full family manufacturing acceptance at L: external tabs, selected-face hardware and the complete workflow still require their own evidence for each family.

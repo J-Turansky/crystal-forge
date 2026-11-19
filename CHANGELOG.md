@@ -1,10 +1,14 @@
 # Crystal Forge — Changelog
 
-## v0.16.0-dev.34.2 — Keep automatic cable routing responsive
+## v0.16.0-dev.35.1 — Responsive automatic routing and tool finder
 
-- Run the Crystal pixel-string automatic repair search in a cancellable worker rather than blocking the 3D editor.
-- Limit attempts to eight seconds, preserve unchanged models when routing is impossible, and display actionable feedback.
-- Add a four-pixel impossible-route browser regression and immutable worker test.
+- Run expensive Crystal pixel-string automatic routing in a deadline-limited background worker to keep the editor responsive.
+- Provide an accessible Find tools search in the left panel, including a direct pixel-fit test STL download shortcut and mounting, wiring, Cura and print links.
+- Preserve accepted project geometry on impossible or timed-out routes and add worker, browser responsiveness and tool discovery regressions.
+
+## v0.16.0-dev.35 — Direct prepared-job print downloads
+
+- Download STL or a registered multi-part STL archive and the matching Cura profile directly from a prepared job.
 
 ## v0.16.0-dev.34.1 — Restore Model Maker startup on GitHub Pages
 

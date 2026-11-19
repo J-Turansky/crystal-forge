@@ -1946,7 +1946,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     }).join('')+'<button data-job-reset>Use project defaults</button></fieldset>'+
     '<div class="sms-actions"><button data-job-up>Move up</button><button data-job-down>Move down</button>'+
     '<button data-job-prepare>'+(preparing?'Preparing…':['failed','cancelled'].includes(job.status)?'Retry':'Prepare')+'</button>'+
-    '<button data-job-cancel>Cancel</button><button data-job-export>Download production ZIP</button><button data-job-3mf>Download 3MF</button><button data-job-remove>Remove</button></div>';
+    '<button data-job-cancel>Cancel</button><button data-job-export>Download production ZIP</button><button data-job-stl>Download STL</button><button data-job-3mf>Download 3MF</button><button data-job-cura>Download Cura profile</button><button data-job-remove>Remove</button></div>';
    tile.prepend(modelPicture(model.thumbnail||(model.id===currentId?quickPrintThumbnail:null)));
    const action=(name,disabled,run)=>{
     const button=tile.querySelector('[data-job-'+name+']');button.disabled=disabled;button.onclick=run;
@@ -1972,8 +1972,10 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     cancelPreparation(project,job.id);discardPrintResult(job.id);
     project.printJobs=project.printJobs.filter(item=>item.id!==job.id);save();renderJobs();
    });
-   action('export',!!block,()=>exportJob(job.id,false));
-   action('3mf',!!block,()=>exportJob(job.id,true));
+   action('export',!!block,()=>exportJob(job.id,'pack'));
+   action('stl',!!block,()=>exportJob(job.id,'stl'));
+   action('3mf',!!block,()=>exportJob(job.id,'3mf'));
+   action('cura',!!block,()=>exportJob(job.id,'cura'));
    $('smsJobs').append(tile);
    if(focusJob===job.id&&focusControl){
     const control=focusControl==='data-job-setting'?tile.querySelector('[data-job-setting="'+focused.dataset.jobSetting+'"]'):tile.querySelector('['+focusControl+']');
@@ -2024,25 +2026,45 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   for(const byte of new TextEncoder().encode(job.id))suffix=BigInt.asUintN(64,(suffix^BigInt(byte))*0x100000001b3n);
   return slug+'-rev'+model.revision+'-'+suffix.toString(16).padStart(16,'0');
  }
- function exportJob(id,only3MF){
+ function printJobCura(settings){
+  try{
+   const profile=createCuraProfile(curaOptions(settings));
+   return {profile:[profile.filename,profile.bytes],manual:['cura-manual-settings.txt',profile.fallbackText]};
+  }catch(error){
+   return {manual:['cura-manual-review.txt',error.message+'\nJob settings: '+JSON.stringify(curaOptions(settings),null,2)]};
+  }
+ }
+ function exportJob(id,format){
   try{
    const job=project.printJobs.find(j=>j.id===id);
    if(!job)throw Error('This print job was removed.');
    const model=findModel(project,job.modelId),result=currentPrintResult(job),settings=effectivePrinter(job);
    const block=printExportBlock(job,result,settings);if(block)throw Error(block);
-   const exported=exportMaterialBodies(result,{name:model.name});
    const stem=printDownloadStem(model,job);
-   if(only3MF){adapter.download(new Blob([exported.threeMF],{type:'model/3mf'}),stem+'.3mf');return;}
+   if(format==='cura'){
+    const cura=printJobCura(settings);
+    const [name,data]=cura.profile||cura.manual;
+    adapter.download(new Blob([data],{type:cura.profile?'application/zip':'text/plain'}),stem+'-'+name);
+    return;
+   }
+   const exported=exportMaterialBodies(result,{name:model.name});
+   if(format==='3mf'){adapter.download(new Blob([exported.threeMF],{type:'model/3mf'}),stem+'.3mf');return;}
+   if(format==='stl'){
+    if(exported.stls.length===1){
+     adapter.download(new Blob([exported.stls[0].bytes],{type:'model/stl'}),stem+'.stl');
+    }else{
+     const files=exported.stls.map(part=>[part.name,part.bytes]);
+     files.push(['material-roles.json',JSON.stringify(exported.assignments,null,2)],
+      ['READ-ME.txt','Import these STL files together as parts sharing one origin. Keep their positions and assign each material in Cura.']);
+     adapter.download(new Blob([zipProfileEntries(files)],{type:'application/zip'}),stem+'-stls.zip');
+    }
+    return;
+   }
    const entries=exported.stls.map(s=>[s.name,s.bytes]);entries.push([exported.filename,exported.threeMF],['editable-model.json',JSON.stringify(model,null,2)],['material-roles.json',JSON.stringify(exported.assignments,null,2)],['print-report.json',JSON.stringify(result.report,null,2)]);
    entries.push(...lightPassageReportEntries(result.report.lightPassageInspection));
-   let curaProfile='included';
-   try{
-    const profile=createCuraProfile(curaOptions(settings));
-    entries.push([profile.filename,profile.bytes],['cura-manual-settings.txt',profile.fallbackText]);
-   }catch(error){
-    curaProfile='manual-review';
-    entries.push(['cura-manual-review.txt',error.message+'\nJob settings: '+JSON.stringify(curaOptions(settings),null,2)]);
-   }
+   const cura=printJobCura(settings),curaProfile=cura.profile?'included':'manual-review';
+   if(cura.profile)entries.push(cura.profile);
+   entries.push(cura.manual);
    const manifestName='print-job-manifest.json';
    const manifest={
     schemaVersion:1,modelId:model.id,modelName:model.name,generatorType:model.generator.typeId,

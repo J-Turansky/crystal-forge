@@ -604,6 +604,14 @@ try{
  const printPack=await useDownload(tile.locator('[data-job-export]'));
  const threeMF=zipEntries(modelFile.bytes),pack=zipEntries(printPack.bytes);
  assert(threeMF.has('3D/3dmodel.model'));
+ const directSTL=await useDownload(tile.locator('[data-job-stl]'));
+ assert.match(directSTL.name,/\.stl$/);
+ const packedSTL=[...pack.keys()].find(name=>name.endsWith('.stl'));
+ assert.deepEqual(directSTL.bytes,pack.get(packedSTL));
+ const directCura=await useDownload(tile.locator('[data-job-cura]'));
+ const packedCura=[...pack.keys()].find(name=>name.endsWith('.curaprofile'));
+ assert.match(directCura.name,/\.curaprofile$/);
+ assert.deepEqual(directCura.bytes,pack.get(packedCura));
  const manifest=JSON.parse(pack.get('print-job-manifest.json'));
  const preparedTile=(await queue()).find(job=>job.id===tileJob.id);
  const meshXML=threeMF.get('3D/3dmodel.model').toString();
