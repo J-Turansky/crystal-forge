@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.35.8 — Inspect the prepared manufacturing mesh from Build
+
+- Render the actual prepared mesh from Build and toggle a cut section without exporting.
+
 ## v0.16.0-dev.35.7 — Discover and move saved pixel profiles
 
 - Select the active profile in Build, keep the selection on reload and move custom profiles between computers with a library file.

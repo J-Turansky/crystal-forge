@@ -7,6 +7,7 @@ export function createLightInspector({THREE, scene, camera, prepare, cancel}) {
   <p role="status"></p>
   <div class="sms-actions"><button type="button" data-prepare>Prepare inspection</button><button type="button" data-cancel hidden>Cancel preparation</button></div>
   <fieldset hidden><legend>Prepared section</legend>
+  <label><input type="checkbox" data-section-toggle checked> Cut section</label>
   <label>Section axis <select><option>X</option><option>Z</option></select></label>
   <label>Section position <input type="range"><output></output></label>
   <button type="button" data-reset>Reset section</button>
@@ -15,11 +16,11 @@ export function createLightInspector({THREE, scene, camera, prepare, cancel}) {
   <div data-results></div><button type="button" data-close>Close inspection</button>`;
  const status=root.querySelector('[role=status]'),controls=root.querySelector('fieldset');
  const axis=root.querySelector('select'),slider=root.querySelector('[type=range]'),offset=root.querySelector('output');
- const overlay=root.querySelector('[type=checkbox]'),results=root.querySelector('[data-results]');
+ const sectionToggle=root.querySelector('[data-section-toggle]'),overlay=root.querySelector('[data-overlay] input'),results=root.querySelector('[data-results]');
  const prepareButton=root.querySelector('[data-prepare]'),cancelButton=root.querySelector('[data-cancel]');
  const plane=new THREE.Plane(),bounds=new THREE.Box3();
  const inspectionLayer=21;
- let group,paths,marker,report,activeModel,result,jobState,selected,cameraMask,lights=[];
+ let group,paths,marker,report,activeModel,result,jobState,selected,cameraMask,modelType,lights=[];
  const showSection=(reset=false)=>{
   const key=axis.value.toLowerCase(),min=bounds.min[key],max=bounds.max[key];
   if(reset){slider.min=min;slider.max=max;slider.step=.1;slider.value=(min+max)/2;}
@@ -64,7 +65,7 @@ export function createLightInspector({THREE, scene, camera, prepare, cancel}) {
   group=new THREE.Group();paths=new THREE.Group();group.add(paths);
   for(const {mesh} of result.bodies){
    group.add(new THREE.Mesh(makeGeometry(mesh),new THREE.MeshStandardMaterial({
-    color:0xa4b9ca,roughness:.65,flatShading:true,side:THREE.DoubleSide,clippingPlanes:[plane]
+    color:0xa4b9ca,roughness:.65,flatShading:true,side:THREE.DoubleSide,clippingPlanes:sectionToggle.checked?[plane]:[]
    })));
   }
   bounds.setFromObject(group);
@@ -93,7 +94,7 @@ export function createLightInspector({THREE, scene, camera, prepare, cancel}) {
   prepareButton.disabled=jobState==='preparing';
   cancelButton.hidden=jobState!=='preparing';
   prepareButton.textContent=result?'Refresh inspection':'Prepare inspection';
-  status.textContent=jobState==='preparing'?'Preparing the current model…':jobState==='failed'?'Preparation failed. See Print for the error and retry.':!result?'Preview only — prepare first to inspect real cuts.':report?'Prepared manufacturing mesh · '+report.mode+' · software sampling only.':'Prepared Light Pod · access geometry visible. Illumination unverified.';
+  status.textContent=jobState==='preparing'?'Preparing the current model…':jobState==='failed'?'Preparation failed. See Print for the error and retry.':!result?'Preview only — prepare first to inspect real cuts.':report?'Prepared manufacturing mesh · '+report.mode+' · software sampling only.':modelType==='light-pods'?'Prepared Light Pod · access geometry visible. Illumination unverified.':'Prepared manufacturing mesh · verified export geometry.';
   results.replaceChildren();
   if(report){
    const key=document.createElement('p');key.textContent='Teal: sampled clear. Red: obstructed route trace.';results.append(key);
@@ -117,14 +118,19 @@ export function createLightInspector({THREE, scene, camera, prepare, cancel}) {
  root.querySelector('[data-close]').onclick=()=>{root.open=false;clear();root.querySelector('summary').focus();};
  prepareButton.onclick=()=>prepare(activeModel);
  cancelButton.onclick=()=>cancel(activeModel);
- axis.onchange=()=>showSection(true);
+ sectionToggle.onchange=()=>draw();
+ axis.onchange=()=>{if(!sectionToggle.checked){sectionToggle.checked=true;draw();}else showSection(true);};
  slider.oninput=()=>showSection();
  root.querySelector('[data-reset]').onclick=()=>{selected=null;marker.visible=false;results.querySelectorAll('[aria-pressed]').forEach(item=>item.setAttribute('aria-pressed','false'));axis.value='X';showSection(true);};
  overlay.onchange=()=>{if(paths)paths.visible=overlay.checked;};
  root.hidden=true;
- return {root,hasPrepared:()=>!!result,update(model,nextResult,nextState){
+ return {root,hasPrepared:()=>!!result,openManufacturingMesh(){
+  if(!activeModel)return;
+  sectionToggle.checked=false;root.open=true;draw();
+  if(!result&&jobState!=='preparing')prepare(activeModel);
+ },update(model,nextResult,nextState,type){
   if(model===activeModel&&nextResult===result&&nextState===jobState)return;
-  if(model!==activeModel){root.open=false;selected=null;axis.value='X';}
-  activeModel=model;result=nextResult;jobState=nextState;root.hidden=!model;render();
+  if(model!==activeModel){root.open=false;selected=null;axis.value='X';sectionToggle.checked=true;}
+  activeModel=model;result=nextResult;jobState=nextState;modelType=type;root.hidden=!model;render();
  }};
 }

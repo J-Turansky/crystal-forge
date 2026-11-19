@@ -513,8 +513,8 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    if(!inspection.root.isConnected)$('smsPrecisionContent').prepend(inspection.root);
    const model=active(),job=project.printJobs.find(item=>item.modelId===currentId);
    const type=model?.generator.typeId;
-   const supported=mode==='model'&&(type==='crystals'||(type==='light-pods'&&model.parameters.illuminated));
-   inspection.update(supported?currentId:null,supported&&job?currentPrintResult(job):undefined,supported?job?.status:undefined);
+   const supported=mode==='model'&&!!model;
+   inspection.update(supported?currentId:null,supported&&job?currentPrintResult(job):undefined,supported?job?.status:undefined,type);
   }
   if(shell){const history=histories.get(currentId),crystal=active()?.generator.typeId==='crystals';const blocked=mode!=='model'||!!active()?.link;$('smsGlobalUndo').disabled=blocked||!(crystal?adapter.canUndo(-1):history?.index>0);$('smsGlobalRedo').disabled=blocked||!(crystal?adapter.canUndo(1):history?.index<history?.items.length-1);document.body.dataset.studioView=mode;shell.home.toggleAttribute('aria-current',mode==='home');$('smsLibrary').toggleAttribute('aria-current',mode==='library');if(mode!=='model'&&document.body.classList.contains('sms-focused'))shell.focus.click();}
   const type=mode==='model'?active()?.generator.typeId:null;
@@ -1627,6 +1627,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
      controls.append(group);
     }
    }
+  }
+  if(build&&inspection){
+   const render=document.createElement('button');
+   render.type='button';render.textContent='Render actual model';
+   render.onclick=()=>inspection.openManufacturingMesh();
+   controls.append(render);
   }
   shell.searchSettings();
  }
