@@ -1,18 +1,12 @@
 # Crystal Forge / Sensory Model Studio
 
-The current review status, main baseline and owner review sequence are in the [WT-018 integration ledger](docs/BACKLOG_TRIAGE.md). See [seven-builder acceptance](docs/MODEL_BUILDER_PARITY.md) for shared-tool coverage and the remaining checks.
+[Open the browser app](https://connorturansky-svg.github.io/crystal-forge/).
 
-## Current milestone
+Design seven model families, including Crystal Clusters, Tactile Tiles, Gears, Waves, Control Caps, Characters, and Light Pods. Build adds measured LED fittings on suitable material. Print Centre prepares valid geometry through Manifold and exports STL and 3MF. SVG artwork and validated STL/OBJ solids can enter the same workspace. Open or invalid meshes remain available for preview with an explanation.
 
-Sensory Model Studio contains seven model families and a shared Print Centre. The stability draft targets joystick STL export and production release metadata. See the [acceptance record](docs/SENSORY_MODEL_STUDIO_V016_ACCEPTANCE.md) for verification and remaining work.
+Projects save locally. Use Library to save reusable models and export a backup, or connect a private GitHub repository for optional cross-device recovery.
 
-**PR12 [#18](https://github.com/connorturansky-svg/crystal-forge/pull/18) was merged.** The current [PR13/#19](https://github.com/connorturansky-svg/crystal-forge/pull/19) consolidates the final software stage: orphan-free routed pixels across old/new projects, no double-rendered ghost tracks, fail-closed cable manufacturing, optional automatic printer-bed splitting, keyboard nudges and stronger export/QA. **Real Cura and physical LED/optical/mounting tests remain required.** [Final release acceptance](docs/FINAL_PHASE_ACCEPTANCE.md).
-
-
-A browser-based low-poly crystal generator and fabrication prototype for illuminated, hollow, touch-considerate crystal sculptures. Physical safety and print strength must still be verified. **Open the app:** https://connorturansky-svg.github.io/crystal-forge/
-
-Runs in Edge or Chrome with no installation or Python. JavaScript modules, Three.js and the Manifold WebAssembly geometry library load from the internet. Projects stay local by default. Save multiple named editable designs in the project library, and import/export a complete backup. You can optionally connect to your own private GitHub repository to sync every named project, the active model, custom measured pixel profiles and templates, and restore previous revisions. Authentication uses a narrowly scoped token held only in memory, not automatic OAuth; see the migration guide.
-
+Source baseline `7ad5326` includes WT-018 and the first Gear placement and wire-guide changes from [#84](https://github.com/connorturansky-svg/crystal-forge/pull/84). [Software parity and acceptance](docs/MODEL_BUILDER_PARITY.md) tracks what is evidenced across the seven families. [Software work #79](https://github.com/connorturansky-svg/crystal-forge/issues/79) and [physical QA #10](https://github.com/connorturansky-svg/crystal-forge/issues/10) remain active.
 
 ## Source visibility and reuse
 
@@ -28,7 +22,9 @@ To restrict access to ongoing source development, consider migrating to a
 Changing repository visibility may affect GitHub Pages availability on
 the account's plan and does not revoke existing clones/forks.
 
-## PR7 — Completion milestone (draft)
+## Historical development milestones
+
+### PR7 — Completion milestone
 
 [Draft PR7](https://github.com/connorturansky-svg/crystal-forge/pull/13) extends all five development packages in one branch. [PR7 scope and physical acceptance matrix](docs/PR7_COMPLETE_FABRICATION.md): real opt-in targeted light conduits, mixed per-LED socket profiles, shaped fit coupons, detachable M3 base/plate, modular production ZIP, worker progress and extended benchmarking. None of these guarantees every spike is illuminated or mounted safely without actual Cura/print testing.
 
