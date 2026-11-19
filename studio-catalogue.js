@@ -1,3 +1,5 @@
+import {importedMeshRecipe} from './studio-mesh-import.js';
+import {buildSvgExtrusionRecipe} from './svg-import/index.js';
 import {planNativePixelString} from './studio-native-routing.js';
 import {layeredCharacter} from './studio-character-relief.js';
 import {createPodShell} from './wt002-pod-shell.js';
@@ -186,7 +188,7 @@ export const waveGenerator=define('waves','Waves & Organic Forms','Organic',[
  const w = p.width / 2, d = p.depth / 2;
  const pixelBoreSupport = {outline:[[-w,-d],[w,-d],[w,d],[-w,d]],minThickness:p.thickness};
  const material=p.flowStyle==='Parallel'?{secondary:[box([p.width,.8,p.depth],[0,.4,0])]}:{secondary:[],materialSplitHeight:.8,materialSplitRole:'top'};
- return {positive:[{kind:'mesh',mesh}],...material,pixelBoreSupport,negative:[],bounds:{width:p.width,depth:p.depth,height:p.thickness+p.amplitude},warnings:['Review the wave slopes in Cura; the flat underside is the intended bed face.']};
+ return {positive:[{kind:'mesh',mesh}],...material,pixelBoreSupport,serialSupport:{outline:pixelBoreSupport.outline,thickness:p.thickness},negative:[],bounds:{width:p.width,depth:p.depth,height:p.thickness+p.amplitude},warnings:['Review the wave slopes in Cura; the flat underside is the intended bed face.']};
 });
 function raisedControlSymbol(symbol,width,surface,offset=0){
  const h=2.4,y=surface, size=width*.34;
@@ -449,10 +451,25 @@ export const characterGenerator=define('characters','Characters & Silhouettes','
 });
 export const tileGenerator={...tactileTileGenerator,parameterSchema:tactileTileGenerator.parameterSchema.map(s=>({...s,label:s.label||s.key.replace(/[A-Z]/g,c=>' '+c.toLowerCase()),step:s.key==='seed'?1:s.key==='randomness'?.05:.5})),
  recipe(input){const r=generateTile(input);return {serialSupport:{outline:r.bodies[0].mesh.boreOutline,thickness:r.parameters.thickness},pixelBoreSupport:{outline:r.bodies[0].mesh.boreOutline,minThickness:r.parameters.thickness},positive:[{kind:'mesh',mesh:r.bodies[0].mesh}],partitioned:r.parameters.dualMaterial,secondary:r.bodies.length===2?[{kind:'mesh',mesh:r.bodies[1].mesh}]:[],negative:[],dualMaterial:r.parameters.dualMaterial,bounds:this.estimateBounds(input),warnings:['Tactile feel, cleanability and edge comfort require a printed sample.']};}};
+export const svgArtworkGenerator=define('svg-artwork','Imported SVG artwork','Imports',[],[],
+ p=>buildSvgExtrusionRecipe(p.artwork),{supportsDualMaterial:false});
 export const generators=[tileGenerator,gearGenerator,waveGenerator,capGenerator,characterGenerator,pebbleGenerator];
-export function makeCatalogue(crystalAdapter){const registry=createGeneratorRegistry();for(const g of [crystalAdapter,...generators].filter(Boolean))registry.register(g);return registry;}
+export const importedMeshGenerator=define('imported-mesh','Imported 3D model','Imports',[
+ choice('unit','Source units','mm',['mm','cm','in']),
+ choice('up','Source up-axis','Z',['Y','Z']),
+ numeric('scale','Import scale',1,.001,100,'',.001),
+ numeric('rotation','Bed rotation',0,-180,180,'degrees',1),
+ numeric('x','Bed X position',0,-250,250),
+ numeric('z','Bed Y position',0,-250,250)
+],[],p=>importedMeshRecipe(p.source,{...p,previewOnly:true}),{supportsDualMaterial:false});
+export const studioGenerators=[...generators,svgArtworkGenerator,importedMeshGenerator];
+export function makeCatalogue(crystalAdapter){const registry=createGeneratorRegistry();for(const g of [crystalAdapter,...studioGenerators].filter(Boolean))registry.register(g);return registry;}
 export function applyBuildModules(recipe,build={},capabilities={}, {preview=false}={}){
  const r={...recipe,positive:[...recipe.positive],negative:[...(recipe.negative||[])],secondary:[...(recipe.secondary||[])],warnings:[...(recipe.warnings||[])]};
+ if(r.meshIssue){
+  if(!preview)throw Error('Preview only: '+r.meshIssue);
+  return r;
+ }
  // The same recipe reaches both preview and the fabrication worker.
  if(!r.partitioned){
   for(const role of ['positive','secondary']){
@@ -491,7 +508,10 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
   if(!Number.isFinite(thickness)||thickness<3||thickness>10)
    throw Error('Choose 3–10 mm fitting backing thickness.');
   const b=r.bounds,spread=12;
-  r.positive.push(box([b.width+spread*2,thickness,b.depth+spread*2]));
+  const width=b.width+spread*2,depth=b.depth+spread*2;
+  r.positive.push(box([width,thickness,depth]));
+  // Only certify the new continuous underside slab. The planner still checks cutters.
+  r.serialSupport={outline:[[-width/2,-depth/2],[width/2,-depth/2],[width/2,depth/2],[-width/2,depth/2]],thickness,explicitBacking:true};
   r.bounds={...b,width:b.width+spread*2,depth:b.depth+spread*2,height:Math.max(b.height,thickness)};
   r.warnings.push('Expanded fitting backing was explicitly enabled. Inspect underside openings, material joins and support requirements in Cura and on a printed sample.');
  }
@@ -502,10 +522,10 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
    if(reason)throw Error('P'+(index+1)+': '+reason);
   }
  }
- const routing=planNativePixelString(r,build);
+ const routing=planNativePixelString(r,build,{guide:preview&&!!build.pixelHoles?.length});
  if(routing.enabled&&!routing.ready&&!preview)throw Error(routing.reason);
  addPixelHoleCuts(r,build.pixelHoles);
- if(routing.ready){
+ if(routing.enabled&&routing.ready){
   r.negative.push(...routing.cutters);
   r.warnings.push('Serial grooves are underside-open. Check cable seating and roof layers in Cura and on a physical print.');
  }

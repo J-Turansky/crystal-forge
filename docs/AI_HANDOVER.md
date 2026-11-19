@@ -1,5 +1,29 @@
 # AI handover — read immediately after AGENTS.md
 
+## Current direction
+
+Verified main at `421f050b9d980356b502ad22483712c1105e2f54`. Its tree equals the common ancestor `c4f5b6d56a366f24b20be75550eb9fa906de9ee9`. #71 reached main. #72–#75 and #78 landed on feature branches. #77 remains draft; its exact tested head `7997df537739b6fe630b1669dd24e92f05b69db0` incorporates those changes. #76 landed on planning/prompts. This main-targeted candidate carries the tested branch tree over the identical main baseline. [Source checks](https://github.com/connorturansky-svg/crystal-forge/pull/77/checks).
+
+The sole owner merge dependency is this main-targeted consolidation PR. Retire #77 once its work is confirmed reachable from main. #70 is already closed; #74 preserves the importer. #1, #6, #7 and #9 are superseded by #79 and #10, and #8 is a duplicate tracked under held #51. #31 is complete. Jordan’s #36/#37 and owner decisions #33/#38/#39/#42 remain separate. Keep #10 open for Cura, LED fit, cable seating, optics and installation.
+
+Advance WT-019 through #79 after verifying this candidate. See [the builder matrix](MODEL_BUILDER_PARITY.md).
+
+## WT-018 review candidate
+
+Use the [integration ledger](BACKLOG_TRIAGE.md) for exact GitHub refs, owner gates and issue dispositions. The [Builder matrix](MODEL_BUILDER_PARITY.md) distinguishes partial parity from verified acceptance.
+
+## STL and OBJ in Studio
+
+New model → Import 3D model accepts binary and standard facet-per-line ASCII STL and triangulated OBJ. The dialog previews the bed footprint and confirms units, source up-axis, scale, rotation and position. Records retain normalized indexed source geometry and transforms. Open, degenerate, inconsistently wound and disconnected meshes can be viewed as preview-only, while production requires closed topology and final Manifold validation. A verified explicit backing supports fittings on suitable closed imported solids. Limits are 4 MiB, 30,000 triangles and 500 mm extents. OBJ material files are ignored; no external resources are fetched.
+
+## SVG artwork in Studio
+
+Studio uses the SVG engine from Jordan’s draft #37 at `0dbd1c80ce255dbcefde73f5ef99d1517bc3a0f0`. Open New model → Import SVG, choose a local file, set width and depth, and review the normalized preview. Studio stores the source metadata and contours, and uses standard Manifold preparation and export. Unsupported artwork, external content and disconnected pieces are rejected by the source engine.
+
+## Routing on verified stock
+
+Waves certify their solid rectangular underside. Eligible Caps, Characters and non-illuminated Pods can use an explicitly enabled solid fitting slab. Cavities, mounting cuts, added bases, part offsets and dual material remain guarded. Check physical cable seating under #10.
+
 ## Workspace stale-write protection
 
 WT-018 recovers the save and recovery guards from PR #66. The comparison uses local storage and is not atomic across tabs. Export in-memory work as JSON if the newer saved workspace blocks a write.
