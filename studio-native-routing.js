@@ -62,10 +62,10 @@ export function nativeRouteEligibility(recipe,build){
  return '';
 }
 
-export function planNativePixelString(recipe,build){
- const settings=build.serialRouting;
+export function planNativePixelString(recipe,build,{guide=false}={}){
+ const settings={version:1,pitch:50,...build.serialRouting};
  const plan={enabled:settings?.enabled===true,ready:false,links:[],cutters:[],reason:nativeRouteEligibility(recipe,build)};
- if(!plan.enabled)return plan;
+ if(!plan.enabled&&!guide)return plan;
  if(settings.version!==1){plan.reason='This serial route version is unsupported. Turn routing off to prepare bores only.';return plan;}
  if(plan.reason)return plan;
  const holes=build.pixelHoles||[],pitch=Number(settings.pitch),inTail=Number(settings.inTail??settings.tail??200),outTail=Number(settings.outTail??settings.tail??200);
@@ -119,7 +119,7 @@ export function planNativePixelString(recipe,build){
  if(entry&&exit&&gap(entry,exit)<6)plan.links.at(-1).reason='Use distinct perimeter exits at least 6 mm apart.';
  plan.reason=plan.links.filter(link=>link.reason).map(link=>link.label+': '+link.reason).join(' ');
  plan.ready=!plan.reason;
- if(plan.ready)plan.cutters=plan.links.map((link,i)=>{
+ if(plan.ready&&plan.enabled)plan.cutters=plan.links.map((link,i)=>{
   const points=link.path.slice();
   if(i===0)points.unshift(add(entry,inAxis,-4));
   if(i===plan.links.length-1)points.push(add(exit,outAxis,4));
