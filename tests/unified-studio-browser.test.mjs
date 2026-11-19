@@ -763,6 +763,13 @@ try{
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
  assert(await page.locator('.sms-palette').getByRole('button',{name:'Add pixel',exact:true}).isVisible());
  assert(await page.locator('.sms-palette').getByRole('button',{name:'Create / edit pixel profile'}).isVisible());
+ const crystalPitch=page.locator('.sms-palette [data-build-wire-pitch]');
+ assert(await crystalPitch.isVisible(),'Crystal cable pitch is directly accessible beside pixel placement');
+ await crystalPitch.selectOption('25');
+ assert.equal(await page.locator('[data-state="pixelStringSpacing"]').inputValue(),'25');
+ await page.locator('.sms-palette').getByRole('button',{name:'Add pixel',exact:true}).click();
+ assert.equal(await page.locator('#viewport canvas').getAttribute('data-hardware-placement'),'pixel');
+ await page.keyboard.press('Escape');
  await shot('wt017-seven-families-build');
  await page.setViewportSize({width:390,height:844});
  await page.locator('.sms-workspace-nav [data-tab=design]').click();
