@@ -158,53 +158,47 @@ export function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLo
  // Curved cap E is included within total B, not added on top.
  const capRise=Math.min(Math.max(.35,Number(p.capHeight)||.35),Math.max(.35,Math.max(0,tipY)*.65));
  const shaftEnd=conical?requestedBodyDepth:tipY-capRise,depth=Math.max(.5,shaftEnd-start);
+ // Manufacture bore, flange, optional retaining ridge and roof as ONE
+ // profile-shaped solid. Unioning overlapping coaxial cutters creates
+ // microscopic seams that can become degenerate printable triangles.
  const cutters=[];
  let relievedDepth=0;
- const cylinder=(r,y,h)=>hold(wasm.Manifold.cylinder(h,r,r,48).rotate([-90,0,0]).translate([pos.x,y,pos.z]));
  const lip=Math.min(.7,Math.max(0,Number(p.retentionLip)||0));
  const lipFrom=Math.max(1.9,Number(p.flangeHeight||0)+.8),lipWidth=1.4;
- if(lip>0&&depth>lipFrom-start+lipWidth+2&&bodyRadius-lip>1.4){
-  // Narrow bore section above the flange. Physical snap-fit is unverified.
-  cutters.push(cylinder(bodyRadius,start,lipFrom-start));
-  cutters.push(cylinder(bodyRadius-lip,lipFrom,lipWidth));
-  cutters.push(cylinder(bodyRadius,lipFrom+lipWidth,depth-(lipFrom+lipWidth-start)));
- }else cutters.push(cylinder(bodyRadius,start,depth));
- if(p.kind!=='seed'&&p.flangeHeight>.1&&p.maxDiameter>p.boreDiameter+.1)
-  cutters.push(cylinder(p.maxDiameter/2,-.5,Math.min(depth,p.flangeHeight+.5)));
- if(conical)cutters.push(hold(wasm.Manifold.cylinder(bodyRadius,bodyRadius,0,48)
-  .rotate([-90,0,0]).translate([pos.x,shaftEnd,pos.z])));
- else{
-  // Facet the negative roof to the same 20 dome rings and 48 radial sectors
-  // as the measured 1:1 positive. The older coarse stretched sphere omitted
-  // printable tip volume despite a correctly calibrated nominal bore.
-  // A 0.35 mm axial overlap sits slightly INSIDE the straight bore to
-  // avoid coincident cylindrical faces during multi-socket Booleans.
-  const radial=48,rings=[[shaftEnd-.35,bodyRadius*.995]];
-  for(let i=0;i<20;i++){
-   const angle=i*Math.PI/40;
-   rings.push([shaftEnd+capRise*Math.sin(angle),bodyRadius*Math.cos(angle)]);
-  }
-  const vertices=[],triangles=[];
-  for(const [y,r] of rings)for(let side=0;side<radial;side++){
-   const angle=2*Math.PI*side/radial;
-   vertices.push(pos.x+r*Math.cos(angle),y,pos.z+r*Math.sin(angle));
-  }
-  const bottom=vertices.length/3,apex=bottom+1,last=(rings.length-1)*radial;
-  vertices.push(pos.x,rings[0][0],pos.z,pos.x,shaftEnd+capRise,pos.z);
-  for(let side=0;side<radial;side++){
-   const next=(side+1)%radial;
-   triangles.push(bottom,side,next,apex,last+next,last+side);
-   for(let ring=0;ring<rings.length-1;ring++){
-    const a=ring*radial+side,b=ring*radial+next,c=a+radial,d=b+radial;
-    triangles.push(a,c,b,b,c,d);
-   }
-  }
-  const mesh=new wasm.Mesh({numProp:3,vertProperties:new Float32Array(vertices),triVerts:new Uint32Array(triangles)});
-  mesh.merge();
-  const cap=hold(new wasm.Manifold(mesh));
-  if(cap.status()!=='NoError'||cap.isEmpty())throw Error('The rounded socket roof is not a valid Manifold.');
-  cutters.push(cap);
+ const hasLip=lip>0&&depth>lipFrom-start+lipWidth+2&&bodyRadius-lip>1.4;
+ const hasFlange=p.kind!=='seed'&&p.flangeHeight>.1&&p.maxDiameter>p.boreDiameter+.1;
+ if(hasFlange&&shaftEnd<p.flangeHeight+.1)
+  throw Error('Pixel socket needs enough stock for the complete flange and roof.');
+ const radial=48,rings=[[start,hasFlange?p.maxDiameter/2:bodyRadius]];
+ if(hasFlange)rings.push([p.flangeHeight,p.maxDiameter/2],[p.flangeHeight,bodyRadius]);
+ if(hasLip)rings.push([lipFrom,bodyRadius],[lipFrom,bodyRadius-lip],
+  [lipFrom+lipWidth,bodyRadius-lip],[lipFrom+lipWidth,bodyRadius]);
+ rings.push([shaftEnd,bodyRadius]);
+ if(!conical)for(let i=1;i<20;i++){
+  const angle=i*Math.PI/40;
+  rings.push([shaftEnd+capRise*Math.sin(angle),bodyRadius*Math.cos(angle)]);
  }
+ const vertices=[],triangles=[];
+ for(const [y,r] of rings)for(let side=0;side<radial;side++){
+  const angle=2*Math.PI*side/radial;
+  vertices.push(pos.x+r*Math.cos(angle),y,pos.z+r*Math.sin(angle));
+ }
+ const bottom=vertices.length/3,apex=bottom+1,last=(rings.length-1)*radial;
+ vertices.push(pos.x,start,pos.z,pos.x,tipY,pos.z);
+ for(let side=0;side<radial;side++){
+  const next=(side+1)%radial;
+  triangles.push(bottom,side,next,apex,last+next,last+side);
+  for(let ring=0;ring<rings.length-1;ring++){
+   const a=ring*radial+side,b=ring*radial+next,c=a+radial,d=b+radial;
+   triangles.push(a,c,b,b,c,d);
+  }
+ }
+ const latheMesh=new wasm.Mesh({numProp:3,vertProperties:new Float32Array(vertices),triVerts:new Uint32Array(triangles)});
+ latheMesh.merge();
+ const socket=hold(new wasm.Manifold(latheMesh));
+ if(socket.status()!=='NoError'||socket.isEmpty())
+  throw Error('The measured pixel-socket cutter is not a valid closed solid.');
+ cutters.push(socket);
  if(includeLocalWireRelief&&p.wireWidth>.1&&p.wireDepth>.1){
   // Two shallow underside cable reliefs; not full wiring channels.
   // Wire relief F is a measured physical width; socket fit clearance must not resize it.
