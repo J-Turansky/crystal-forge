@@ -90,6 +90,26 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
    tag.userData.previewOnly=true;tag.userData.pixelLabel=hole.pixelId;group.add(tag);
   }
  }
+ for(const mount of recipe.negative||[])if(mount.mountHole){
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(mount.radius,.2,6,48),
+   new THREE.MeshBasicMaterial({color:0xb783ff,depthTest:false}));
+  ring.rotation.x=-Math.PI/2;
+  const [x,,z]=mount.position,under=mount.mountEntryFace==='underside';
+  surfaceRay.set(new THREE.Vector3(x,under?-100:recipe.bounds.height+100,z),new THREE.Vector3(0,under?1:-1,0));
+  const surface=surfaceRay.intersectObjects(solidSurfaces,false)[0];
+  ring.position.set(x,(surface?.point.y??(under?0:recipe.bounds.height))+(under?-.3:.3),z);
+  ring.renderOrder=5;ring.userData.previewOnly=true;ring.userData.mountId=mount.mountId;group.add(ring);
+  if(typeof document!=='undefined'){
+   const canvas=document.createElement('canvas');canvas.width=96;canvas.height=48;
+   const context=canvas.getContext('2d');
+   context.fillStyle='#33244d';context.fillRect(0,0,96,48);
+   context.fillStyle='#ffffff';context.font='bold 32px sans-serif';context.textAlign='center';
+   context.fillText('M'+mount.mountHole.split(' ').at(-1),48,36);
+   const label=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthTest:false}));
+   label.position.copy(ring.position);label.position.y+=under?-2:2;label.scale.set(6,3,1);label.renderOrder=6;
+   label.userData.previewOnly=true;label.userData.mountLabel=mount.mountId;group.add(label);
+  }
+ }
  for(const link of recipe.nativeRouting?.links||[]){
   if(link.path.length<2)continue;
   const points=[],point=p=>new THREE.Vector3(p.x,.15,p.z);
@@ -104,7 +124,7 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
  }
  return group;
 }
-export function disposeGroup(group){group.traverse(node=>{if(node.userData.pixelLabel)node.material?.map?.dispose();if(!node.isSprite)node.geometry?.dispose();if(Array.isArray(node.material))node.material.forEach(m=>m.dispose());else node.material?.dispose();});group.removeFromParent();}
+export function disposeGroup(group){group.traverse(node=>{if(node.userData.pixelLabel||node.userData.mountLabel)node.material?.map?.dispose();if(!node.isSprite)node.geometry?.dispose();if(Array.isArray(node.material))node.material.forEach(m=>m.dispose());else node.material?.dispose();});group.removeFromParent();}
 export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
  const owned=[];const hold=solid=>(owned.push(solid),solid);
  const convert=part=>{
@@ -143,7 +163,7 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
    for(const part of recipe.negative){
     const cut=hold(convert(part).setTolerance(tolerance));
     if(hold(total.intersect(cut)).volume()<.1)
-     throw Error((part.pixelHole||part.wireChannel||'Cut')+' does not cut the model.');
+     throw Error((part.pixelHole||part.mountHole||part.wireChannel||'Cut')+' does not cut the model.');
     cuts.push(cut);
    }
    const originalVolume=total.volume();
@@ -174,8 +194,8 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
   }else for(const part of recipe.negative||[]){
    const before=total;
    total=hold(total.subtract(convert(part)));
-   if((part.pixelHole||part.wireChannel)&&before.volume()-total.volume()<.1)
-    throw Error((part.pixelHole||part.wireChannel)+' does not cut the model. Move it onto solid material in Build.');
+   if((part.pixelHole||part.mountHole||part.wireChannel)&&before.volume()-total.volume()<.1)
+    throw Error((part.pixelHole||part.mountHole||part.wireChannel)+' does not cut the model. Move it onto solid material in Build.');
   }
   if(total.status()!=='NoError'||total.isEmpty()||total.volume()<=0)throw Error('Manufacturing produced no valid material.');
   let regions=[{role:'primary',solid:total}];

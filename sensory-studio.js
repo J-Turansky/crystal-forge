@@ -7,6 +7,7 @@ import {lightPassageExportBlock,lightPassageReportEntries} from './light-passage
 import {renderPixelProfileDiagram} from './pixel-profile-diagram.js';
 import {applyPixelFittingProfile,resolvePixelFitting,withMeasuredPixelFit,saveablePixelFit} from './studio-pixel-fit.js';
 import {pixelBuilderMarkup,pixelHoleMarkup,bindPixelBuilder,pixelProfiles,stablePixels,findPixelPosition,checkedPixelBore,newPixel} from './studio-pixel-builder.js';
+import {stableMounts,newMount,mountHoleIssue} from './studio-mount-builder.js';
 import {createModel,addModel,findModel,openTab,closeTab,reorderTabs,duplicateModel,editModel,
  queueModel,beginPreparation,finishPreparation,cancelPreparation,canExport,resolveJobPrinter,movePrintJob,invalidatePrintJob,saveLibraryRevision,
  insertLibraryModel,availableLinkedUpdate,acceptLinkedUpdate,breakLink,modelFingerprint,validateProject,WORKSPACE_KEY,newId} from './studio-documents.js';
@@ -459,7 +460,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const placeholder=document.createElement('span');placeholder.className='sms-picture-empty';placeholder.textContent='Preview unavailable';return placeholder;
  }
  function renderTabs(){
-  if(placementModel&&!canEditPixels(active()))endPixelPlacement();
+  if((placementModel||mountingModel)&&(!canEditPixels(active())||(placementModel&&placementModel!==active()?.id)||(mountingModel&&mountingModel!==active()?.id)))endPixelPlacement();
   for(const job of project.printJobs)if(job.status==='stale')discardPrintResult(job.id);
   if(inspection){
    if(!inspection.root.isConnected)$('smsPrecisionContent').prepend(inspection.root);
@@ -540,7 +541,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  const nativeGuideChoices=new Map();
  const showNativeGuide=model=>nativeGuideChoices.get(model.id)??!!cache.get(model.id)?.routing?.links.some(link=>link.path.length>1);
- const selectedPixels=new Map(),pixelMessages=new Map(),pixelProfileChoices=new Map();
+ const selectedPixels=new Map(),selectedMounts=new Map(),pixelMessages=new Map(),pixelProfileChoices=new Map();
  // Newly saved measured profiles are shared across all families, but never
  // silently alter dimensions on existing fittings.
  document.addEventListener('studio-pixel-profile-saved',event=>{
@@ -549,12 +550,16 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   pixelProfileChoices.set(model.id,id);
   if(mode==='model'&&stage==='build'){renderPalette();if(model.generator.typeId!=='crystals')renderEditor();}
  });
- let placementModel=null,pixelGesture=null,pendingDuplicate=null;
+ let placementModel=null,mountingModel=null,pixelGesture=null,pendingDuplicate=null;
  const pixelHoles=model=>stablePixels(model.build.pixelHoles||[]);
+ const mountHoles=model=>stableMounts(model.build.manualMountHoles||[]);
  const fittingProfiles=()=>pixelProfiles(adapter.pixelFitProfiles?.()||[]);
  const chosenProfile=model=>fittingProfiles().find(profile=>profile.id===(pixelProfileChoices.get(model.id)||'seed'));
  function pixelMarkers(model){
   return (cache.get(model.id)?.group?.children||[]).filter(mesh=>mesh.userData.pixelId);
+ }
+ function mountMarkers(model){
+  return (cache.get(model.id)?.group?.children||[]).filter(mesh=>mesh.userData.mountId);
  }
  function refreshPixelMarkers(model){
   if(model.generator.typeId==='crystals')return;
@@ -564,6 +569,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    marker.visible=stage==='build';
    marker.material.color.setHex(marker.userData.pixelId===selectedPixels.get(model.id)?0x48e4f1:0xffbe47);
   }
+  for(const marker of mountMarkers(model)){
+   marker.visible=stage==='build';
+   marker.material.color.setHex(marker.userData.mountId===selectedMounts.get(model.id)?0x48e4f1:0xb783ff);
+  }
+  for(const label of cache.get(model.id)?.group?.children||[])if(label.userData.mountLabel)
+   label.visible=stage==='build';
   for(const port of cache.get(model.id)?.group?.children||[])if(port.userData.pixelLabel||port.userData.pixelPort)
    port.visible=stage==='build'&&(!!port.userData.pixelLabel||port.userData.pixelPort===selectedPixels.get(model.id));
  }
@@ -579,6 +590,24 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  function pixelIssue(model,hole,others,recipe){
   try{return checkedPixelBore(recipe||pixelSource(model),hole,others);}catch(error){return error.message;}
  }
+ function mountSource(model){
+  const family=registry.get(model.generator.typeId);
+  return applyBuildModules(family.recipe(model.parameters),
+   {...model.build,pixelHoles:[],manualMountHoles:[],serialRouting:null},family.capabilities,{preview:true});
+ }
+ function mountIssue(model,mount,others){
+  try{
+   const family=registry.get(model.generator.typeId);
+   if(!['tactile-tiles','gears','waves','control-caps','characters','light-pods'].includes(family.typeId))return 'This generator cannot certify a physical mounting through-hole.';
+   const issue=mountHoleIssue(mountSource(model),mount,others,pixelHoles(model));
+   if(issue)return issue;
+   // Verify full manufacturing eligibility, including routes that would otherwise
+   // be blocked by this new mounting cut. Never persist a silently invalid route.
+   applyBuildModules(family.recipe(model.parameters),
+    {...model.build,manualMountHoles:[...others,mount]},family.capabilities);
+   return null;
+  }catch(error){return error.message;}
+ }
  function redrawPixelEditor(focus){
   const open=$('smsPixelAdd')?.closest('details')?.open;
   renderEditor();
@@ -586,6 +615,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(focus?.selector)focus.root.querySelector(focus.selector)?.focus({preventScroll:true});
  }
  function selectPixel(model,id){
+  selectedMounts.delete(model.id);
   selectedPixels.set(model.id,id);
   refreshPixelMarkers(model);
   renderPalette();
@@ -609,6 +639,26 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const holes=pixelHoles(model);
   if(!holes[index]||model.link)return;
   holes.splice(index,1);savePixels(model,holes,holes[Math.min(index,holes.length-1)]?.id);
+ }
+ function selectMount(model,id){
+  selectedPixels.delete(model.id);
+  selectedMounts.set(model.id,id);
+  refreshPixelMarkers(model);renderPalette();
+ }
+ function saveMounts(model,mounts,id){
+  if(!commit({build:{...model.build,manualMountHoles:mounts}}))return false;
+  selectedMounts.set(model.id,id);selectedPixels.delete(model.id);
+  pixelMessages.delete(model.id);redrawPixelEditor();return true;
+ }
+ function editMount(model,index,mount){
+  const mounts=mountHoles(model);if(!mounts[index]||model.link)return false;
+  const issue=mountIssue(model,mount,mounts.filter((_,i)=>i!==index));
+  if(issue){pixelStatus(model,issue);return false;}
+  mounts[index]=mount;return saveMounts(model,mounts,mount.id);
+ }
+ function removeMount(model,index){
+  const mounts=mountHoles(model);if(!mounts[index]||model.link)return;
+  mounts.splice(index,1);saveMounts(model,mounts,mounts[Math.min(index,mounts.length-1)]?.id);
  }
  function pixelPlacementAdvice(model,reason){
   const tips=' Try a smaller profile or move the fitting into a wider solid area.';
@@ -637,7 +687,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  function projectMarker(marker){return projectPoint(marker.position);}
  function markerAt(model,event){
-  return pixelMarkers(model).map(marker=>{
+  return [...pixelMarkers(model),...mountMarkers(model)].map(marker=>{
    const p=projectMarker(marker);
    return {marker,distance:Math.hypot(p.x-event.clientX,p.y-event.clientY)};
   }).filter(hit=>hit.distance<=14).sort((a,b)=>a.distance-b.distance)[0]?.marker;
@@ -674,7 +724,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  placementGhost.visible=false;
  scene.add(placementGhost);
  function endPixelPlacement(){
-  placementModel=null;pendingDuplicate=null;placementGhost.visible=false;
+  placementModel=null;mountingModel=null;pendingDuplicate=null;placementGhost.visible=false;
   delete viewport.dataset.nativePlacement;
  }
  function fittingCandidate(model,point,duplicate=null){
@@ -684,10 +734,13 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  function updatePlacementGhost(model,event){
   const hit=fittingSurface(model,event);
   if(!hit){placementGhost.visible=false;viewport.dataset.nativePlacement='outside';return;}
-  const {point}=hit,hole=fittingCandidate(model,point,pendingDuplicate),holes=pixelHoles(model);
-  const issue=fittingFaceIssue(hit)||(holes.length>=16?'Use up to 16 fittings per model.':pixelIssue(model,hole,holes));
+  const {point}=hit,placingMount=mountingModel===model.id;
+  const hole=placingMount?newMount(Math.round(point.x*10)/10,Math.round(point.z*10)/10):fittingCandidate(model,point,pendingDuplicate);
+  const holes=placingMount?mountHoles(model):pixelHoles(model);
+  const issue=fittingFaceIssue(hit)||(holes.length>=16?'Maximum 16 fittings per model.':
+   placingMount?mountIssue(model,{...hole,entryFace:hit.normal.y<0?'underside':'top'},holes):pixelIssue(model,hole,holes));
   placementGhost.position.set(hole.x,point.y+(hit.normal.y<0?-.3:.3),hole.z);
-  placementGhost.scale.setScalar((hole.diameter+hole.clearance)/2);
+  placementGhost.scale.setScalar((hole.diameter+(hole.clearance||0))/2);
   placementGhost.material.color.setHex(issue?0xff3c59:0x48e4f1);
   placementGhost.visible=true;
   viewport.dataset.nativePlacement=issue?'invalid':'valid';
@@ -700,16 +753,25 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(issue){pixelStatus(model,pixelPlacementAdvice(model,issue));return false;}
   return savePixels(model,[...holes,{...hole,checked:true}],hole.id);
  }
+ function placeMountAt(model,{point,normal}){
+  const mounts=mountHoles(model);
+  if(mounts.length>=16){pixelStatus(model,'Use up to 16 mounting holes per model.');return false;}
+  const mount=newMount(Math.round(point.x*10)/10,Math.round(point.z*10)/10);
+  mount.entryFace=normal.y<0?'underside':'top';
+  const issue=fittingFaceIssue({normal})||mountIssue(model,mount,mounts);
+  if(issue){pixelStatus(model,issue);return false;}
+  return saveMounts(model,[...mounts,mount],mount.id);
+ }
  const fittingActions=document.createElement('dialog');
  fittingActions.setAttribute('aria-label','Hardware at this point');
- fittingActions.innerHTML='<p data-fitting-message></p><button type="button" data-add-point-pixel>Add pixel</button> <button type="button" data-cancel-point>Cancel</button>';
+ fittingActions.innerHTML='<p data-fitting-message></p><button type="button" data-add-point-pixel>Add pixel</button> <button type="button" data-add-point-mount>Add mounting feature</button> <button type="button" data-cancel-point>Cancel</button>';
  document.body.append(fittingActions);
  fittingActions.querySelector('[data-cancel-point]').onclick=()=>fittingActions.close();
  viewport.addEventListener('dblclick',event=>{
    const model=active();
-   if(event.button!==0||!canEditPixels(model)||model.link||placementModel===model.id)return;
+   if(event.button!==0||!canEditPixels(model)||model.link||placementModel===model.id||mountingModel===model.id)return;
    const marker=markerAt(model,event);
-   if(marker){consume(event);selectPixel(model,marker.userData.pixelId);return;}
+   if(marker){consume(event);if(marker.userData.mountId)selectMount(model,marker.userData.mountId);else selectPixel(model,marker.userData.pixelId);return;}
    const hit=fittingSurface(model,event);
    if(!hit)return;
    const {point}=hit;
@@ -718,6 +780,18 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    const holes=pixelHoles(model), candidate=fittingCandidate(model,point);
    const issue=fittingFaceIssue(hit)||(holes.length>=16?'Use up to 16 fittings per model.':pixelIssue(model,candidate,holes));
    fittingActions.querySelector('[data-fitting-message]').textContent=issue?pixelPlacementAdvice(model,issue):'Place a vertical through-bore here. The bore opens on both faces; cable cuts are on the underside.';
+   const holeMount=newMount(Math.round(point.x*10)/10,Math.round(point.z*10)/10);
+   holeMount.entryFace=hit.normal.y<0?'underside':'top';
+   const mounts=mountHoles(model),mountButton=fittingActions.querySelector('[data-add-point-mount]');
+   const mountProblem=fittingFaceIssue(hit)||(mounts.length>=16?'Use up to 16 mounting holes per model.':mountIssue(model,holeMount,mounts));
+   mountButton.disabled=!!mountProblem;
+   mountButton.title=mountProblem||'Cut a measured 3.4 mm vertical through-hole on verified solid material';
+   mountButton.onclick=()=>{
+    fittingActions.close();
+    if(active()?.id===model.id&&canEditPixels(model))placeMountAt(model,hit);
+   };
+   if(mountProblem&&!issue)fittingActions.querySelector('[data-fitting-message]').textContent+=
+    ' Mount: '+mountProblem;
    add.disabled=!!issue;
    add.onclick=()=>{
     fittingActions.close();
@@ -734,18 +808,20 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  viewport.addEventListener('pointerdown',event=>{
   const model=active();
   if(event.button!==0||!canEditPixels(model))return;
-  const marker=markerAt(model,event),placing=placementModel===model.id&&!model.link;
+  const marker=markerAt(model,event),placing=(placementModel===model.id||mountingModel===model.id)&&!model.link;
   if(!marker&&!placing)return;
   consume(event);viewport.focus({preventScroll:true});viewport.setPointerCapture(event.pointerId);
-  const canDrag=marker?.userData.pixelId===selectedPixels.get(model.id);
-  pixelGesture={model,marker,placing,canDrag,id:event.pointerId,time:performance.now(),start:[event.clientX,event.clientY]};
-  if(marker)selectPixel(model,marker.userData.pixelId);
+  const kind=marker?.userData.mountId?'mount':'pixel';
+  const canDrag=kind==='mount'?marker?.userData.mountId===selectedMounts.get(model.id):
+   marker?.userData.pixelId===selectedPixels.get(model.id);
+  pixelGesture={model,marker,placing,kind,canDrag,id:event.pointerId,time:performance.now(),start:[event.clientX,event.clientY]};
+  if(marker){if(kind==='mount')selectMount(model,marker.userData.mountId);else selectPixel(model,marker.userData.pixelId);}
  },true);
  viewport.addEventListener('pointermove',event=>{
   const gesture=pixelGesture;
   if(!gesture){
    const model=active();
-   if(canEditPixels(model)&&placementModel===model.id)updatePlacementGhost(model,event);
+   if(canEditPixels(model)&&(placementModel===model.id||mountingModel===model.id))updatePlacementGhost(model,event);
    return;
   }
   if(gesture.id!==event.pointerId)return;
@@ -761,18 +837,20 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   pixelRay(event);
   const hit=partRay.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),-gesture.origin.y),new THREE.Vector3());
   if(!hit)return;
-  const holes=pixelHoles(gesture.model),id=gesture.marker.userData.pixelId;
+  const mounts=gesture.kind==='mount',holes=mounts?mountHoles(gesture.model):pixelHoles(gesture.model);
+  const id=mounts?gesture.marker.userData.mountId:gesture.marker.userData.pixelId;
   const current=holes.find(hole=>hole.id===id);
   gesture.candidate={...current,x:Math.round(hit.x*10)/10,z:Math.round(hit.z*10)/10};
-  const issue=pixelIssue(gesture.model,gesture.candidate,holes.filter(hole=>hole.id!==id),gesture.recipe);
+  const issue=mounts?mountIssue(gesture.model,gesture.candidate,holes.filter(hole=>hole.id!==id)):
+   pixelIssue(gesture.model,gesture.candidate,holes.filter(hole=>hole.id!==id),gesture.recipe);
   movePixelMarker(gesture.model,gesture.marker,gesture.candidate.x,gesture.candidate.z);
   gesture.marker.material.color.setHex(issue?0xff3c59:0x48e4f1);
  },true);
  function movePixelMarker(model,marker,x,z){
   marker.position.x=x;marker.position.z=z;
-  const id=marker.userData.pixelId;
+  const id=marker.userData.pixelId||marker.userData.mountId;
   for(const part of cache.get(model.id)?.group?.children||[]){
-   if(part.userData.pixelPort===id||part.userData.pixelLabel===id){part.position.x=x;part.position.z=z;}
+   if(part.userData.pixelPort===id||part.userData.pixelLabel===id||part.userData.mountLabel===id){part.position.x=x;part.position.z=z;}
   }
  }
  function cancelPixelGesture(){
@@ -792,15 +870,25 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const model=gesture.model;
   if(active()?.id!==model.id||!canEditPixels(model))return;
   if(gesture.candidate){
-   const index=pixelHoles(model).findIndex(hole=>hole.id===gesture.candidate.id);
-   editPixel(model,index,gesture.candidate);return;
+   if(gesture.kind==='mount'){
+    const index=mountHoles(model).findIndex(hole=>hole.id===gesture.candidate.id);
+    editMount(model,index,gesture.candidate);
+   }else{
+    const index=pixelHoles(model).findIndex(hole=>hole.id===gesture.candidate.id);
+    editPixel(model,index,gesture.candidate);
+   }return;
   }
   if(!gesture.placing||gesture.marker)return;
   const hit=fittingSurface(model,event);
   if(!hit){pixelStatus(model,'Click a solid model surface to place this fitting.');return;}
   const faceIssue=fittingFaceIssue(hit);
   if(faceIssue){pixelStatus(model,faceIssue);return;}
-  if(placeFittingAt(model,hit,pendingDuplicate)){
+  if(mountingModel===model.id){
+   if(placeMountAt(model,hit)){
+    if(mountHoles(model).length>=16){endPixelPlacement();renderPalette();}
+    else updatePlacementGhost(model,event);
+   }
+  }else if(placeFittingAt(model,hit,pendingDuplicate)){
    if(pendingDuplicate||pixelHoles(active()).length>=16){endPixelPlacement();renderPalette();}
    else updatePlacementGhost(active(),event);
   }
@@ -808,10 +896,21 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  viewport.addEventListener('keydown',event=>{
   const model=active();
   if(!canEditPixels(model))return;
-  if(event.key==='Escape'&&(pixelGesture||placementModel===model.id)){
+  if(event.key==='Escape'&&(pixelGesture||placementModel===model.id||mountingModel===model.id)){
    consume(event);cancelPixelGesture();endPixelPlacement();pixelStatus(model,'Placement ended.');renderPalette();return;
   }
   if(model.link)return;
+  const mounts=mountHoles(model),mountIndex=mounts.findIndex(hole=>hole.id===selectedMounts.get(model.id));
+  const arrows={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
+  if(mountIndex>=0){
+   const direction=arrows[event.key];
+   if(event.key==='Delete'){consume(event);removeMount(model,mountIndex);return;}
+   if(direction){
+    consume(event);const n=event.shiftKey?5:1,hole=mounts[mountIndex];
+    editMount(model,mountIndex,{...hole,x:hole.x+direction[0]*n,z:hole.z+direction[1]*n});
+    return;
+   }
+  }
   const holes=pixelHoles(model),index=holes.findIndex(hole=>hole.id===selectedPixels.get(model.id));
   if(index<0)return;
   const delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[event.key];
@@ -958,6 +1057,38 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    block.append(line);
   }
  }
+ function renderMountPalette(root,model){
+  const family=registry.get(model.generator.typeId);
+  if(!['tactile-tiles','gears','waves','control-caps','characters','light-pods'].includes(family.typeId))return;
+  const mounts=mountHoles(model),selected=mounts.findIndex(hole=>hole.id===selectedMounts.get(model.id));
+  const locked=!!model.link,disabled=locked?' disabled':'';
+  const block=document.createElement('fieldset');block.setAttribute('aria-label','Mounting holes');
+  block.innerHTML='<legend>Mounting holes</legend>'+
+   '<p>Place actual vertical 2–8 mm through-holes on a verified solid top or underside surface. M1…Mn are editable; printed mounting loads and screw fit are not certified. The legacy two-hole mounting preset remains separate.</p>'+
+   '<div class="sms-actions"><button type="button" data-place-mount'+(locked||mounts.length>=16?' disabled':'')+'>Place mounting hole in 3D</button>'+
+   (mountingModel===model.id?'<button type="button" data-done-mount>Done placing mounts</button>':'')+'</div>'+
+   '<div class="sms-actions" aria-label="Select mount">'+mounts.map((mount,i)=>'<button type="button" data-select-mount="'+i+'" aria-pressed="'+(i===selected)+'">M'+(i+1)+'</button>').join('')+'</div>'+
+   (selected<0?'':('<fieldset><legend>M'+(selected+1)+' · Through-hole</legend>'+
+    [['x','X (mm)','-200','200'],['z','Z (mm)','-200','200'],['diameter','Hole diameter (mm)','2','8']].map(([field,label,min,max])=>
+     '<label>'+label+'<input type="number" data-mount-field="'+field+'" min="'+min+'" max="'+max+'" step=".1" value="'+esc(mounts[selected][field])+'"'+disabled+'></label>').join('')+
+    '<button type="button" data-remove-mount'+disabled+'>Remove M'+(selected+1)+'</button></fieldset>'));
+  root.append(block);
+  block.querySelector('[data-place-mount]').onclick=()=>{
+   endPixelPlacement();mountingModel=model.id;viewport.dataset.nativePlacement='outside';
+   renderPalette();viewport.tabIndex=0;viewport.focus({preventScroll:true});
+   pixelStatus(model,'Click or tap a verified top/underside solid surface to place 3.4 mm mounting through-holes. Use Done or Escape to exit.');
+  };
+  const done=block.querySelector('[data-done-mount]');
+  if(done)done.onclick=()=>{endPixelPlacement();renderPalette();};
+  block.querySelectorAll('[data-select-mount]').forEach(button=>button.onclick=()=>selectMount(model,mounts[Number(button.dataset.selectMount)].id));
+  block.querySelectorAll('[data-mount-field]').forEach(input=>input.onchange=()=>{
+   if(!input.checkValidity()){input.reportValidity();input.value=mounts[selected][input.dataset.mountField];return;}
+   const hole={...mounts[selected],[input.dataset.mountField]:Number(input.value)};
+   if(!editMount(model,selected,hole))input.value=mounts[selected][input.dataset.mountField];
+  });
+  const remove=block.querySelector('[data-remove-mount]');
+  if(remove)remove.onclick=()=>removeMount(model,selected);
+ }
  function renderPixelPalette(root,model){
   const holes=pixelHoles(model),profiles=fittingProfiles(),selected=holes.findIndex(hole=>hole.id===selectedPixels.get(model.id));
   const disabled=model.link?' disabled':'',noAdd=holes.length>=16?' disabled':disabled;
@@ -1044,6 +1175,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   };
   bindPixelEditor(root,model,holes,profiles);
   appendNativeRouting(root,model);
+  renderMountPalette(root,model);
  }
  async function downloadPixelCoupon(model,hole,options,button){
   button.disabled=true;

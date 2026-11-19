@@ -1,5 +1,14 @@
 # AI handover — read immediately after AGENTS.md
 
+## WT-020 current development handover — 19 November 2026
+
+- **Active software parity tracker:** Issue #79. **Pinned specification:** `prompts/020-final-software-parity-release.md @ f9c248fc6933da3d0451f5168e4eab830b5af6fe` on `planning/prompts`.
+- **Last verified main:** `50be3d8dc8fcbe8971c84692edb91993c64566c7`, with WT-018 #80 merged and GitHub Pages workflow reporting success for that SHA. The owner's live Gear P1–P4 double-click/face/wiring scenario still needs a fresh public-browser check.
+- **Draft integration order:** #84 main-targeted Gear corrections → #85 native family pointer checks, stacked on #84 → this WT-020 native mounting draft, stacked on #85. After each owner-authorised merge, retarget/reconcile successors and test their **new exact heads**. Do not merge automatically or double-cherry-pick historical #82/#83.
+- **This draft:** `studio-mount-builder.js` certifies source-material, diameter and collision rules for 2–8 mm native vertical through-mounts; `studio-catalogue.js` inserts actual M1…Mn negative cutters, `studio-geometry.js` draws purple numbered editable markers and checks they remove material, `sensory-studio.js` provides direct 3D context, continuous placement, selection, drag, precise edits and keyboard actions, plus real browser and Manifold fixtures. It does **not** provide arbitrary 3D normal-aligned inserts or load-rated mounting.
+- **Remaining WT-020 release blockers:** full shared Design, Build, mounting, wiring, optics, Library, Print Centre, SVG/STL/OBJ, persistence and external clean-browser parity acceptance still **L/M**, not complete. Real Cura/LED/strength validation is Issue #10; modular assembly #51 remains ON HOLD; Jordan #36/#37 and owner/Copilot #33/#42 remain independent.
+- **Current app documentation below includes historical draft records.** Never use those dated records in place of fresh Git ancestry, PR checks and the acceptance matrix.
+
 ## Current direction
 
 Verified main at `421f050b9d980356b502ad22483712c1105e2f54`. Its tree equals the common ancestor `c4f5b6d56a366f24b20be75550eb9fa906de9ee9`. #71 reached main. #72–#75 and #78 landed on feature branches. #77 remains draft; its exact tested head `7997df537739b6fe630b1669dd24e92f05b69db0` incorporates those changes. #76 landed on planning/prompts. This main-targeted candidate carries the tested branch tree over the identical main baseline. [Source checks](https://github.com/connorturansky-svg/crystal-forge/pull/77/checks).

@@ -283,6 +283,31 @@ for(const [family,parameters,options] of fittingCases){
  assert(files.stls.length>=1&&files.threeMF.length>100,family.typeId+' needs valid exported STL and 3MF');
 }
 assert.match(pixelBoreIssue(pebbleGenerator.recipe({illuminated:false}),newPixel({id:'seed',bodyDiameter:5})),/cavity|unavailable|solid/);
+// WT-020: every native family makes an actual, validated M1 through-hole
+// using the same verified solid-column source as pixel bores. No mock preview.
+for(const [family,parameters,options] of fittingCases){
+ const source=family.recipe(parameters),build={...options,pixelBuilderVersion:1,pixelHoles:[]};
+ const uncut=applyBuildModules(source,build,family.capabilities);
+ const target=findPixelPosition(uncut,[],{id:'seed',bodyDiameter:5});
+ assert(target,family.typeId+' must expose solid stock for a certified mount');
+ const mount={id:'m-'+family.typeId,x:target.x,z:target.z,diameter:3.4,entryFace:'top'};
+ const cut=applyBuildModules(source,{...build,manualMountHoles:[mount]},family.capabilities);
+ assert.equal(cut.negative.filter(part=>part.mountHole).length,1,family.typeId+' has actual cutter');
+ const visible=previewRecipe(THREE,cut);
+ assert.equal(visible.children.filter(part=>part.userData.mountId).length,1,'Mount marker must match saved M1');
+ disposeGroup(visible);
+ const before=prepareRecipe(THREE,wasm,uncut).bodies.reduce((total,body)=>total+body.volume,0);
+ const printed=prepareRecipe(THREE,wasm,cut);
+ const after=printed.bodies.reduce((total,body)=>total+body.volume,0);
+ assert(before-after>.1,family.typeId+' mount must subtract actual printable material');
+ const files=exportMaterialBodies(printed,{name:'wt020-mount-'+family.typeId});
+ assert(files.stls.length&&files.threeMF.length>100,'Mount persists in real STL/3MF export');
+ assert.throws(()=>applyBuildModules(source,{...build,manualMountHoles:[mount],
+  pixelHoles:[{...target,checked:true}]},family.capabilities),/another pixel|mount|close/i,
+  family.typeId+' must reject overlapping LED and mount');
+}
+console.log('WT-020 native family mounting through-holes: actual Manifold volume, markers, STL/3MF and collision guards passed.');
+
 console.log('WT-017 native family actual bores and export passed; Crystal checked by original hardware fixtures.');
 
 const extendedRouting=[

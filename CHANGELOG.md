@@ -1,5 +1,15 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.33 — Verified native mounting through-holes
+
+- Add contextual M1…Mn placement, selection, precision editing, keyboard nudge and conservative 3D through-mount validation for native Studio builders.
+- Include numbered mounting previews and actual Manifold/STL/3MF cutters, with overlap/void/solid-material failure checks and source persistence tests.
+- Physical screw retention, load and installation remain unverified under #10; cutter orientation remains vertical, so unsupported side faces are refused.
+
+## v0.16.0-dev.32 — Exercise native fitting interactions across model families
+
+- Add browser acceptance for shared model-surface placement and measured profiles.
+
 ## v0.16.0-dev.31 — Keep native pixel markers on the selected face
 
 - Preserve the chosen through-bore opening and show available cable guides without enabling cutters.
