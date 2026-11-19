@@ -711,14 +711,23 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
   // 3MF output *before* being marked prepared. Rounded socket Booleans can
   // leave sub-precision slivers that Manifold still regards as valid.
   if(!printableMaterialTriangles(combined.getMesh())){
-   const before=combined.volume(),tolerance=.0001;
-   const rebuilt=hold(new wasm.Manifold(combined.getMesh()));
-   const cleaned=hold(hold(rebuilt.asOriginal()).simplify(tolerance));
-   if(cleaned.status()!=='NoError'||cleaned.isEmpty()||
-      Math.abs(cleaned.volume()-before)>.01||!printableMaterialTriangles(cleaned.getMesh()))
-    throw Error('The physical mesh contains sub-STL-precision triangles. Move a fitting or adjust its geometry; preparation was refused before export.');
-   combined=cleaned;
-   warnings.push('Sub-printable triangle slivers were removed within a 0.0001 mm tolerance; review the resulting layer geometry in Cura.');
+   const before=combined.volume(),raw=combined.getMesh();
+   let repaired=null,acceptedTolerance=0;
+   // Try only sub-layer-height tolerances; never change nominal socket
+   // dimensions or silently drop bad triangles from exported materials.
+   for(const tolerance of [.0001,.0003,.001,.002]){
+    const rebuilt=hold(new wasm.Manifold(raw));
+    const tolerant=hold(rebuilt.setTolerance(tolerance));
+    const candidate=hold(hold(tolerant.asOriginal()).simplify(tolerance));
+    if(candidate.status()==='NoError'&&!candidate.isEmpty()&&
+       Math.abs(candidate.volume()-before)<=.05&&printableMaterialTriangles(candidate.getMesh())){
+     repaired=candidate;acceptedTolerance=tolerance;break;
+    }
+   }
+   if(!repaired)
+    throw Error('The physical mesh contains sub-STL-precision triangles that bounded repair could not remove. Adjust fitting geometry; preparation was refused before export.');
+   combined=repaired;
+   warnings.push('Sub-printable triangle slivers were removed with a bounded '+acceptedTolerance+' mm repair tolerance. Inspect the final layer geometry in Cura.');
   }
   onProgress('Auditing the final manifold geometry and printer limits…');
   const inspectionMode=s.lightingMode==='none'?'none':s.hollowCrystals?'hollow':portPlan.requested&&vault.applied?'vault':s.targetedLightPaths?'targeted':portPlan.requested?'vault':'none';
