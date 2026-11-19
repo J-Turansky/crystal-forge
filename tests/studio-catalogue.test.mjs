@@ -230,7 +230,7 @@ for(const id of ['knob','selector']){
   assert.equal(preview.pixelId,'physical-preview');
   assert.equal(preview.insertionDepth,fixture.profile.bodyHeight);
   assert(preview.positive.triVerts.length>0&&preview.negative.triVerts.length>0);
-  assert([preview.exposedVolume,preview.collisionVolume,preview.remainingRoof].every(Number.isFinite));
+  assert([preview.exposedVolume,preview.collisionVolume,preview.nominalRoofAllowance].every(Number.isFinite));
   const stock=prepareRecipe(THREE,wasm,{...recipe,negative:[],nativeRouting:null});
   const finished=prepareRecipe(THREE,wasm,recipe);
   const blankSolid=new wasm.Manifold(stock.bodies[0].mesh);
