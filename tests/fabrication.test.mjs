@@ -55,9 +55,9 @@ const wasm=await Module();wasm.setup();
  open.delete();opening.delete();block.delete();
 }
 
-function geometryEdges(g){
+function geometryEdges(g,precision=1e4){
  const p=g.attributes.position.array,edges=new Map();
- const v=i=>[...p.slice(i,i+3)].map(x=>Math.round(x*1e4)).join(',');
+ const v=i=>[...p.slice(i,i+3)].map(x=>precision===0?x:Math.round(x*precision)).join(',');
  for(let i=0;i<p.length;i+=9)for(let j=0;j<3;j++){
   const endpoints=[v(i+j*3),v(i+((j+1)%3)*3)].sort().join(':');
   edges.set(endpoints,(edges.get(endpoints)||0)+1);
@@ -742,7 +742,10 @@ assert.deepEqual(stepped.diameters,[11.95,12.05,12.15,12.25,12.35]);
 assert.equal(stepped.wireExitCount,10,'Five shapes have their wires open on both sides');
 assert.equal(stepped.diameters.length,5,'Stepped pixel housing and flange coupon has five holes');
 assert(stepped.geometry.getAttribute('position').count>200,'Stepped coupon has real printable geometry');
-assert.equal(geometryEdges(stepped.geometry).open,0,'Stepped coupon remains watertight');
+const couponCoarse=geometryEdges(stepped.geometry).open;
+assert.equal(couponCoarse,0,'Stepped coupon remains watertight: rounding at 1e-4 mm produces '+
+ couponCoarse+' suspect edges; 1e-5 mm produces '+geometryEdges(stepped.geometry,1e5).open+
+ ', and exact serialized Float32 coordinates produce '+geometryEdges(stepped.geometry,0).open);
 stepped.geometry.dispose();
 const singleSocket=makePixelSeatCoupon(wasm,{...settings,pixelProfileId:'gumdrop',pixelDiameter:12,pixelFit:.25,pixelRetentionLip:.35},{single:true,openWireExits:false});
 assert.deepEqual(singleSocket.diameters,[12.25]);
