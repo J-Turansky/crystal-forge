@@ -176,7 +176,7 @@ try{
  await page.getByRole('searchbox',{name:'Search settings'}).clear();
  await shot('wt014-desktop');
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
- await page.locator('.sms-palette').getByRole('button',{name:'Add pixel hole',exact:true}).click();
+ await page.locator('.sms-palette').getByRole('button',{name:'Add pixel',exact:true}).click();
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles.length),1);
  await page.locator('#smsGlobalUndo').click();
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length||0),0);
@@ -223,7 +223,7 @@ try{
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.mode),'Decorative');
  assert(await purpose.evaluate(input=>document.activeElement===input));
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
- await page.locator('.sms-palette').getByRole('button',{name:'Add pixel hole',exact:true}).click();
+ await page.locator('.sms-palette').getByRole('button',{name:'Add pixel',exact:true}).click();
  const pixel=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0]);
  assert(pixel);
  assert.notDeepEqual([pixel.x,pixel.z],[25.3,0]);
@@ -253,7 +253,7 @@ try{
  await page.locator('#smsPicker [data-generator="tactile-tiles"]').click();
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
  const pixelPalette=page.locator('.sms-palette');
- await pixelPalette.getByRole('button',{name:'Add pixel hole',exact:true}).click();
+ await pixelPalette.getByRole('button',{name:'Add pixel',exact:true}).click();
  const getHoles=()=>page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
  const [initialHole]=await getHoles();
  await page.locator('[data-view=top]').click();
@@ -652,10 +652,10 @@ try{
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
   const palette=page.locator('.sms-palette');
   const serial=palette.getByRole('group',{name:'Serial LED string'});
-  await palette.getByRole('button',{name:'Add pixel hole',exact:true}).click();
+  await palette.getByRole('button',{name:'Add pixel',exact:true}).click();
   const position=palette.locator('[data-pixel-field=x]');
   await position.fill('-15');await position.press('Tab');
-  await palette.getByRole('button',{name:'Add pixel hole',exact:true}).click();
+  await palette.getByRole('button',{name:'Add pixel',exact:true}).click();
   await position.fill('15');await position.press('Tab');
   await serial.locator('[data-native-route]').click();
   assert(await serial.locator('[data-native-route]').isChecked());
@@ -697,9 +697,9 @@ try{
   await page.locator('.sms-workspace-nav [data-tab=design]').click();
   await palette.getByRole('button',{name:'Solid',exact:true}).click();
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
-  await palette.getByRole('button',{name:'Add pixel hole',exact:true}).click();
+  await palette.getByRole('button',{name:'Add pixel',exact:true}).click();
   await position.fill('-15');await position.press('Tab');
-  await palette.getByRole('button',{name:'Add pixel hole',exact:true}).click();
+  await palette.getByRole('button',{name:'Add pixel',exact:true}).click();
   await position.fill('15');await position.press('Tab');
   await serial.locator('[data-native-route]').click();
   assert(await serial.locator('[data-native-route]').isChecked());
@@ -721,6 +721,49 @@ try{
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
   assert(await serial.locator('[data-native-route]').isDisabled());
  }
+
+ // WT-017: measured profiles are available before placement and reused on
+ // multiple families. The existing A-G dimensional editor remains canonical.
+ await page.evaluate(()=>window.__sensoryStudio.addModel('waves',{flowStyle:'Parallel',dualMaterial:false},'Pixel profile source'));
+ await page.locator('.sms-workspace-nav [data-tab=build]').click();
+ const wavePalette=page.locator('.sms-palette');
+ await wavePalette.getByRole('button',{name:'Create / edit pixel profile'}).click();
+ assert(await page.locator('#pixelProfileOverlay').isVisible());
+ await page.locator('#pixelName').fill('Reusable 4.5 mm seed');
+ await page.locator('#pixelBodyDiameter').fill('4.5');
+ await page.locator('#pixelBodyHeight').fill('9');
+ await page.locator('#pixelFlangeDiameter').fill('5');
+ await page.locator('#savePixelProfileBtn').click();
+ await wavePalette.getByRole('button',{name:/Reusable 4.5 mm seed/}).waitFor();
+ await wavePalette.getByRole('button',{name:'Add pixel',exact:true}).click();
+ assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].diameter),4.5);
+ await shot('wt017-pixel-profile-build');
+ const nativeFamilies=[
+  ['tactile-tiles',{dualMaterial:false},false],
+  ['gears',{mode:'Decorative',wheelStyle:'Rounded lobes',webStyle:'Solid',bore:0,spokes:0,dualMaterial:false},false],
+  ['control-caps',{shaft:0,controlStyle:'Pushbutton',dualMaterial:false},false],
+  ['characters',{character:'Cloud',construction:'Classic',dualMaterial:false},false],
+  ['light-pods',{illuminated:false,dualMaterial:false},true]
+ ];
+ for(const [type,parameters,backing] of nativeFamilies){
+  await page.evaluate(({type,parameters})=>window.__sensoryStudio.addModel(type,parameters,'WT017 '+type),{type,parameters});
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  const pal=page.locator('.sms-palette');
+  assert(await pal.getByRole('button',{name:'Add pixel',exact:true}).isVisible(),type+' has Add pixel');
+  assert(await pal.getByRole('button',{name:'Create / edit pixel profile'}).isVisible());
+  await pal.getByRole('button',{name:/Reusable 4.5 mm seed/}).click();
+  if(backing)await pal.locator('[data-pixel-backing]').check();
+  await pal.getByRole('button',{name:'Add pixel',exact:true}).click();
+  const saved=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
+  assert.equal(saved.length,1,type+' accepted a measured fitting');
+  assert.equal(saved[0].diameter,4.5,type+' reused named profile');
+  assert(await pal.locator('[data-native-route]').count(),type+' shows routing availability');
+ }
+ await page.evaluate(()=>window.__sensoryStudio.addModel('crystals',null,'WT017 Crystals'));
+ await page.locator('.sms-workspace-nav [data-tab=build]').click();
+ assert(await page.locator('.sms-palette').getByRole('button',{name:'Add pixel',exact:true}).isVisible());
+ assert(await page.locator('.sms-palette').getByRole('button',{name:'Create / edit pixel profile'}).isVisible());
+ await shot('wt017-seven-families-build');
  await page.setViewportSize({width:390,height:844});
  await page.locator('.sms-workspace-nav [data-tab=design]').click();
  assert(await page.locator('#smsModelRail #smsNew').isVisible());
