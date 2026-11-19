@@ -460,7 +460,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const placeholder=document.createElement('span');placeholder.className='sms-picture-empty';placeholder.textContent='Preview unavailable';return placeholder;
  }
  function renderTabs(){
-  if(placementModel&&!canEditPixels(active()))endPixelPlacement();
+  if((placementModel||mountingModel)&&(!canEditPixels(active())||(placementModel&&placementModel!==active()?.id)||(mountingModel&&mountingModel!==active()?.id)))endPixelPlacement();
   for(const job of project.printJobs)if(job.status==='stale')discardPrintResult(job.id);
   if(inspection){
    if(!inspection.root.isConnected)$('smsPrecisionContent').prepend(inspection.root);
@@ -598,6 +598,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  function mountIssue(model,mount,others){
   try{
    const family=registry.get(model.generator.typeId);
+   if(!family.capabilities.supportsMounting)return 'This model does not have verified mounting-hole geometry.';
    const issue=mountHoleIssue(mountSource(model),mount,others,pixelHoles(model));
    if(issue)return issue;
    // Verify full manufacturing eligibility, including routes that would otherwise
@@ -1056,6 +1057,38 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    block.append(line);
   }
  }
+ function renderMountPalette(root,model){
+  const family=registry.get(model.generator.typeId);
+  if(!family.capabilities.supportsMounting)return;
+  const mounts=mountHoles(model),selected=mounts.findIndex(hole=>hole.id===selectedMounts.get(model.id));
+  const locked=!!model.link,disabled=locked?' disabled':'';
+  const block=document.createElement('fieldset');block.setAttribute('aria-label','Mounting holes');
+  block.innerHTML='<legend>Mounting holes</legend>'+
+   '<p>Place actual vertical 2–8 mm through-holes on a verified solid top or underside surface. M1…Mn are editable; printed mounting loads and screw fit are not certified. The legacy two-hole mounting preset remains separate.</p>'+
+   '<div class="sms-actions"><button type="button" data-place-mount'+(locked||mounts.length>=16?' disabled':'')+'>Place mounting hole in 3D</button>'+
+   (mountingModel===model.id?'<button type="button" data-done-mount>Done placing mounts</button>':'')+'</div>'+
+   '<div class="sms-actions" aria-label="Select mount">'+mounts.map((mount,i)=>'<button type="button" data-select-mount="'+i+'" aria-pressed="'+(i===selected)+'">M'+(i+1)+'</button>').join('')+'</div>'+
+   (selected<0?'':('<fieldset><legend>M'+(selected+1)+' · Through-hole</legend>'+
+    [['x','X (mm)','-200','200'],['z','Z (mm)','-200','200'],['diameter','Hole diameter (mm)','2','8']].map(([field,label,min,max])=>
+     '<label>'+label+'<input type="number" data-mount-field="'+field+'" min="'+min+'" max="'+max+'" step=".1" value="'+esc(mounts[selected][field])+'"'+disabled+'></label>').join('')+
+    '<button type="button" data-remove-mount'+disabled+'>Remove M'+(selected+1)+'</button></fieldset>'));
+  root.append(block);
+  block.querySelector('[data-place-mount]').onclick=()=>{
+   endPixelPlacement();mountingModel=model.id;viewport.dataset.nativePlacement='outside';
+   renderPalette();viewport.tabIndex=0;viewport.focus({preventScroll:true});
+   pixelStatus(model,'Click or tap a verified top/underside solid surface to place 3.4 mm mounting through-holes. Use Done or Escape to exit.');
+  };
+  const done=block.querySelector('[data-done-mount]');
+  if(done)done.onclick=()=>{endPixelPlacement();renderPalette();};
+  block.querySelectorAll('[data-select-mount]').forEach(button=>button.onclick=()=>selectMount(model,mounts[Number(button.dataset.selectMount)].id));
+  block.querySelectorAll('[data-mount-field]').forEach(input=>input.onchange=()=>{
+   if(!input.checkValidity()){input.reportValidity();input.value=mounts[selected][input.dataset.mountField];return;}
+   const hole={...mounts[selected],[input.dataset.mountField]:Number(input.value)};
+   if(!editMount(model,selected,hole))input.value=mounts[selected][input.dataset.mountField];
+  });
+  const remove=block.querySelector('[data-remove-mount]');
+  if(remove)remove.onclick=()=>removeMount(model,selected);
+ }
  function renderPixelPalette(root,model){
   const holes=pixelHoles(model),profiles=fittingProfiles(),selected=holes.findIndex(hole=>hole.id===selectedPixels.get(model.id));
   const disabled=model.link?' disabled':'',noAdd=holes.length>=16?' disabled':disabled;
@@ -1142,6 +1175,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   };
   bindPixelEditor(root,model,holes,profiles);
   appendNativeRouting(root,model);
+  renderMountPalette(root,model);
  }
  async function downloadPixelCoupon(model,hole,options,button){
   button.disabled=true;
