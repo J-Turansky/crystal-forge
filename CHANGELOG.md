@@ -1,5 +1,33 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.28 — Consolidate WT-018 for main review
+
+- Bring together backed routing, artwork and mesh import, native pixel placement and independent cable guides.
+
+## v0.16.0-dev.27 — Preview cable routes without cutting channels
+
+- Show planned native cable paths and arrows independently of the setting that cuts printable grooves.
+
+## v0.16.0-dev.26 — Document the WT-018 review and production gates
+
+- Record the current roadmap, review order and acceptance checks.
+
+## v0.16.0-dev.25 — Open pixel placement from the 3D model
+
+- Double-click a solid native Build surface to check and place the selected pixel profile.
+
+## v0.16.0-dev.24 — Import STL and OBJ models into Studio
+
+- Confirm source units, scale and bed placement for local STL and triangulated OBJ models before adding them.
+
+## v0.16.0-dev.23 — Import SVG artwork into Studio
+
+- Preview local SVG artwork, set the width and extrusion depth in millimetres, and save it as a Studio model.
+
+## v0.16.0-dev.22 — Serial cable routing on additional verified models
+
+- Route cables on solid Waves and eligible single-material models with explicit fitting backing.
+
 ## v0.16.0-dev.21 — Protect workspace saves across tabs
 
 - Warn when another tab has saved a newer workspace.

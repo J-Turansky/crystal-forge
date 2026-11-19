@@ -1,4 +1,6 @@
 import {archiveSummary,archiveChoices,reconcileArchive,commitRecovery,RECOVERY_PREFIX,validateArchive,assertWorkspaceVersion} from './studio-sync-plan.js';
+import {readMeshFile,importedMeshRecipe,MAX_MESH_BYTES} from './studio-mesh-import.js';
+import {parseSvgArtwork,createSvgImport,MAX_SVG_BYTES} from './svg-import/index.js';
 import {readOrganisation,organisationName,ensureSnapshotIds,templateProject} from './studio-organisation.js';
 import {createLightInspector} from './studio-light-inspector.js';
 import {lightPassageExportBlock,lightPassageReportEntries} from './light-passage-inspection.js';
@@ -228,8 +230,110 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    grid.append(back);
    for(const preset of visualPresets(generator))appendCard(generator,preset);
   }else{
-   for(const family of registry.list())appendCard(family,null);
+   for(const family of registry.list())if(!['svg-artwork','imported-mesh'].includes(family.typeId))appendCard(family,null);
+   const artwork=document.createElement('button');artwork.type='button';artwork.textContent='Import SVG';
+   artwork.onclick=()=>{picker.close();openSvgImport();};grid.append(artwork);
+   const mesh=document.createElement('button');mesh.type='button';mesh.textContent='Import 3D model';
+   mesh.onclick=()=>{picker.close();openMeshImport();};grid.append(mesh);
   }
+ }
+ function openSvgImport(){
+  const dialog=document.createElement('dialog');dialog.setAttribute('aria-label','Import SVG artwork');
+  dialog.innerHTML='<h2>Import SVG artwork</h2><label>Local SVG file <input type="file" accept=".svg,image/svg+xml"></label><figure data-artwork-preview></figure><label>Width (mm) <input type="number" min=".5" max="500" step="any" value="60" data-width></label><label>Extrusion depth (mm) <input type="number" min=".5" max="500" step="any" value="5" data-depth></label><p role="status" aria-live="polite"></p><div class="sms-actions"><button type="button" data-import disabled>Create artwork model</button><button type="button" data-cancel>Cancel</button></div>';
+  const fileInput=dialog.querySelector('[type=file]'),width=dialog.querySelector('[data-width]'),depth=dialog.querySelector('[data-depth]');
+  const status=dialog.querySelector('[role=status]'),preview=dialog.querySelector('figure'),commit=dialog.querySelector('[data-import]');
+  let artwork=null,record=null,version=0;
+  const inspect=()=>{
+   record=null;commit.disabled=true;
+   if(!artwork)return;
+   try{
+    record=createSvgImport(artwork,{widthMm:width.valueAsNumber,depthMm:depth.valueAsNumber});
+    const size=record.dimensions;
+    status.textContent=[size.widthMm,size.heightMm,size.depthMm].map(n=>n.toFixed(2)).join(' × ')+' mm. '+artwork.warnings.join(' ');
+    commit.disabled=false;
+   }catch(error){status.textContent=error.message;}
+  };
+  fileInput.onchange=async()=>{
+   const request=++version,file=fileInput.files[0];
+   artwork=null;record=null;commit.disabled=true;preview.replaceChildren();status.textContent='';
+   if(!file)return;
+   try{
+    if(file.size>MAX_SVG_BYTES)throw Error('SVG is larger than 256 KiB. Simplify the artwork and try again.');
+    status.textContent='Reading local artwork…';
+    const parsed=await parseSvgArtwork(await file.text(),{name:file.name});
+    if(request!==version||!dialog.open)return;
+    artwork=parsed;
+    const d=artwork.source.dimensions;
+    if(Number.isFinite(d?.widthMm)&&d.widthMm>=.5&&d.widthMm<=500)width.value=d.widthMm;
+    const {minX,minY,width:w,height:h}=artwork.bounds;
+    const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg'),path=document.createElementNS(ns,'path');
+    svg.setAttribute('viewBox',[minX,minY,w,h].join(' '));svg.setAttribute('width','240');svg.setAttribute('height','160');
+    svg.setAttribute('role','img');svg.setAttribute('aria-label','Filled artwork preview');
+    path.setAttribute('fill','currentColor');path.setAttribute('fill-rule','evenodd');
+    path.setAttribute('d',artwork.loops.map(loop=>'M '+loop.points.map(point=>point.join(' ')).join(' L ')+' Z').join(' '));
+    svg.append(path);preview.append(svg);inspect();
+   }catch(error){if(request===version&&dialog.open)status.textContent=error.message;}
+  };
+  width.oninput=depth.oninput=inspect;
+  commit.onclick=()=>{
+   if(!record)return;
+   const name=record.source.name.replace(/\.svg$/i,'')||'Imported artwork';
+   try{add('svg-artwork',{artwork:record},name);dialog.close();}catch(error){status.textContent=error.message;}
+  };
+  dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();
+  dialog.addEventListener('close',()=>{version++;dialog.remove();},{once:true});
+  document.body.append(dialog);dialog.showModal();
+ }
+ function openMeshImport(){
+  const dialog=document.createElement('dialog');dialog.setAttribute('aria-label','Import 3D model');
+  dialog.innerHTML='<h2>Import STL or OBJ</h2><label>Local mesh file <input type="file" accept=".stl,.obj"></label><label>Source units <select name="unit"><option value="">Choose units</option><option>mm</option><option>cm</option><option>in</option></select></label><label>Source up-axis <select name="up"><option>Z</option><option>Y</option></select></label><label>Scale <input name="scale" type="number" min=".001" max="100" step="any" value="1"></label><label>Bed rotation (degrees) <input name="rotation" type="number" min="-180" max="180" step="1" value="0"></label><label>Bed X (mm) <input name="x" type="number" min="-250" max="250" step="any" value="0"></label><label>Bed Y (mm) <input name="z" type="number" min="-250" max="250" step="any" value="0"></label><figure></figure><p role="status" aria-live="polite"></p><div class="sms-actions"><button type="button" data-create disabled>Add model</button><button type="button" data-cancel>Cancel</button></div>';
+  const input=dialog.querySelector('[type=file]'),status=dialog.querySelector('[role=status]');
+  const figure=dialog.querySelector('figure'),commit=dialog.querySelector('[data-create]');
+  let source=null,parameters=null,sequence=0;
+  const inspect=()=>{
+   figure.replaceChildren();parameters=null;commit.disabled=true;
+   if(!source)return;
+   try{
+    for(const field of dialog.querySelectorAll('input[type=number]'))if(!field.checkValidity()||!Number.isFinite(field.valueAsNumber))throw Error('Check scale, rotation and bed position.');
+    const next=Object.fromEntries([...dialog.querySelectorAll('[name]')].map(field=>[field.name,field.type==='number'?field.valueAsNumber:field.value]));
+    if(!next.unit)throw Error('Confirm the units used by this mesh.');
+    const recipe=importedMeshRecipe(source,{...next,previewOnly:true});
+    const {width,height,depth}=recipe.bounds;
+    status.textContent=[width,depth,height].map(n=>n.toFixed(2)).join(' × ')+' mm. '+(recipe.meshIssue?'Preview only: '+recipe.meshIssue:'Closed mesh. Prepare a print job for final Manifold validation.');
+    const {points,triangles}=recipe.positive[0].mesh;
+    const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg'),path=document.createElementNS(ns,'path');
+    const span=Math.max(20,width+2*Math.abs(next.x),depth+2*Math.abs(next.z))*1.05;
+    svg.setAttribute('viewBox',[-span/2,-span/2,span,span].join(' '));svg.setAttribute('width','220');svg.setAttribute('height','160');
+    svg.setAttribute('role','img');svg.setAttribute('aria-label','Top view of mesh on the print bed');
+    const faces=[],stride=Math.max(1,Math.ceil(triangles.length/900))*3;
+    for(let i=0;i<triangles.length;i+=stride){
+     const corners=triangles.slice(i,i+3).map(id=>[points[id*3],points[id*3+2]].join(' '));
+     faces.push('M '+corners.join(' L ')+' Z');
+    }
+    path.setAttribute('d',faces.join(' '));path.setAttribute('fill','none');path.setAttribute('stroke','currentColor');path.setAttribute('stroke-width',span/500);
+    svg.append(path);figure.append(svg);
+    parameters={...next,source};commit.disabled=false;commit.textContent=recipe.meshIssue?'Add preview-only model':'Add model';
+   }catch(error){status.textContent=error.message;}
+  };
+  input.onchange=async()=>{
+   const request=++sequence,file=input.files[0];source=null;inspect();status.textContent='';
+   if(!file)return;
+   try{
+    if(file.size>MAX_MESH_BYTES)throw Error('Choose an STL or OBJ smaller than 4 MiB.');
+    const data=await file.arrayBuffer();if(request!==sequence||!dialog.open)return;
+    source=readMeshFile(file.name,data);
+    dialog.querySelector('[name=up]').value=source.format==='obj'?'Y':'Z';inspect();
+   }catch(error){if(request===sequence&&dialog.open)status.textContent=error.message;}
+  };
+  for(const field of dialog.querySelectorAll('[name]'))field.oninput=inspect;
+  commit.onclick=()=>{
+   if(!parameters)return;
+   try{add('imported-mesh',parameters,source.name.replace(/\.(stl|obj)$/i,'')||'Imported model');dialog.close();}
+   catch(error){status.textContent=error.message;}
+  };
+  dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();
+  dialog.addEventListener('close',()=>{sequence++;dialog.remove();},{once:true});
+  document.body.append(dialog);dialog.showModal();
  }
  const snapshot=adapter.capture();
  if(!project.models.length)addModel(project,createModel({name:snapshot.settings.title||'Crystal Mine',typeId:'crystals',parameters:snapshot.settings,editableState:{crystals:snapshot.crystals,selectedId:snapshot.selectedId}}));
@@ -433,7 +537,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(remaining.size)output.push(details('Fine adjustments','Adjust the seed or other generator settings.',[...remaining].map(field=>control(field,model.parameters)).join('')));
   return (family?control(family,model.parameters):'')+output.join('');
  }
- const hiddenNativeRoutes=new Set();
+ const nativeGuideChoices=new Map();
  const selectedPixels=new Map(),pixelMessages=new Map(),pixelProfileChoices=new Map();
  // Newly saved measured profiles are shared across all families, but never
  // silently alter dimensions on existing fittings.
@@ -453,7 +557,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  function refreshPixelMarkers(model){
   if(model.generator.typeId==='crystals')return;
   for(const guide of cache.get(model.id)?.group?.children||[])if(guide.userData.nativeRoute)
-   guide.visible=stage==='build'&&!hiddenNativeRoutes.has(model.id);
+   guide.visible=stage==='build'&&(nativeGuideChoices.get(model.id)??!!model.build.serialRouting?.enabled);
   for(const marker of pixelMarkers(model)){
    marker.visible=stage==='build';
    marker.material.color.setHex(marker.userData.pixelId===selectedPixels.get(model.id)?0x48e4f1:0xffbe47);
@@ -535,6 +639,44 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   }).filter(hit=>hit.distance<=14).sort((a,b)=>a.distance-b.distance)[0]?.marker;
  }
  const viewport=renderer.domElement;
+ function fittingSurface(model,event){
+  pixelRay(event);
+  const meshes=cache.get(model.id)?.group?.children.filter(mesh=>mesh.visible&&mesh.isMesh&&!mesh.userData.previewOnly)||[];
+  return partRay.intersectObjects(meshes,false)[0]?.point;
+ }
+ function placeFittingAt(model,point,duplicate=null){
+  const holes=pixelHoles(model);
+  if(holes.length>=16){pixelStatus(model,'Use up to 16 fittings per model.');return false;}
+  const fresh=newPixel(chosenProfile(model),Math.round(point.x*10)/10,Math.round(point.z*10)/10);
+  const hole=duplicate?{...duplicate,id:fresh.id,x:fresh.x,z:fresh.z}:fresh;
+  const issue=pixelIssue(model,hole,holes);
+  if(issue){pixelStatus(model,pixelPlacementAdvice(model,issue));return false;}
+  return savePixels(model,[...holes,{...hole,checked:true}],hole.id);
+ }
+ const fittingActions=document.createElement('dialog');
+ fittingActions.setAttribute('aria-label','Hardware at this point');
+ fittingActions.innerHTML='<p data-fitting-message></p><button type="button" data-add-point-pixel>Add pixel</button> <button type="button" data-cancel-point>Cancel</button>';
+ document.body.append(fittingActions);
+ fittingActions.querySelector('[data-cancel-point]').onclick=()=>fittingActions.close();
+ viewport.addEventListener('dblclick',event=>{
+   const model=active();
+   if(event.button!==0||!canEditPixels(model)||model.link||placementModel===model.id||!panel.querySelector('#smsPixelAdd'))return;
+   const marker=markerAt(model,event);
+   if(marker){consume(event);selectPixel(model,marker.userData.pixelId);return;}
+   const point=fittingSurface(model,event);
+   if(!point)return;
+   consume(event);
+   const add=fittingActions.querySelector('[data-add-point-pixel]');
+   const holes=pixelHoles(model), candidate=newPixel(chosenProfile(model),Math.round(point.x*10)/10,Math.round(point.z*10)/10);
+   const issue=holes.length>=16?'Use up to 16 fittings per model.':pixelIssue(model,candidate,holes);
+   fittingActions.querySelector('[data-fitting-message]').textContent=issue?pixelPlacementAdvice(model,issue):'Place the selected pixel profile here.';
+   add.disabled=!!issue;
+   add.onclick=()=>{
+    fittingActions.close();
+    if(active()?.id===model.id&&canEditPixels(model))placeFittingAt(model,point);
+   };
+   fittingActions.showModal();
+  },true);
  const consume=event=>{event.preventDefault();event.stopImmediatePropagation();};
  const canEditPixels=model=>mode==='model'&&stage==='build'&&model&&model.generator.typeId!=='crystals';
  viewport.addEventListener('pointerdown',event=>{
@@ -596,18 +738,9 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    editPixel(model,index,gesture.candidate);return;
   }
   if(!gesture.placing||gesture.marker)return;
-  pixelRay(event);
-  const group=cache.get(model.id)?.group;
-  const hit=partRay.intersectObjects(group?.children.filter(mesh=>mesh.isMesh&&!mesh.userData.previewOnly)||[],false)[0];
-  if(!hit){pixelStatus(model,pixelPlacementAdvice(model,'Click a solid model surface to place this fitting.'));return;}
-  const holes=pixelHoles(model);
-  if(holes.length>=16){pixelStatus(model,'Use up to 16 fittings per model.');return;}
-  const fresh=newPixel(chosenProfile(model),Math.round(hit.point.x*10)/10,Math.round(hit.point.z*10)/10);
-  const hole=pendingDuplicate?{...pendingDuplicate,id:fresh.id,x:fresh.x,z:fresh.z}:fresh;
-  const issue=pixelIssue(model,hole,holes);
-  if(issue){pixelStatus(model,pixelPlacementAdvice(model,issue));return;}
-  placementModel=null;pendingDuplicate=null;
-  savePixels(model,[...holes,{...hole,checked:true}],hole.id);
+  const point=fittingSurface(model,event);
+  if(!point){pixelStatus(model,pixelPlacementAdvice(model,'Click a solid model surface to place this fitting.'));return;}
+  if(placeFittingAt(model,point,pendingDuplicate)){placementModel=null;pendingDuplicate=null;}
  },true);
  viewport.addEventListener('keydown',event=>{
   const model=active();
@@ -729,17 +862,19 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   };
   const note=document.createElement('p');
   note.setAttribute('role','status');
-  note.textContent=plan.reason?(!settings.enabled?'Bore-only — '+plan.reason:plan.reason):settings.enabled?'Channels ready for preparation.':'Opt in to cut 3.2 mm wide, 1.8 mm deep underside channels.';
+  note.textContent=plan.reason?(!settings.enabled?'Bore-only — '+plan.reason:plan.reason):settings.enabled?'Channels ready for preparation.':'Guide only until Cut serial channels is enabled.';
   block.append(note);
   block.insertAdjacentHTML('beforeend','<label><input type="checkbox" data-native-route'+(settings.enabled?' checked':'')+
    (model.link||(!settings.enabled&&plan.reason)?' disabled':'')+'> Cut serial channels</label>');
   block.querySelector('[data-native-route]').onchange=e=>change({enabled:e.target.checked});
-  if(!settings.enabled)return;
+  const guide=document.createElement('label'),show=document.createElement('input');
+  show.type='checkbox';show.dataset.nativePreview='';show.checked=nativeGuideChoices.get(model.id)??settings.enabled;
+  show.onchange=()=>{nativeGuideChoices.set(model.id,show.checked);refreshPixelMarkers(model);};
+  guide.append(show,' Show routes and arrows');block.append(guide);
   block.insertAdjacentHTML('beforeend','<label>Physical pixel pitch<select data-native-pitch'+disabled+
    '><option value="25">25 mm</option><option value="50">50 mm</option><option value="100">100 mm</option><option value="custom">Custom</option></select></label>'+
    '<label>IN tail limit (mm)<input data-native-in-tail type="number" min="5" max="250" value="'+esc(settings.inTail)+'"'+disabled+'></label>'+
-   '<label>OUT tail limit (mm)<input data-native-out-tail type="number" min="5" max="250" value="'+esc(settings.outTail)+'"'+disabled+'></label>'+
-   '<label><input data-native-preview type="checkbox"'+(hiddenNativeRoutes.has(model.id)?'':' checked')+'> Show routes and arrows</label>');
+   '<label>OUT tail limit (mm)<input data-native-out-tail type="number" min="5" max="250" value="'+esc(settings.outTail)+'"'+disabled+'></label>');
   const pitch=block.querySelector('[data-native-pitch]');
   pitch.value=settings.customPitch||![25,50,100].includes(settings.pitch)?'custom':settings.pitch;
   pitch.onchange=()=>change(pitch.value==='custom'?{customPitch:true}:{pitch:Number(pitch.value),customPitch:false});
@@ -753,10 +888,6 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    pitch.parentElement.insertAdjacentHTML('afterend','<label>Custom pitch (mm)<input data-native-custom type="number" min="5" max="250" value="'+esc(settings.pitch)+'"'+disabled+'></label>');
    bindNumber(block.querySelector('[data-native-custom]'),'pitch');
   }
-  block.querySelector('[data-native-preview]').onchange=e=>{
-   if(e.target.checked)hiddenNativeRoutes.delete(model.id);else hiddenNativeRoutes.add(model.id);
-   refreshPixelMarkers(model);
-  };
   for(const link of plan.links){
    const line=document.createElement('p');
    line.textContent=link.label+(Number.isFinite(link.measure)?' · '+link.measure.toFixed(1)+' / '+link.budget+' mm':'')+(link.reason?' · '+link.reason:'');

@@ -209,6 +209,14 @@ for(const recipe of [tileRoute,gearRoute]){
 }
 const curveBuild={pixelHoles:[checked('left',-15),checked('right',15,2)],pixelBuilderVersion:1,serialRouting:serial};
 const curvePlan=applyBuildModules(tileRoute,curveBuild).nativeRouting;
+const guideBuild={...curveBuild,serialRouting:{...serial,enabled:false}};
+const guideRecipe=applyBuildModules(tileRoute,guideBuild,{},{preview:true});
+const boreOnly=applyBuildModules(tileRoute,guideBuild);
+assert.equal(guideRecipe.nativeRouting.enabled,false);
+assert.deepEqual(guideRecipe.nativeRouting.links,curvePlan.links);
+assert.deepEqual(guideRecipe.nativeRouting.cutters,[]);
+assert.deepEqual(guideRecipe.negative,boreOnly.negative);
+assert.equal(boreOnly.nativeRouting.links.length,0);
 assert(curvePlan.links[1].path.length>2);
 const shortTail=applyBuildModules(tileRoute,{...curveBuild,serialRouting:{...serial,inTail:5,outTail:100}}, {},{preview:true}).nativeRouting;
 assert.match(shortTail.links[0].reason,/Cable budget/);assert.equal(shortTail.links.at(-1).reason,'');
@@ -217,7 +225,7 @@ assert.throws(()=>applyBuildModules(tileRoute,{...curveBuild,serialRouting:{...s
 assert.throws(()=>applyBuildModules(tileRoute,{...curveBuild,pixelHoles:[...curveBuild.pixelHoles].reverse()}),/tangent-compatible/);
 assert.throws(()=>applyBuildModules(tileGenerator.recipe({thickness:2}),curveBuild),/3.8 mm/);
 assert.throws(()=>applyBuildModules(gearGenerator.recipe(turbine),{serialRouting:serial}),/solid decorative/);
-assert.throws(()=>applyBuildModules(pebbleGenerator.recipe(river.parameters),{serialRouting:serial}),/Only solid/);
+assert.throws(()=>applyBuildModules(pebbleGenerator.recipe(river.parameters),{serialRouting:serial}),/fitting backing/);
 assert.throws(()=>applyBuildModules(gearRoute,{...curveBuild,mounting:true}),/mounting cuts/);
 const curved=prepareRecipe(THREE,wasm,applyBuildModules(tileRoute,curveBuild));
 assert.equal(curved.report.nativeRouting.channels.length,3);
@@ -259,3 +267,30 @@ for(const [family,parameters,options] of fittingCases){
 }
 assert.match(pixelBoreIssue(pebbleGenerator.recipe({illuminated:false}),newPixel({id:'seed',bodyDiameter:5})),/cavity|unavailable|solid/);
 console.log('WT-017 native family actual bores and export passed; Crystal checked by original hardware fixtures.');
+
+const extendedRouting=[
+ [waveGenerator,{flowStyle:'Parallel',dualMaterial:false},false],
+ [capGenerator,{controlStyle:'Pushbutton',shaft:0,dualMaterial:false},true],
+ [characterGenerator,{character:'Cloud',construction:'Classic',dualMaterial:false},true],
+ [pebbleGenerator,{illuminated:false,dualMaterial:false},true]
+];
+for(const [family,parameters,pixelBacking] of extendedRouting){
+ const source=family.recipe(parameters),build={pixelBacking,pixelBuilderVersion:1,pixelHoles:[]};
+ const backing=applyBuildModules(source,build,family.capabilities);
+ const hole=findPixelPosition(backing,[],{id:'seed',bodyDiameter:5});
+ assert(hole,family.typeId+' has a verified fitting position');
+ build.pixelHoles=[{...hole,rotation:0,checked:true}];
+ const before=prepareRecipe(THREE,wasm,applyBuildModules(source,build,family.capabilities));
+ const recipe=applyBuildModules(source,{...build,serialRouting:serial},family.capabilities);
+ const after=prepareRecipe(THREE,wasm,recipe);
+ assert.equal(after.report.nativeRouting.channels.length,2);
+ assert(before.bodies[0].volume-after.bodies[0].volume>10);
+ const files=exportMaterialBodies(after);
+ assert(files.stls.length&&files.threeMF.length>100);
+}
+assert.throws(()=>applyBuildModules(pebbleGenerator.recipe({illuminated:true,dualMaterial:false}),{
+ pixelBacking:true,serialRouting:serial
+},pebbleGenerator.capabilities),/Existing cavities/);
+assert.throws(()=>applyBuildModules(capGenerator.recipe({shaft:8,dualMaterial:false}),{
+ pixelBacking:true,serialRouting:serial
+},capGenerator.capabilities),/Existing cavities/);
