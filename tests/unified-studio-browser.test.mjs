@@ -925,6 +925,23 @@ try{
  await page.locator('#resetPixelSocketClearance').click();
  assert.equal(Number(await page.locator('#pixelSocketClearance').inputValue()),.15);
  await page.keyboard.press('Escape');
+ const libraryFile=await useDownload(wavePalette.getByRole('button',{name:'Export pixel profiles'}));
+ const library=JSON.parse(libraryFile.bytes.toString('utf8'));
+ const calibrated=library.pixelProfiles.find(profile=>profile.name==='Reusable 4.5 mm seed');
+ assert(calibrated,'The transferred library includes the current measured profile');
+ const libraryInput=wavePalette.getByLabel('Import pixel profiles');
+ const existingId=(await getHoles())[0].profileId;
+ await libraryInput.setInputFiles({name:'pixel-profile-library.json',mimeType:'application/json',buffer:libraryFile.bytes});
+ await page.getByRole('option',{name:'Reusable 4.5 mm seed',exact:true}).first().waitFor({state:'attached'});
+ const collision={...library,pixelProfiles:[{...calibrated,wireWidth:calibrated.wireWidth+.2}]};
+ await libraryInput.setInputFiles({name:'pixel-profile-library.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(collision))});
+ const selector=wavePalette.locator('[data-active-pixel-profile]');
+ const imported=selector.locator('option').filter({hasText:'(imported copy)'});
+ await imported.waitFor({state:'attached'});
+ const importedId=await imported.getAttribute('value');
+ assert.notEqual(importedId,existingId,'A conflicting profile is imported with an independent ID');
+ assert.equal((await getHoles())[0].profileId,existingId,'Import leaves the installed fitting linked to its original profile');
+ assert.equal((await getHoles())[0].clearance,.35);
  await shot('wt017-pixel-profile-build');
  await checkNativeDoubleClick('waves',wavePalette,(await getHoles())[0]);
  const nativeFamilies=[
