@@ -1,5 +1,6 @@
 import {makePixelReplicaRecipe} from './pixel-replica.js';
 import {prepareRecipe} from './studio-geometry.js';
+import {makeRoutedSocketSpecimen} from './studio-catalogue.js';
 import {exportMaterialBodies} from './studio-material-export.js';
 import {lightPassageExportBlock} from './light-passage-inspection.js';
 import * as THREE from 'three';
@@ -1145,6 +1146,23 @@ for(const format of ['stl','3mf']){
     status.textContent='Downloaded underside socket bore '+coupon.diameters.map(n=>n.toFixed(2)).join(', ')+' mm.';
    }finally{coupon.geometry.dispose();}
   }catch(error){status.textContent=error.message;}
+  finally{button.disabled=false;}
+ };
+}
+for(const format of ['stl','3mf']){
+ const button=$('routeSpecimen'+format.toUpperCase());
+ button.onclick=async()=>{
+  button.disabled=true;
+  try{
+   const values=Object.fromEntries(Object.entries(pixelFields).map(([key,id])=>
+    [key,key==='name'||key==='kind'?$(id).value:$(id).valueAsNumber]));
+   const profile=normalisePixelProfile(values),clearance=socketFitFromEditor();
+   const recipe=makeRoutedSocketSpecimen(profile,{clearance,retentionLip:s.pixelRetentionLip});
+   const files=exportMaterialBodies(prepareRecipe(THREE,await loadManifold(),recipe),{name:'two-pixel-route-test'});
+   download(new Blob([format==='stl'?files.stls[0].bytes:files.threeMF],
+    {type:format==='stl'?'model/stl':'model/3mf'}),'two-pixel-route-test.'+format);
+   $('pixelSocketStatus').textContent='Downloaded two underside sockets and three carved channels, including open IN and OUT.';
+  }catch(error){$('pixelSocketStatus').textContent=error.message;}
   finally{button.disabled=false;}
  };
 }

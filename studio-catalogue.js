@@ -565,7 +565,7 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
  }
  const routing=planNativePixelString(r,build,{guide:preview&&!!build.pixelHoles?.length});
  if(routing.enabled&&!routing.ready&&!preview)throw Error(routing.reason);
- addPixelHoleCuts(r,build.pixelHoles);
+ addPixelHoleCuts(r,build.pixelHoles,{routed:routing.enabled&&routing.ready});
  if(routing.enabled&&routing.ready){
   r.negative.push(...routing.cutters);
   r.warnings.push('Serial grooves are underside-open. Check cable seating and roof layers in Cura and on a physical print.');
@@ -573,6 +573,18 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
  addBackingTabs(r,build,routing);
  r.nativeRouting=routing;
  return r;
+}
+
+export function makeRoutedSocketSpecimen(profile,{clearance=.15,retentionLip=0}={}){
+ const width=Math.max(70,4*profile.flangeDiameter+20),depth=Math.max(40,profile.flangeDiameter+12);
+ const height=profile.bodyHeight+4,spacing=Math.max(30,profile.flangeDiameter+5);
+ const recipe={bounds:{width,depth,height},positive:[box([width,height,depth])],negative:[],
+  serialSupport:{outline:[[-width/2,-depth/2],[width/2,-depth/2],[width/2,depth/2],[-width/2,depth/2]],thickness:height}};
+ const pixelHoles=[-spacing/2,spacing/2].map((x,index)=>({id:'specimen-p'+(index+1),x,z:0,
+  profileId:profile.id,diameter:profile.bodyDiameter,clearance,rotation:0,entryFace:'underside',checked:true,
+  socketProfile:{...profile,retentionLip}}));
+ return applyBuildModules(recipe,{pixelBuilderVersion:1,pixelHoles,
+  serialRouting:{version:1,enabled:true,pitch:Math.max(50,spacing),inTail:250,outTail:250}});
 }
 
 gearGenerator.visualFields=['wheelStyle','webStyle','reliefStyle','diameter','teeth','spokes','rimWidth','webWidth','reliefHeight'];

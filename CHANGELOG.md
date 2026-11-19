@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.35.5 — Shaped underside sockets and routed print specimen
+
+- Prepare measured underside sockets on suitable stock and export a two-socket test piece with recessed IN, connecting and OUT channels.
+
 ## v0.16.0-dev.35.4 — Face-aware fitting movement and profile clearance
 
 - Keep native fitting drags on their installation face and isolate saved Crystal socket allowances by profile.
