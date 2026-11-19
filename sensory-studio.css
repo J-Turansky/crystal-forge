@@ -47,7 +47,7 @@ body.sms-workspace .sms-panel-details{background:var(--panel);border-left:3px so
 /* Unified workspace keeps the live editor and camera mounted. */
 body.sms-unified{display:flex;flex-direction:column;height:100dvh;min-height:0;overflow:hidden}
 body.sms-unified .layout{display:grid;flex:1;min-height:0;height:auto;position:relative;
- grid-template-columns:var(--sms-tools-width) 8px minmax(0,1fr) 8px var(--sms-settings-width);
+ grid-template-columns:var(--sms-tools-width) 8px minmax(0,1fr) 8px var(--sms-settings-width)!important;
  grid-template-rows:minmax(0,1fr) 58px}
 .sms-unified .layout>.workspace-resizer{display:none!important}
 .sms-unified .topbar{min-height:44px;flex:0 0 auto;flex-wrap:wrap;gap:4px 10px;padding:4px 10px;z-index:32}
@@ -95,7 +95,7 @@ body.sms-unified .layout{display:grid;flex:1;min-height:0;height:auto;position:r
 .sms-rail #smsNew{white-space:nowrap;padding:4px 7px}
 @media(max-width:900px){
  body.sms-unified{height:auto;min-height:100dvh;overflow:auto;padding-bottom:58px}
- body.sms-unified .layout{width:100%;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(400px,62dvh) auto auto}
+ body.sms-unified .layout{width:100%;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:minmax(400px,62dvh) auto auto}
  .sms-centre{grid-column:1;grid-row:1}.sms-tools{grid-column:1;grid-row:2}.sms-settings{grid-column:1;grid-row:3}
  .sms-edge{display:none}
  .sms-side-body{max-height:48dvh}
