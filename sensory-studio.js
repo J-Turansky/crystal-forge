@@ -1180,7 +1180,8 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const channels=document.querySelector('[data-state="wireChannels"]');
   const arrows=document.querySelector('[data-state="wireDirectionArrows"]');
   const width=document.querySelector('[data-state="wireWidth"]');
-  if(!length||!channels||!arrows||!width)return;
+  const vaulted=document.querySelector('[data-state="wireVaulted"]');
+  if(!length||!channels||!arrows||!width||!vaulted)return;
   const field=document.createElement('fieldset');
   field.innerHTML='<legend>Wire routing and cable lengths</legend>'+
    '<label>Available pixel-to-pixel cable length<select data-build-wire-pitch>'+
@@ -1188,6 +1189,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    '<label data-build-wire-custom-row>Custom length (mm)<input data-build-wire-custom type="number" min="5" max="1000" step="1"></label>'+
    '<label>Wire-track width (mm)<input data-build-wire-width type="number" min="1.5" max="9" step=".25" required></label>'+
    '<label><input data-build-wire-channels type="checkbox"> Cut underside wiring channels</label>'+
+   '<label><input data-build-wire-vaulted type="checkbox"> Vault wire-track roofs</label>'+
    '<label><input data-build-wire-arrows type="checkbox"> Show direction arrows</label>'+
    '<div class="sms-actions"><button type="button" data-build-wire-snap>Snap pixels to cable length</button>'+
    '<button type="button" data-build-wire-reverse>Reverse pixel order</button></div>'+
@@ -1216,7 +1218,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    if(!custom.checkValidity()){custom.reportValidity();custom.value=length.value;return;}
    length.value=custom.value;length.dispatchEvent(new Event('change',{bubbles:true}));
   };
-  for(const [selector,origin] of [['[data-build-wire-channels]',channels],['[data-build-wire-arrows]',arrows]]){
+  for(const [selector,origin] of [['[data-build-wire-channels]',channels],['[data-build-wire-vaulted]',vaulted],['[data-build-wire-arrows]',arrows]]){
    const control=field.querySelector(selector);control.checked=origin.checked;
    control.onchange=()=>{origin.click();control.checked=origin.checked;};
   }

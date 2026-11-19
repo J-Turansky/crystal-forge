@@ -310,6 +310,10 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
  const roof=estimateRoofReview(plan.polygon,cfg,{});
  assert(roof.needsCura&&Number.isFinite(roof.estimateMm),'Roof span review remains advisory');
  const prepared=validate('wired-groove',cfg);
+ const flatSix=validate('flat six millimetre groove',{...cfg,wireWidth:6});
+ const vaultedSix=validate('vaulted six millimetre groove',{...cfg,wireWidth:6,wireVaulted:true});
+ assert.equal(vaultedSix.wireChannelsCut,flatSix.wireChannelsCut);
+ assert(vaultedSix.volumeMm3<flatSix.volumeMm3-1,'Vault cut adds volume above the full usable wire space');
  assert(prepared.socketCeilings.every(socket=>socket.wireReliefDepth===0),
   'PR13: two legacy-routed pixels must have no detached local relief cuts');
  assert.equal(prepared.wireChannelsCut,plan.wirePlan.routes.length,'Manufacturing uses the exact planned groove count');

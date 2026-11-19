@@ -59,7 +59,7 @@ export function planWireRoutes(crystals,s,hardware){
    if(edge&&i>=steps-2)continue;
    const t=i/steps,p={x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t};
    if(!inside(p,poly))return false;
-   if(baseSurfaceHeight(crystals,s,p.x,p.z)<depth+1.6)return false;
+   if(baseSurfaceHeight(crystals,s,p.x,p.z)<depth+1.6+(s.wireVaulted?width/2:0))return false;
   }
   return true;
  };

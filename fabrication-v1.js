@@ -547,9 +547,20 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
     const dx=route.b.x-route.a.x,dz=route.b.z-route.a.z;
     const length=Math.hypot(dx,dz)+.5,angle=-Math.atan2(dz,dx)*180/Math.PI;
     const mx=(route.a.x+route.b.x)/2,mz=(route.a.z+route.b.z)/2;
-    return hold(wasm.Manifold.cube([length,route.depth+.6,route.width])
-     .translate([-length/2,-.5,-route.width/2])
-     .rotate([0,angle,0]).translate([mx,0,mz]));
+    const halfWidth=route.width/2;
+    let groove;
+    if(s.wireVaulted){
+     const section=new wasm.CrossSection([[[-halfWidth,-.5],[halfWidth,-.5],
+      [halfWidth,route.depth],[0,route.depth+halfWidth],[-halfWidth,route.depth]]],'EvenOdd');
+     try{
+      const prism=hold(section.extrude(length));
+      groove=hold(hold(prism.rotate([0,90,0])).translate([-length/2,0,0]));
+     }finally{section.delete();}
+    }else{
+     const block=hold(wasm.Manifold.cube([length,route.depth+.6,route.width]));
+     groove=hold(block.translate([-length/2,-.5,-halfWidth]));
+    }
+    return hold(hold(groove.rotate([0,angle,0])).translate([mx,0,mz]));
    });
    const cut=hold(combined.subtract(hold(wasm.Manifold.union(grooves))));
    assertSolid(cut,'Underside wiring grooves');combined=cut;
