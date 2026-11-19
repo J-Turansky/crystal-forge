@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.35.12 — Integrate Crystal tips and vaulted wire tracks
+
+- Choose global Crystal tip shapes and optionally vault native underside wire tracks while preserving their usable dimensions.
+
 ## v0.16.0-dev.35.10 — Validate direct shaped socket placement
 
 - Place a shaped socket on eligible native model surfaces and verify its opening and stock before saving.
