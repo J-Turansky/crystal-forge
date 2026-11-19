@@ -2,8 +2,8 @@ import {pixelBoreIssue} from '../studio-pixel-bore-validation.js';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import Module from 'manifold-3d';
-import {waveGenerator,tileGenerator,gearGenerator,capGenerator,pebbleGenerator,generators,applyBuildModules} from '../studio-catalogue.js';
-import {findPixelPosition} from '../studio-pixel-builder.js';
+import {waveGenerator,tileGenerator,gearGenerator,capGenerator,characterGenerator,pebbleGenerator,generators,applyBuildModules} from '../studio-catalogue.js';
+import {findPixelPosition,newPixel} from '../studio-pixel-builder.js';
 import {previewRecipe,disposeGroup,prepareRecipe} from '../studio-geometry.js';
 import {exportMaterialBodies} from '../studio-material-export.js';
 const wasm=await Module();wasm.setup();
@@ -219,3 +219,32 @@ for(const [family,ids,baseline] of [[tileGenerator,['terraces','quilt'],'grass']
  assert.equal(new Set(volumes).size,3);
 }
 console.log('WT-012 catalogue and native serial channel fabrication passed.');
+
+// WT-017: certified, real cut geometry and STL/3MF exports for all six
+// non-Crystal families. Original Crystal hardware regressions run separately.
+const fittingCases=[
+ [tileGenerator,{pattern:'grass',dualMaterial:false},{}],
+ [gearGenerator,{mode:'Decorative',webStyle:'Solid',bore:0,spokes:0,extraHoles:0,dualMaterial:false},{}],
+ [waveGenerator,{flowStyle:'Parallel',dualMaterial:false},{}],
+ [capGenerator,{controlStyle:'Pushbutton',shaft:0,dualMaterial:false},{}],
+ [characterGenerator,{character:'Cloud',construction:'Classic',dualMaterial:false},{}],
+ [pebbleGenerator,{illuminated:false,dualMaterial:false},{pixelBacking:true}]
+];
+for(const [family,parameters,options] of fittingCases){
+ const source=family.recipe(parameters);
+ const base=applyBuildModules(source,{...options,pixelBuilderVersion:1,pixelHoles:[]},family.capabilities);
+ const profile={id:'custom-wt017',bodyDiameter:4.5},pixel=findPixelPosition(base,[],profile);
+ assert(pixel,family.typeId+' should offer a certifiably printable placement (explicit backing on Pod).');
+ const hole={...pixel,checked:true};
+ assert.equal(pixelBoreIssue(base,hole),null,family.typeId+' needs a verified solid column');
+ const made=applyBuildModules(source,{...options,pixelBuilderVersion:1,pixelHoles:[hole]},family.capabilities);
+ assert.equal(made.negative.filter(part=>part.pixelHole).length,1);
+ const empty=prepareRecipe(THREE,wasm,base),bored=prepareRecipe(THREE,wasm,made);
+ const before=empty.bodies.reduce((n,body)=>n+body.volume,0);
+ const after=bored.bodies.reduce((n,body)=>n+body.volume,0);
+ assert(before-after>.1,family.typeId+' fitting must subtract actual material');
+ const files=exportMaterialBodies(bored,{name:'wt017-'+family.typeId});
+ assert(files.stls.length>=1&&files.threeMF.length>100,family.typeId+' needs valid exported STL and 3MF');
+}
+assert.match(pixelBoreIssue(pebbleGenerator.recipe({illuminated:false}),newPixel({id:'seed',bodyDiameter:5})),/cavity|unavailable|solid/);
+console.log('WT-017 native family actual bores and export passed; Crystal checked by original hardware fixtures.');
