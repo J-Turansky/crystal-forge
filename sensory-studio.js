@@ -663,6 +663,47 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   remove.onclick=()=>adapter.removeCrystalPixel();
   box.append(remove);root.append(box);
  }
+ function renderCrystalWirePalette(root){
+  // Small controls mirror existing authoritative Crystal wiring settings.
+  // They never maintain a second route plan or alter a stored pixel location.
+  const length=document.querySelector('[data-state="pixelStringSpacing"]');
+  const channels=document.querySelector('[data-state="wireChannels"]');
+  const arrows=document.querySelector('[data-state="wireDirectionArrows"]');
+  if(!length||!channels||!arrows)return;
+  const field=document.createElement('fieldset');
+  field.innerHTML='<legend>Wire routing and cable lengths</legend>'+
+   '<label>Available pixel-to-pixel cable length<select data-build-wire-pitch>'+
+   '<option value="25">25 mm</option><option value="50">50 mm</option><option value="100">100 mm</option><option value="custom">Custom</option></select></label>'+
+   '<label data-build-wire-custom-row>Custom length (mm)<input data-build-wire-custom type="number" min="5" max="1000" step="1"></label>'+
+   '<label><input data-build-wire-channels type="checkbox"> Cut underside wiring channels</label>'+
+   '<label><input data-build-wire-arrows type="checkbox"> Show direction arrows</label>'+
+   '<div class="sms-actions"><button type="button" data-build-wire-snap>Snap pixels to cable length</button>'+
+   '<button type="button" data-build-wire-reverse>Reverse pixel order</button></div>'+
+   '<p>Ordered P1 → Pn; opposite 180° IN/OUT. The real curved cable length is checked and overlength routes show red. Thin or blocked paths are refused by Prepare.</p>';
+  const pitch=field.querySelector('[data-build-wire-pitch]');
+  const custom=field.querySelector('[data-build-wire-custom]');
+  const chosen=Number(length.value);
+  pitch.value=[25,50,100].includes(chosen)?String(chosen):'custom';
+  custom.value=length.value;
+  custom.parentElement.hidden=pitch.value!=='custom';
+  pitch.onchange=()=>{
+   if(pitch.value==='custom'){custom.parentElement.hidden=false;custom.focus();return;}
+   const origin=document.getElementById('wireSpacingPreset');
+   origin.value=pitch.value;origin.dispatchEvent(new Event('change',{bubbles:true}));
+   custom.value=pitch.value;custom.parentElement.hidden=true;
+  };
+  custom.onchange=()=>{
+   if(!custom.checkValidity()){custom.reportValidity();custom.value=length.value;return;}
+   length.value=custom.value;length.dispatchEvent(new Event('change',{bubbles:true}));
+  };
+  for(const [selector,origin] of [['[data-build-wire-channels]',channels],['[data-build-wire-arrows]',arrows]]){
+   const control=field.querySelector(selector);control.checked=origin.checked;
+   control.onchange=()=>{origin.click();control.checked=origin.checked;};
+  }
+  field.querySelector('[data-build-wire-snap]').onclick=()=>document.getElementById('snapPixelSpacingBtn')?.click();
+  field.querySelector('[data-build-wire-reverse]').onclick=()=>document.getElementById('reversePixelStringBtn')?.click();
+  root.append(field);
+ }
  document.addEventListener('studio-crystal-pixel-selection',()=>{
   const key=document.activeElement?.dataset.crystalPixelKey;
   renderPalette();
@@ -965,6 +1006,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     addAction('Fit base for gumdrop',$('fitPixelBaseBtn'));
     addAction('Print a pixel fit test',$('calibrationBtn'));
     renderCrystalPixelPalette(controls,model);
+    renderCrystalWirePalette(controls);
    }else{
     renderPixelPalette(controls,model);
    }
