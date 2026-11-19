@@ -1104,13 +1104,13 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   };
   renderTabs();renderLibraryCards();
  }
- function editOrganisation(change,after=()=>{}){
+ function editOrganisation(change,after=()=>{},redraw=true){
   try{
    const next=copy(state.organisation);change(next);
    const valid=readOrganisation(next);
    validateProject(project);
    localStorage.setItem(WORKSPACE_KEY,JSON.stringify({...state,organisation:valid}));
-   state.organisation=valid;after();renderLibraryCards();
+   state.organisation=valid;after();if(redraw)renderLibraryCards();
    $('smsOrganisationStatus').textContent='Saved locally.';
   }catch(error){$('smsOrganisationStatus').textContent=error.message;}
  }
@@ -1128,10 +1128,10 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  function organisationActions(actions,kind,id,revision){
   const key=kind+':'+id,item=state.organisation.items[key]||{favorite:false,collectionIds:[]};
-  const update=change=>editOrganisation(next=>{
+  const update=(change,after,redraw)=>editOrganisation(next=>{
    const entry=next.items[key]||={favorite:false,collectionIds:[]};change(entry);
    if(!entry.favorite&&!entry.collectionIds.length)delete next.items[key];
-  });
+  },after,redraw);
   const add=(name,handler)=>{
    const button=document.createElement('button');button.type='button';button.textContent=name;button.onclick=handler;actions.append(button);return button;
   };
@@ -1141,7 +1141,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   for(const collection of state.organisation.collections){
    const label=document.createElement('label'),input=document.createElement('input');
    input.type='checkbox';input.checked=item.collectionIds.includes(collection.id);
-   input.onchange=()=>update(entry=>{entry.collectionIds=input.checked?[...entry.collectionIds,collection.id]:entry.collectionIds.filter(cid=>cid!==collection.id);});
+   input.onchange=()=>update(entry=>{
+    entry.collectionIds=input.checked?[...entry.collectionIds,collection.id]:entry.collectionIds.filter(cid=>cid!==collection.id);
+   },()=>{
+    const count=state.organisation.items[key]?.collectionIds.length||0;
+    summary.textContent='Collections'+(count?' ('+count+')':'');
+   },!input.checked&&collectionFilter===collection.id);
    label.append(input,' '+collection.name);picker.append(label);
   }
   if(!state.organisation.collections.length)picker.append('Create a collection to organise this item.');
