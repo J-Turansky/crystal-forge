@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import Module from 'manifold-3d';
 import {exportMaterialBodies} from '../studio-material-export.js';
 import {generateFormation,crystalGeometry,baseGeometry,baseAccentSpecs,baseSurfaceHeight,baseProfileHeight,baseEdgeHeight,crystalRootOffset,crystalOrientation,crystalEndRatios} from '../geometry-v3.js';
-import {setThreeInstance,prepareFabrication,probeLightPassageSegment,makeCalibrationStrip,makePixelSeatCoupon,splitPreparedMesh,splitPreparedMeshGrid,makeSplitPinCoupon,makeDetachablePlate,makeSteppedPixelCoupon,encodeSTL,saveSTL,save3MF} from '../fabrication-v1.js';
+import {setThreeInstance,prepareFabrication,putSocket,probeLightPassageSegment,makeCalibrationStrip,makePixelSeatCoupon,splitPreparedMesh,splitPreparedMeshGrid,makeSplitPinCoupon,makeDetachablePlate,makeSteppedPixelCoupon,encodeSTL,saveSTL,save3MF} from '../fabrication-v1.js';
 setThreeInstance(THREE);
 import {planHardware} from '../hardware-layout.js';
 import {planBedAwareSplit} from '../bed-split.js';
@@ -16,6 +16,28 @@ import {PIXEL_PRESETS,normalisePixelProfile,resolvePixelProfile,resolveSocketPro
 import {auditLightPassages,lightPassageExportBlock,lightPassageReportEntries} from '../light-passage-inspection.js';
 
 const wasm=await Module();wasm.setup();
+{
+ const settings={pixelProfileId:'gumdrop',pixelDiameter:12,pixelFit:.15,pixelRetentionLip:.2,socketConical:true};
+ const profile=resolvePixelProfile(settings),solids=[],hold=solid=>(solids.push(solid),solid);
+ try{
+  const rounded=putSocket(wasm,hold,{x:0,z:0},6,35,-3,profile,{includeLocalWireRelief:false});
+  const conical=putSocket(wasm,hold,{x:0,z:0},6,35,-3,profile,{conical:true,includeLocalWireRelief:false});
+  assert.equal(conical.usableBodyDepth,profile.bodyHeight);
+  assert.equal(conical.retentionLip,rounded.retentionLip);
+  assert.equal(conical.capRise,profile.boreDiameter/2);
+  assert(hold(rounded.solid.subtract(conical.solid)).volume()<.001,'Conical cavity preserves the rounded fit envelope');
+  assert.throws(()=>putSocket(wasm,hold,{x:0,z:0},6,25,-3,profile,{conical:true}),/needs .*stock/);
+  const coupon=makePixelSeatCoupon(wasm,settings,{single:true,openWireExits:false});
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(coupon.geometry,material);
+  const center=Math.max(32,profile.maxDiameter+20)/2,depth=Math.max(32,profile.maxDiameter+22)/2;
+  const ray=new THREE.Raycaster(new THREE.Vector3(center,1,depth),new THREE.Vector3(0,1,0));
+  assert(Math.abs(ray.intersectObject(mesh)[0].point.y-conical.tipY)<.001,'Coupon has the same conical roof apex');
+  coupon.geometry.dispose();material.dispose();
+ }finally{for(const solid of solids)solid.delete();}
+ console.log('WT-021 conical gumdrop: rounded cavity contained, thin stock rejected, coupon apex matched');
+}
+
 
 {
  const block=wasm.Manifold.cube([10,10,10]);

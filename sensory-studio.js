@@ -62,7 +62,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  const overlay=document.createElement('div');overlay.className='sms-overlay';overlay.hidden=true;overlay.id='smsOverlay';document.querySelector('.viewarea').style.position='relative';document.querySelector('.viewarea').append(overlay);
  const shell=unified?setupShell():null;
  const inspection=shell?createLightInspector({THREE,scene,camera,
-  prepare:modelId=>prepare(enqueue(modelId).id),
+  prepare:modelId=>{if(active()?.id===modelId)captureCrystal();prepare(enqueue(modelId).id);},
   cancel:modelId=>{const job=project.printJobs.find(item=>item.modelId===modelId);if(job?.status==='preparing'){cancelPreparation(project,job.id);delete job.progress;discardPrintResult(job.id);save();renderJobs();renderTabs();}}}):null;
  if(inspection){
   $('smsPrecisionContent').prepend(inspection.root);

@@ -140,7 +140,7 @@ function positionedInnerCrystal(c,s,openingY,wall){
  mesh.updateMatrixWorld(true);
  return mesh;
 }
-export function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLocalWireRelief=true}={}){
+export function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLocalWireRelief=true,conical=false}={}){
  // Legacy standalone LED seats can have local cable exit reliefs.
  // They MUST NOT be combined with any external planned wiring grooves:
  // those cuts use a different fixed axis and appear as disconnected stubs.
@@ -150,11 +150,15 @@ export function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLo
  // The measured housing enters from the real bottom face (Y=0). The
  // extra below-bed cutter length only opens the bore, not its usable depth.
  const requestedBodyDepth=Math.max(1,Number(p.bodyHeight)||22);
- const tipY=Math.max(start+1.4,Math.min(roofY-2.8,requestedBodyDepth)),available=tipY-start;
+ const bodyRadius=Math.max(.8,p.boreDiameter/2);
+ const tipY=conical?requestedBodyDepth+bodyRadius:Math.max(start+1.4,Math.min(roofY-2.8,requestedBodyDepth));
+ if(conical&&roofY<tipY+2.8)
+  throw Error('Conical pixel socket needs '+(tipY+2.8).toFixed(2)+' mm of stock. Increase base thickness or choose a rounded roof.');
+
  // Curved cap E is included within total B, not added on top.
  const capRise=Math.min(Math.max(.35,Number(p.capHeight)||.35),Math.max(.35,Math.max(0,tipY)*.65));
- const shaftEnd=tipY-capRise,depth=Math.max(.5,shaftEnd-start);
- const bodyRadius=Math.max(.8,p.boreDiameter/2),cutters=[];
+ const shaftEnd=conical?requestedBodyDepth:tipY-capRise,depth=Math.max(.5,shaftEnd-start);
+ const cutters=[];
  let relievedDepth=0;
  const cylinder=(r,y,h)=>hold(wasm.Manifold.cylinder(h,r,r,32).rotate([-90,0,0]).translate([pos.x,y,pos.z]));
  const lip=Math.min(.7,Math.max(0,Number(p.retentionLip)||0));
@@ -167,7 +171,9 @@ export function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLo
  }else cutters.push(cylinder(bodyRadius,start,depth));
  if(p.kind!=='seed'&&p.flangeHeight>.1&&p.maxDiameter>p.boreDiameter+.1)
   cutters.push(cylinder(p.maxDiameter/2,-.5,Math.min(depth,p.flangeHeight+.5)));
- cutters.push(hold(wasm.Manifold.sphere(bodyRadius,32).scale([1,capRise/bodyRadius,1]).translate([pos.x,shaftEnd,pos.z])));
+ if(conical)cutters.push(hold(wasm.Manifold.cylinder(bodyRadius,bodyRadius,0,32)
+  .rotate([-90,0,0]).translate([pos.x,shaftEnd,pos.z])));
+ else cutters.push(hold(wasm.Manifold.sphere(bodyRadius,32).scale([1,capRise/bodyRadius,1]).translate([pos.x,shaftEnd,pos.z])));
  if(includeLocalWireRelief&&p.wireWidth>.1&&p.wireDepth>.1){
   // Two shallow underside cable reliefs; not full wiring channels.
   const w=Math.max(.8,p.wireWidth+p.clearance),h=Math.max(.2,Math.min(p.wireDepth,Math.max(.2,roofY-2.8))),len=bodyRadius+4;
@@ -178,8 +184,8 @@ export function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLo
   }
  }
  return {solid:hold(wasm.Manifold.union(cutters)),roofY,tipY,shaftEnd,
-  capRise,remainingWall:roofY-tipY,profileId:p.id,retentionLip:lip,
-  requestedBodyDepth,usableBodyDepth:Math.max(0,tipY),wireReliefDepth:relievedDepth};
+  capRise:conical?bodyRadius:capRise,remainingWall:roofY-tipY,profileId:p.id,retentionLip:lip,
+  requestedBodyDepth,usableBodyDepth:Math.max(0,conical?requestedBodyDepth:tipY),wireReliefDepth:relievedDepth};
 }
 function cleanupAll(list){
  for(const m of list){try{m.delete()}catch(e){}}
@@ -470,8 +476,17 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
       // but retained spurious independent slots at every yellow LED ring.
       // Any enabled routing plan owns the groove geometry across ALL modes.
       // A standalone legacy LED may retain its local relief when routing is off.
+      conical:s.socketConical===true,
       includeLocalWireRelief:!s.wireChannels&&s.wireMode!=='string'
      });
+    if(s.socketConical){
+     const stockRadius=Math.max(pos.radius,resolveSocketProfile(s,pos).maxDiameter/2)+1;
+     const envelope=hold(wasm.Manifold.cylinder(bore.tipY+2.8,stockRadius,stockRadius,32)
+      .rotate([-90,0,0]).translate([pos.x,0,pos.z]));
+     const available=hold(combined.intersect(envelope));
+     if(envelope.volume()-available.volume()>.05)
+      throw Error('Conical pixel socket lacks continuous surrounding stock. Move the pixel or increase base thickness.');
+    }
     cutters.push(bore.solid);
     socketCeilings.push({x:pos.x,z:pos.z,roofY:bore.roofY,tipY:bore.tipY,
       straightHeight:bore.shaftEnd,capRise:bore.capRise,remainingWall:bore.remainingWall,profileId:bore.profileId,retentionLip:bore.retentionLip,requestedBodyDepth:bore.requestedBodyDepth,
@@ -708,14 +723,14 @@ export function makePixelSeatCoupon(wasm,s,{openWireExits=true,single=false,trac
  const profile=resolvePixelProfile(s),keep=[],hold=m=>{keep.push(m);return m};
  const spec=single?{fits:[profile.clearance],captions:[],diameters:[profile.boreDiameter]}:calibrationSpec(s,'stepped');
  const labels=spec.captions,pitch=Math.max(32,profile.maxDiameter+20),
-  width=Math.max(32,profile.maxDiameter+22),roof=Math.max(12,profile.bodyHeight+6);
+  width=Math.max(32,profile.maxDiameter+22),roof=Math.max(12,profile.bodyHeight+6+(s.socketConical?profile.maxDiameter/2:0));
  try{
   const bar=hold(wasm.Manifold.cube([pitch*spec.fits.length,roof,width]));
   const cutters=[],legend=[],wireExits=[];
   for(let i=0;i<spec.fits.length;i++){
    const fit=spec.fits[i],adjusted=resolvePixelProfile(s,fit);
    const centreX=(i+.5)*pitch,pos={x:centreX,z:width/2};
-   const bore=putSocket(wasm,hold,pos,adjusted.maxDiameter/2,roof,-3,adjusted);
+   const bore=putSocket(wasm,hold,pos,adjusted.maxDiameter/2,roof,-3,adjusted,{conical:s.socketConical===true});
    cutters.push(bore.solid);
    // On a FULL profile sample, wiring must reach both external side walls.
    // Extend the underside cut a full mm beyond each edge. The same
