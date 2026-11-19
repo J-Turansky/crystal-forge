@@ -721,12 +721,15 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const disabled=model.link?' disabled':'',noAdd=holes.length>=16?' disabled':disabled;
   const hole=holes[selected]||newPixel(chosenProfile(model));
   const fit=resolvePixelFitting(hole,adapter.pixelFitProfiles());
-  root.innerHTML='<p>Bores are available on verified solid regions.</p>'+
+  root.innerHTML='<h3>Pixel fittings</h3><div class="sms-actions"><button type="button" data-pixel-profile-editor>Create / edit pixel profile</button></div>'+
+   '<p>Choose a saved measured profile before placing. A profile selection with P1/P2 selected updates <strong>only that fitting</strong>; otherwise it chooses the next fitting. Nominal measurements are not proof of printed fit.</p>'+
+   '<label><input type="checkbox" data-pixel-backing'+(model.build.pixelBacking?' checked':'')+disabled+'> Add fitting backing (12 mm of additional material around each edge)</label>'+
+   '<p>Fitting bores need continuous solid material. Thin walls, cavities and narrow rims can block placement.</p>'+
    '<div class="sms-actions" aria-label="Hardware library">'+profiles.map(profile=>
     '<button type="button" data-fit-profile="'+esc(profile.id)+'" aria-pressed="'+(chosenProfile(model)?.id===profile.id)+'"'+disabled+
     '>◉ '+esc(profile.name)+' · '+profile.bodyDiameter+' mm</button>').join('')+'</div>'+
    '<div class="sms-actions"><button type="button" data-place-pixel'+noAdd+'>Place LED fitting in 3D</button>'+
-   '<button type="button" data-auto-pixel'+noAdd+'>Add pixel hole</button></div>'+
+   '<button type="button" data-auto-pixel'+noAdd+'>Add pixel</button></div>'+
    '<div class="sms-actions" aria-label="Select pixel">'+holes.map((hole,i)=>'<button type="button" data-select-pixel="'+i+'" aria-pressed="'+(i===selected)+'">P'+(i+1)+'</button>').join('')+'</div>'+
    '<p role="status" data-pixel-status>'+esc(pixelMessages.get(model.id)||'Click a marker to select. Hold then drag to move. Arrow keys nudge 1 mm, or 5 mm with Shift.')+'</p>'+
    (selected<0?'':pixelHoleMarkup(holes[selected],selected,esc,disabled,profiles)+
@@ -745,6 +748,13 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    diagram.innerHTML='<summary>Fitting dimensions</summary>'+renderPixelProfileDiagram({...fit.profile,bodyDiameter:fit.diameter});
    root.querySelector('[aria-label="Hardware library"]').after(diagram);
   }
+  root.querySelector('[data-pixel-profile-editor]').onclick=()=>document.getElementById('editPixelProfileBtn')?.click();
+  root.querySelector('[data-pixel-backing]').onchange=event=>{
+   if(!commit({build:{...model.build,pixelBacking:event.target.checked}})){
+    event.target.checked=!!model.build.pixelBacking;return;
+   }
+   renderEditor();
+  };
   root.querySelectorAll('[data-fit-profile]').forEach(button=>button.onclick=()=>{
    const profileId=button.dataset.fitProfile;
    if(selected>=0&&!editPixel(model,selected,applyPixelFittingProfile(holes[selected],profileId,adapter.pixelFitProfiles())))return;
