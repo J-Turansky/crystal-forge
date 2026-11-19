@@ -925,6 +925,23 @@ try{
  await page.locator('#resetPixelSocketClearance').click();
  assert.equal(Number(await page.locator('#pixelSocketClearance').inputValue()),.15);
  await page.keyboard.press('Escape');
+ const libraryFile=await useDownload(wavePalette.getByRole('button',{name:'Export pixel profiles'}));
+ const library=JSON.parse(libraryFile.bytes.toString('utf8'));
+ const exportedProfile=library.pixelProfiles.find(profile=>profile.name==='Reusable 4.5 mm seed');
+ assert(exportedProfile,'The transferred library includes the current measured profile');
+ const libraryInput=wavePalette.getByLabel('Import pixel profiles');
+ const existingId=(await getHoles())[0].profileId;
+ await libraryInput.setInputFiles({name:'pixel-profile-library.json',mimeType:'application/json',buffer:libraryFile.bytes});
+ await page.getByRole('option',{name:'Reusable 4.5 mm seed',exact:true}).first().waitFor({state:'attached'});
+ const collision={...library,pixelProfiles:[{...exportedProfile,wireWidth:exportedProfile.wireWidth+.2}]};
+ await libraryInput.setInputFiles({name:'pixel-profile-library.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(collision))});
+ const selector=wavePalette.locator('[data-active-pixel-profile]');
+ const importedProfileOption=selector.locator('option').filter({hasText:'(imported copy)'});
+ await importedProfileOption.waitFor({state:'attached'});
+ const importedId=await importedProfileOption.getAttribute('value');
+ assert.notEqual(importedId,existingId,'A conflicting profile is imported with an independent ID');
+ assert.equal((await getHoles())[0].profileId,existingId,'Import leaves the installed fitting linked to its original profile');
+ assert.equal((await getHoles())[0].clearance,.35);
  await shot('wt017-pixel-profile-build');
  await checkNativeDoubleClick('waves',wavePalette,(await getHoles())[0]);
  const nativeFamilies=[
@@ -940,7 +957,15 @@ try{
   const pal=page.locator('.sms-palette');
   assert(await pal.getByRole('button',{name:'Add pixel automatically',exact:true}).isVisible(),type+' has Add pixel');
   assert(await pal.getByRole('button',{name:'Create / edit pixel profile'}).isVisible());
-  await pal.getByRole('button',{name:/Reusable 4.5 mm seed/}).click();
+  const activeProfile=pal.getByLabel('Active Pixel Profile');
+  await activeProfile.selectOption({label:'Reusable 4.5 mm seed'});
+  const activeProfileId=await activeProfile.inputValue();
+  if(type==='tactile-tiles'){
+   await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+   await page.reload();await page.waitForFunction(()=>window.__sensoryStudio);
+   await page.locator('.sms-workspace-nav [data-tab=build]').click();
+   assert.equal(await activeProfile.inputValue(),activeProfileId);
+  }
   if(backing)await pal.locator('[data-pixel-backing]').check();
   await pal.getByRole('button',{name:'Add pixel automatically',exact:true}).click();
   const saved=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);

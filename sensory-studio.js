@@ -588,20 +588,56 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  const nativeGuideChoices=new Map();
  const showNativeGuide=model=>nativeGuideChoices.get(model.id)??!!cache.get(model.id)?.routing?.links.some(link=>link.path.length>1);
- const selectedPixels=new Map(),selectedMounts=new Map(),pixelMessages=new Map(),pixelProfileChoices=new Map();
+ const selectedPixels=new Map(),selectedMounts=new Map(),pixelMessages=new Map();
  // Newly saved measured profiles are shared across all families, but never
  // silently alter dimensions on existing fittings.
  document.addEventListener('studio-pixel-profile-saved',event=>{
   const model=active(),id=event.detail?.profileId;
   if(!model||!id)return;
-  pixelProfileChoices.set(model.id,id);
+  if(model.generator.typeId!=='crystals'&&!model.link)editModel(project,model.id,{build:{...model.build,activePixelProfileId:id}});
+  save();
   if(mode==='model'&&stage==='build'){renderPalette();if(model.generator.typeId!=='crystals')renderEditor();}
  });
  let placementModel=null,mountingModel=null,pixelGesture=null,pendingDuplicate=null;
  const pixelHoles=model=>stablePixels(model.build.pixelHoles||[]);
  const mountHoles=model=>stableMounts(model.build.manualMountHoles||[]);
  const fittingProfiles=()=>pixelProfiles(adapter.pixelFitProfiles?.()||[]);
- const chosenProfile=model=>fittingProfiles().find(profile=>profile.id===(pixelProfileChoices.get(model.id)||'seed'));
+ const chosenProfile=model=>fittingProfiles().find(profile=>profile.id===(model.build.activePixelProfileId||'seed'));
+ function renderActivePixelProfile(root,model){
+  const crystal=model.generator.typeId==='crystals';
+  const id=crystal?adapter.activeCrystalPixelProfile():model.build.activePixelProfileId||'seed';
+  const profiles=fittingProfiles().filter(profile=>profile.bodyHeight);
+  const field=document.createElement('fieldset');field.innerHTML='<legend>Pixel Profile Library</legend>';
+  const label=document.createElement('label');label.textContent='Active Pixel Profile ';
+  const select=document.createElement('select');select.dataset.activePixelProfile='';
+  for(const profile of profiles)select.add(new Option(profile.name,profile.id));
+  if(!profiles.some(profile=>profile.id===id))select.add(new Option('Unavailable profile — import its library',id));
+  select.value=id;select.disabled=!!model.link;
+  select.onchange=()=>{
+   if(crystal)adapter.selectCrystalPixelProfile(select.value);
+   else commit({build:{...model.build,activePixelProfileId:select.value}});
+   renderPalette();
+  };
+  label.append(select);field.append(label);
+  for(const [title,action] of [
+   ['Create pixel profile',()=>adapter.openPixelProfileEditor(select.value,true)],
+   ['Edit active profile',()=>adapter.openPixelProfileEditor(select.value,false)],
+   ['Duplicate profile',()=>adapter.openPixelProfileEditor(select.value,true)],
+   ['Export pixel profiles',()=>adapter.exportPixelProfiles()]
+  ]){
+   const button=document.createElement('button');button.type='button';button.textContent=title;
+   button.onclick=action;field.append(button);
+  }
+  const upload=document.createElement('label');upload.textContent='Import pixel profiles ';
+  const file=document.createElement('input');file.type='file';file.accept='.json,application/json';
+  file.onchange=async()=>{
+   const selected=file.files[0];if(!selected)return;
+   try{await adapter.importPixelProfiles(selected);renderPalette();}
+   catch(error){adapter.status(error.message);}
+   finally{file.value='';}
+  };
+  upload.append(file);field.append(upload);root.append(field);
+ }
  function planPixelProfileClearance(profile){
   const fit=profile.measuredFit;
   if(!fit)return ()=>{};
@@ -744,6 +780,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  function addAutomaticPixel(model){
   try{
    const holes=pixelHoles(model),recipe=pixelSource(model);
+   if(!chosenProfile(model)){pixelStatus(model,'Import the missing pixel profile or select another before placing a fitting.');return;}
    if(holes.length>=16){pixelStatus(model,'Use up to 16 fittings per model.');return;}
    const hole=findPixelPosition(recipe,holes,chosenProfile(model));
    if(hole)savePixels(model,[...holes,{...hole,checked:true}],hole.id);
@@ -830,6 +867,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  function placeFittingAt(model,{point,normal},duplicate=null){
   const holes=pixelHoles(model);
   if(holes.length>=16){pixelStatus(model,'Use up to 16 fittings per model.');return false;}
+  if(!duplicate&&!chosenProfile(model)){pixelStatus(model,'Import the missing profile or select another before placing.');return false;}
   const hole={...fittingCandidate(model,point,duplicate),entryFace:normal.y<0?'underside':'top'};
   const issue=pixelIssue(model,hole,holes);
   if(issue){pixelStatus(model,pixelPlacementAdvice(model,issue));return false;}
@@ -1286,7 +1324,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    diagram.innerHTML='<summary>Fitting dimensions</summary>'+renderPixelProfileDiagram({...fit.profile,bodyDiameter:fit.diameter});
    root.querySelector('[aria-label="Hardware library"]').after(diagram);
   }
-  root.querySelector('[data-pixel-profile-editor]').onclick=()=>document.getElementById('editPixelProfileBtn')?.click();
+  root.querySelector('[data-pixel-profile-editor]').onclick=()=>adapter.openPixelProfileEditor(chosenProfile(model)?.id,false);
   root.querySelector('[data-pixel-backing]').onchange=event=>{
    if(!commit({build:{...model.build,pixelBacking:event.target.checked}})){
     event.target.checked=!!model.build.pixelBacking;return;
@@ -1296,7 +1334,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   root.querySelectorAll('[data-fit-profile]').forEach(button=>button.onclick=()=>{
    const profileId=button.dataset.fitProfile;
    if(selected>=0&&!editPixel(model,selected,applyPixelFittingProfile(holes[selected],profileId,adapter.pixelFitProfiles())))return;
-   pixelProfileChoices.set(model.id,profileId);
+   if(!model.link)commit({build:{...model.build,activePixelProfileId:profileId}});
    renderPalette();
    root.querySelectorAll('[data-fit-profile]').forEach(control=>{if(control.dataset.fitProfile===profileId)control.focus({preventScroll:true});});
   });
@@ -1317,6 +1355,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     socketProfile:{...hole.socketProfile,retentionLip:lip.valueAsNumber}}))lip.value=hole.socketProfile.retentionLip;
   };
   const armPlacement=duplicate=>{
+   if(!duplicate&&!chosenProfile(model)){pixelStatus(model,'Import the missing profile or select another before placing.');return;}
    placementModel=model.id;pendingDuplicate=duplicate;viewport.dataset.nativePlacement='outside';
    renderPalette();viewport.tabIndex=0;viewport.focus({preventScroll:true});
    pixelStatus(model,duplicate?'Click a solid surface to place the duplicate. Escape ends placement.':'Click or tap solid surfaces to place fittings. Use Done or Escape to end placement.');
@@ -1522,10 +1561,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     addAction('Add pixel',$('placePixelBtn'));
     addAction('Fit base for gumdrop',$('fitPixelBaseBtn'));
     addAction('Print a pixel fit test',$('calibrationBtn'));
+    renderActivePixelProfile(controls,model);
     renderCrystalPixelPalette(controls,model);
     renderCrystalWirePalette(controls);
    }else{
     renderPixelPalette(controls,model);
+    renderActivePixelProfile(controls,model);
    }
   }else if(model.generator.typeId==='crystals'){
    for(const [key,label] of [['count','Crystal count'],['spacing','Crystal spacing'],['width','Cluster width']]){

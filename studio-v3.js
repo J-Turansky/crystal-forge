@@ -151,7 +151,8 @@ function refreshPixelProfileOptions(){
  select.replaceChildren(...profiles.map(p=>{
   const option=document.createElement('option');option.value=p.id;option.textContent=p.name;return option;
  }));
- if(!profiles.some(p=>p.id===s.pixelProfileId))s.pixelProfileId='gumdrop';
+ if(!profiles.some(p=>p.id===s.pixelProfileId))
+  select.add(new Option('Unavailable profile — import its library',s.pixelProfileId));
  select.value=s.pixelProfileId;
  const p=resolvePixelProfile(s);
  $('pixelProfileDetails').textContent=p.kind+' · '+p.bodyDiameter+' mm diameter × '+p.bodyHeight+
@@ -1086,15 +1087,22 @@ $('pixelProfileDiagram').addEventListener('click',e=>{
  if(field&&PIXEL_DIMENSIONS.some(dim=>dim.field===field))$(field).focus();
 });
 function closePixelEditor(){$('pixelProfileOverlay').hidden=true;$('editPixelProfileBtn').focus()}
-$('editPixelProfileBtn').onclick=()=>{
- const p=resolvePixelProfile(s);
+let editingPixelProfileId=null;
+function openPixelProfileEditor(id,duplicate=false){
+ const profiles=allPixelProfiles({pixelProfiles:readPixelFitProfiles()});
+ const p=profiles.find(profile=>profile.id===id);
+ if(!p){setStatus('Import the missing pixel profile or choose another profile.');return;}
+ editingPixelProfileId=duplicate?null:p.id;
+
  for(const [k,id] of Object.entries(pixelFields))$(id).value=p[k];
+ if(duplicate)$('pixelName').value=p.name+' copy';
  updatePixelProfileDiagram();
  $('pixelSocketClearance').value=p.measuredFit
   ?(p.measuredFit.printedBoreDiameter-p.measuredFit.bodyDiameter).toFixed(2):s.pixelFit;
  $('pixelSocketStatus').textContent='';
  $('pixelProfileOverlay').hidden=false;$('pixelName').focus();
-};
+}
+$('editPixelProfileBtn').onclick=()=>openPixelProfileEditor(s.pixelProfileId);
 for(const format of ['stl','3mf']){
  const button=$('pixelReplica'+format.toUpperCase());
  button.onclick=async()=>{
@@ -1172,7 +1180,7 @@ function savePixelProfileFromEditor(applySocketFit=false){
  for(const [k,id] of Object.entries(pixelFields))
   data[k]=['name','kind'].includes(k)?$(id).value:Number($(id).value);
  if(!String(data.name||'').trim()){alert('Enter a profile name.');return}
- data.id=s.pixelProfileId.startsWith('custom-')?s.pixelProfileId:'custom-'+Date.now().toString(36);
+ data.id=editingPixelProfileId?.startsWith('custom-')?editingPixelProfileId:'custom-'+crypto.randomUUID();
  if(applySocketFit){
   let fit;
   try{fit=socketFitFromEditor();}catch(error){$('pixelSocketStatus').textContent=error.message;return;}
@@ -1186,7 +1194,9 @@ function savePixelProfileFromEditor(applySocketFit=false){
   catch(error){$('pixelSocketStatus').textContent=error.message;return;}
   s.pixelClearanceByProfile={...s.pixelClearanceByProfile,[p.id]:socketFitFromEditor()};s.fitCalibration=null;
  }
- s.pixelProfiles=[...(s.pixelProfiles||[]).filter(x=>x.id!==p.id),p].slice(-30);
+ const library=readPixelFitProfiles().filter(item=>item.id!==p.id);
+ if(library.length>=30){$('pixelSocketStatus').textContent='The profile library is full (30 custom profiles). Export a backup before removing a profile.';return;}
+ s.pixelProfiles=[...library,p];
  s.pixelProfileId=p.id;s.pixelDiameter=p.bodyDiameter;
  try{localStorage.setItem(pixelLibraryKey,JSON.stringify(s.pixelProfiles))}
  catch(e){console.warn('Pixel library not writable',e)}
@@ -1661,6 +1671,32 @@ if(studioBootstrap&&!new URLSearchParams(location.search).has('legacy'))studioBr
  },
  updateCrystalPixel:(id,fields)=>hardwareUI.updatePixel(id,fields),
  removeCrystalPixel:()=>hardwareUI.removeSelectedPixel(),
+ openPixelProfileEditor,
+ activeCrystalPixelProfile:()=>s.pixelProfileId,
+ selectCrystalPixelProfile:id=>{
+  const profiles=readPixelFitProfiles(),profile=allPixelProfiles({pixelProfiles:profiles}).find(p=>p.id===id);
+  if(!profile)return;
+  s.pixelProfiles=profiles;s.pixelProfileId=id;s.pixelDiameter=profile.bodyDiameter;
+  syncForm();rebuild();snapshot();
+ },
+ exportPixelProfiles:()=>download(new Blob([JSON.stringify({version:1,pixelProfiles:readPixelFitProfiles()},null,2)],
+  {type:'application/json'}),'pixel-profile-library.json'),
+ importPixelProfiles:async file=>{
+  if(file.size>100000)throw Error('Choose a pixel profile library smaller than 100 KB.');
+  const data=JSON.parse(await file.text());
+  if(data.version!==1||!Array.isArray(data.pixelProfiles)||data.pixelProfiles.some(p=>typeof p?.id!=='string'||!p.id.startsWith('custom-')))
+   throw Error('Choose an exported pixel profile library.');
+  const next=readPixelFitProfiles();
+  for(const raw of data.pixelProfiles){
+   const profile=normalisePixelProfile(raw),existing=next.find(p=>p.id===profile.id);
+   if(existing&&JSON.stringify(existing)===JSON.stringify(profile))continue;
+   if(existing){profile.id='custom-'+crypto.randomUUID();profile.name=(profile.name+' (imported copy)').slice(0,70);}
+   next.push(profile);
+  }
+  if(next.length>30)throw Error('Import would exceed 30 custom profiles. Existing profiles were preserved.');
+  localStorage.setItem(pixelLibraryKey,JSON.stringify(next));
+  s.pixelProfiles=next;syncForm();setStatus('Pixel profile library imported. Conflicting profiles were saved as copies.');
+ },
  pixelFitProfiles:()=>readPixelFitProfiles(),
  savePixelFitProfile:profile=>{
   const p=normalisePixelProfile(profile);
