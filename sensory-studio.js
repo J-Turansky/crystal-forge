@@ -1474,22 +1474,27 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    return 'Choose Ultimaker 3 Extended for two materials, or switch the model to one material and prepare again.';
   return '';
  }
- function printEnvelope(result,settings){
-  if(!result)return '';
+ // Match the exporter’s X, -Z, Y rotation. Sign does not affect extents.
+ function preparedSize(result){
   let size=printSizes.get(result);
-  if(!size){
-   const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
+  if(size)return size;
+  const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
   for(const {mesh} of result.bodies){
    const points=mesh.vertProperties||mesh.points,stride=mesh.numProp||3;
    for(let i=0;i<points.length;i+=stride)for(let axis=0;axis<3;axis++){
     min[axis]=Math.min(min[axis],points[i+axis]);max[axis]=Math.max(max[axis],points[i+axis]);
    }
   }
-   size=[0,2,1].map(axis=>max[axis]-min[axis]);printSizes.set(result,size);
-  }
+  size=[0,2,1].map(axis=>max[axis]-min[axis]);
+  printSizes.set(result,size);
+  return size;
+ }
+ function printEnvelope(result,settings){
+  if(!result)return '';
+  const size=preparedSize(result);
   const bed=settings.printer==='Ultimaker 2+'?[223,223,205]:settings.printer==='Ultimaker 3 Extended'?[215,215,300]:null;
   const warning=bed&&size.some((n,i)=>n>bed[i])?' — Warning: exceeds printer envelope. Check scale and orientation in Cura.':'';
-  return size.map(n=>n.toFixed(1)).join(' × ')+' mm'+warning;
+  return 'Prepared X × Y × Z: '+size.map(n=>n.toFixed(1)).join(' × ')+' mm'+warning;
  }
  function renderJobs(){
   if(mode!=='print')return;
@@ -1639,10 +1644,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     schemaVersion:1,modelId:model.id,modelName:model.name,generatorType:model.generator.typeId,
     modelRevision:model.revision,jobId:job.id,preparedRevision:job.preparedRevision,
     printer:settings.printer,nozzleMm:settings.curaNozzle,material:settings.curaMaterial,quality:settings.curaQuality,
+    units:'mm',coordinateFrame:'Z-up',dimensionsMm:preparedSize(result),
     curaProfile,...(result.report.nativeRouting?{routing:result.report.nativeRouting}:{}),files:[...entries.map(([name])=>name),'READ-ME.txt',manifestName]
    };
    const instructions=[
     'Model: '+model.name,'Revision: '+model.revision,'Job ID: '+job.id,
+    'Prepared dimensions (X × Y × Z): '+manifest.dimensionsMm.map(n=>n.toFixed(2)).join(' × ')+' mm',
     'Printer: '+manifest.printer,'Nozzle: '+manifest.nozzleMm+' mm',
     'Material: '+manifest.material,'Quality: '+manifest.quality+' / 100','',
     exported.warnings.join('\n'),

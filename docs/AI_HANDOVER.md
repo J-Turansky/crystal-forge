@@ -1,5 +1,9 @@
 # AI handover — read immediately after AGENTS.md
 
+## Production review candidate
+
+Print Centre and production packs use the same bounding dimensions of the prepared mesh in its exported, Z-up frame. See [production review](PRODUCTION_REVIEW.md) for test scope, walkthrough and physical checks.
+
 ## WT-017 — Consistent Build pixel tools and shared measured profiles
 
 All seven model families now show Add pixel and a shortcut to the existing A–G measured-dimensions profile editor before placement. Crystal uses the original `placePixelBtn`/Hardware Editor and retains its established automatic LEDs, P1 ordering, opposing IN/OUT ports, wire pitch and hand-edit state. Native families continue to use stable Pn IDs, click-place/hold-drag and safe automatic material search. Saving a custom measured profile broadcasts `studio-pixel-profile-saved` so the new profile is selected for the *next* native placement; an already placed fitting is never silently resized. Existing local pixel profiles and saved model IDs remain compatible.

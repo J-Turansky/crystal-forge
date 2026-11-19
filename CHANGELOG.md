@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.19 — Prepared print dimensions
+
+- Show the prepared X, Y and Z dimensions in Print Centre and exported production packs.
+
 ## v0.16.0-dev.18 — Reusable pixel fittings across seven families
 
 - Direct Build tools for Add pixel and measured pixel profile creation across all seven model families.
