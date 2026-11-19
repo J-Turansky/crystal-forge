@@ -12,7 +12,8 @@ import {createModel,addModel,findModel,openTab,closeTab,reorderTabs,duplicateMod
  queueModel,beginPreparation,finishPreparation,cancelPreparation,canExport,resolveJobPrinter,movePrintJob,invalidatePrintJob,saveLibraryRevision,
  insertLibraryModel,availableLinkedUpdate,acceptLinkedUpdate,breakLink,modelFingerprint,validateProject,WORKSPACE_KEY,newId} from './studio-documents.js';
 import {makeCatalogue,applyBuildModules,generators} from './studio-catalogue.js';
-import {previewRecipe,disposeGroup} from './studio-geometry.js';
+import {previewRecipe,disposeGroup,nativeFittingPreviews} from './studio-geometry.js';
+import {loadManifold} from './fabrication-v1.js';
 import {exportMaterialBodies,preparedDimensionsMm} from './studio-material-export.js';
 import {installExactValueEditors} from './exact-value-editors.js';
 import {createToolFinder} from './studio-tool-finder.js';
@@ -48,6 +49,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   validateParameters:p=>({valid:!!p,errors:[],parameters:p}),generatePreview:()=>adapter.capture(),
   generateManufacturingGeometry:()=>adapter.capture(),estimateBounds:()=>adapter.bounds(),migrateParameters:(_,p)=>p};
  const registry=makeCatalogue(crystalAdapter),cache=new Map(),histories=new Map(),prepared=new Map(),workers=new Map();
+ const nativeFitPreviewChoices=new Map(),nativeFitPreviewMessages=new Map();
  let currentId=null,mode='model',stage='design',switching=false,saveTimer=null,dirty=false,search='',filter='all',studioVault=null,vaultClient=null,previewBuilds=0;
  const link=document.createElement('link');link.rel='stylesheet';link.href='./sensory-studio.css';document.head.append(link);
  const bar=document.createElement('nav');bar.className='studio-modelbar';bar.setAttribute('aria-label','Project and model workspaces');
@@ -458,13 +460,75 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    if(c?.group&&c.group.parent)c.view={camera:camera.position.toArray(),target:orbit.target.toArray()};
    if(c?.group)disposeGroup(c.group);
    const recipe=applyBuildModules(generator.recipe(model.parameters),model.build,generator.capabilities,{preview:true});
-   const group=previewRecipe(THREE,recipe,[model.materials.primary?.colour||0x88bbff,model.materials.secondary?.colour||0xffcf70]);previewBuilds++;c={kind:'generic',group,fingerprint,view:c?.view,routing:recipe.nativeRouting};cache.set(model.id,c);
+   const group=previewRecipe(THREE,recipe,[model.materials.primary?.colour||0x88bbff,model.materials.secondary?.colour||0xffcf70]);previewBuilds++;c={kind:'generic',group,fingerprint,view:c?.view,routing:recipe.nativeRouting,recipe};cache.set(model.id,c);
    model.thumbnail=thumbnail(group);
   }
   scene.add(c.group);
   if(c.view){camera.position.fromArray(c.view.camera);orbit.target.fromArray(c.view.target);camera.lookAt(orbit.target);}
   else frame(c.group);
   adapter.status('Ready — '+generator.displayName+'. Preview is editable geometry; prepare the print job before exporting.');
+  refreshNativeFittingPreview(model);
+ }
+ // Build-only physical overlays derive their solids from the exact same
+ // Manifold cutter and placement transform as the manufacturing worker.
+ // They are excluded from picking, saved state and all exported geometry.
+ function nativeFitMesh(mesh){
+  const vertices=mesh.vertProperties||mesh.points,triangles=mesh.triVerts||mesh.triangles,stride=mesh.numProp||3;
+  if(!vertices?.length||!triangles?.length||stride<3)throw Error('No valid physical fitting preview geometry.');
+  const positions=new Float32Array(triangles.length*3);
+  for(let i=0;i<triangles.length;i++){
+   const offset=triangles[i]*stride;
+   for(let axis=0;axis<3;axis++)positions[i*3+axis]=vertices[offset+axis];
+  }
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+  geometry.computeVertexNormals();
+  return geometry;
+ }
+ function refreshNativeFittingPreview(model){
+  if(model?.generator.typeId==='crystals')return;
+  const c=cache.get(model.id);
+  if(!c?.group||!c.recipe)return;
+  const enabled=stage==='build'&&nativeFitPreviewChoices.get(model.id)===true;
+  const token=c.fingerprint+':'+(enabled?'on':'off');
+  if(c.fitToken===token)return;
+  c.fitToken=token;
+  for(const overlay of c.group.children.filter(child=>child.userData.nativeFittingPreview)){
+   c.group.remove(overlay);overlay.geometry?.dispose();overlay.material?.dispose();
+  }
+  nativeFitPreviewMessages.set(model.id,enabled?'Preparing physical fitting preview…':'');
+  const report=message=>{
+   nativeFitPreviewMessages.set(model.id,message);
+   if(active()?.id===model.id)for(const output of document.querySelectorAll('[data-native-fit-preview-status]'))
+    output.textContent=message;
+  };
+  if(!enabled){report('');return;}
+  (async()=>{
+   try{
+    const wasm=await loadManifold();
+    if(cache.get(model.id)!==c||c.fitToken!==token)return;
+    const results=nativeFittingPreviews(THREE,wasm,c.recipe);
+    if(cache.get(model.id)!==c||c.fitToken!==token)return;
+    const messages=[];
+    for(const [index,fit] of results.entries()){
+     for(const [kind,shape,color,opacity] of [
+      ['negative',fit.negative,0x46beff,.16],
+      ['positive',fit.positive,fit.collisionVolume>.01?0xff6161:0xffdc58,.42]
+     ]){
+      const overlay=new THREE.Mesh(nativeFitMesh(shape),new THREE.MeshBasicMaterial({
+       color,opacity,transparent:true,depthTest:false,depthWrite:false,side:THREE.DoubleSide
+      }));
+      overlay.userData.nativeFittingPreview=kind;
+      overlay.userData.previewOnly=true;
+      overlay.name='native-fitting-'+kind+'-'+fit.pixelId;
+      overlay.renderOrder=kind==='positive'?96:95;
+      c.group.add(overlay);
+     }
+     messages.push('P'+(index+1)+' · insertion '+fit.insertionDepth.toFixed(2)+' mm · centre roof '+fit.remainingRoof.toFixed(2)+' mm · '+fit.exposedVolume.toFixed(2)+' mm³ outside stock · '+fit.collisionVolume.toFixed(2)+' mm³ stock interference');
+    }
+    report(messages.join(' | ')||'Select a measured shaped socket to preview its physical fit.');
+   }catch(error){if(cache.get(model.id)===c&&c.fitToken===token)report('Physical fitting preview unavailable: '+error.message);}
+  })();
  }
  function frame(group){
   const box=new THREE.Box3().setFromObject(group),size=box.getSize(new THREE.Vector3()),centre=box.getCenter(new THREE.Vector3());
@@ -1406,6 +1470,8 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    '<p>Choose a saved measured profile before placing. A profile selection with P1/P2 selected updates <strong>only that fitting</strong>; otherwise it chooses the next fitting. Plain bores open on both faces. Select a fitting to enable a measured blind socket on its installation face. Cable cuts open on the underside. Print a coupon to check fit.</p>'+
    '<label><input type="checkbox" data-pixel-backing'+(model.build.pixelBacking?' checked':'')+disabled+'> Add fitting backing (12 mm of additional material around each edge)</label>'+
    '<p>Fitting bores need continuous solid material. Thin walls, cavities and narrow rims can block placement.</p>'+
+   '<label><input type="checkbox" data-native-fit-preview'+(nativeFitPreviewChoices.get(model.id)?' checked':'')+'> Show physical pixels and socket cutters</label>'+
+   '<output role="status" data-native-fit-preview-status>'+esc(nativeFitPreviewMessages.get(model.id)||'')+'</output>'+
    '<div class="sms-actions" aria-label="Hardware library">'+profiles.map(profile=>
     '<button type="button" data-fit-profile="'+esc(profile.id)+'" aria-pressed="'+(chosenProfile(model)?.id===profile.id)+'"'+disabled+
     '>◉ '+esc(profile.name)+' · '+profile.bodyDiameter+' mm</button>').join('')+'</div>'+
@@ -1433,6 +1499,10 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    diagram.innerHTML='<summary>Fitting dimensions</summary>'+renderPixelProfileDiagram({...fit.profile,bodyDiameter:fit.diameter});
    root.querySelector('[aria-label="Hardware library"]').after(diagram);
   }
+  root.querySelector('[data-native-fit-preview]').onchange=event=>{
+   nativeFitPreviewChoices.set(model.id,event.target.checked);
+   refreshNativeFittingPreview(model);
+  };
   root.querySelector('[data-pixel-profile-editor]').onclick=()=>adapter.openPixelProfileEditor(chosenProfile(model)?.id,false);
   root.querySelector('[data-pixel-backing]').onchange=event=>{
    if(!commit({build:{...model.build,pixelBacking:event.target.checked}})){
@@ -1626,6 +1696,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const model=active(),family=registry.get(model.generator.typeId);
   const build=model.generator.typeId==='crystals'?document.querySelector('.workspace-tabs [data-tab=build]').classList.contains('active'):stage==='build';
   const root=shell.palette;root.replaceChildren();
+  if(model.generator.typeId!=='crystals')refreshNativeFittingPreview(model);
   const heading=document.createElement('h2');heading.textContent=build?'Build tools':'Design choices';root.append(heading);
   const controls=document.createElement('div');controls.className='sms-context-controls';root.append(controls);
   if(!build&&family.presets.length){
