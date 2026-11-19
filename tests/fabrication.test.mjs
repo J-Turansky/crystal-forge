@@ -438,6 +438,21 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
  const routedVault={...serialOne,baseHeight:35,wireWidth:6,wireDepth:2,wireVaulted:true,socketConical:true};
  const asymmetric={...routedVault,lightingMode:'multi',pixelCount:2,pixelStringSpacing:100,
   pixelRetentionLip:.15,manualPixelHoles:[{x:-18,z:-4,wireAngle:0},{x:18,z:6,wireAngle:0}]};
+ // WT-021 AUD-01: missing intersections are never evidence of clearance.
+ const requireExportedRoof=(height,label)=>{
+  assert(Number.isFinite(height),label+': missing exported channel roof (no intersection)');
+  assert(height>1.95,label+': channel roof gives less than 1.95 mm clearance');
+ };
+ assert.throws(()=>requireExportedRoof(undefined,'deliberately missing roof fixture'),
+  /missing exported channel roof/);
+ const insideFootprint=(x,z,polygon)=>{
+  let inside=false;
+  for(let i=0,j=polygon.length-1;i<polygon.length;j=i++){
+   const a=polygon[i],b=polygon[j];
+   if((a.z>z)!==(b.z>z)&&x<(b.x-a.x)*(z-a.z)/(b.z-a.z)+a.x)inside=!inside;
+  }
+  return inside;
+ };
  for(const installation of [routedVault,asymmetric]){
  const routed=prepareFabrication({wasm,...assembly(installation),settings:installation});
  const routes=routed.report.hardware.wirePlan.routes;
@@ -461,21 +476,62 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
   assert(Math.abs(apex-socket.tipY)<.001,format+' full-model conical apex');
   assert(Math.abs(apex-ceiling(socket.x+2,socket.z)-2)<.001,format+' conical roof falls 2 mm over 2 mm');
   }
-  for(const {a,b} of routes){
+  for(const {a,b,kind} of routes){
    const span=Math.hypot(b.x-a.x,b.z-a.z);
-   for(let i=0;i<=Math.ceil(span);i++){
-    const t=i/Math.ceil(span);
+   assert(span>.001,format+' zero-length route cannot be sampled');
+   const steps=Math.ceil(span),footprint=routed.report.hardware.polygon;
+   let verifiedInside=0;
+   for(let i=0;i<=steps;i++){
+    const t=i/steps;
     for(const offset of [-2.9,0,2.9]){
      const z=a.z+(b.z-a.z)*t+(b.x-a.x)*offset/span;
      const x=a.x+(b.x-a.x)*t-(b.z-a.z)*offset/span;
-     assert((ceiling(x,z)??Infinity)>1.95,format+' continuous 5.8 × 1.95 mm sampled wire clearance');
+     // An exterior IN/OUT cutter deliberately extends beyond the base;
+     // outside that footprint there must be no requirement to hit stock.
+     if(!insideFootprint(x,z,footprint))continue;
+     requireExportedRoof(ceiling(x,z),format+' route '+kind+' at '+x.toFixed(2)+','+z.toFixed(2));
+     verifiedInside++;
     }
    }
+   // A link is entirely internal; an IN/OUT segment may lie wholly outside
+   // the base where it deliberately opens the physical wire aperture.
+   assert(verifiedInside>0||kind==='input'||kind==='output',
+    format+' internal route has no verifiable roof cross-sections');
   }
   geometry.dispose();material.dispose();
  }
  routed.geometry.dispose();
  }
+ // WT-021 AUD-02: inspect a physical wire aperture in the *serialized STL*.
+ // The socket body bore grows with pixelFit, while the wire relief width
+ // must remain independently determined by physical profile F (3 mm here).
+ const couponWireOpening=(fit)=>{
+  const settings={pixelProfileId:'gumdrop',pixelDiameter:12,pixelFit:fit,pixelRetentionLip:0};
+  const profile=resolvePixelProfile(settings);
+  const coupon=makePixelSeatCoupon(wasm,settings,{single:true,openWireExits:true});
+  const bytes=encodeSTL(coupon.geometry),data=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  const facets=data.getUint32(80,true),positions=new Float32Array(facets*9);
+  for(let face=0;face<facets;face++)for(let coordinate=0;coordinate<9;coordinate++)
+   positions[face*9+coordinate]=data.getFloat32(96+face*50+coordinate*4,true);
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(geometry,material);
+  try{
+   const centreX=Math.max(32,profile.maxDiameter+20)/2;
+   const insideSlot=new THREE.Vector3(centreX,-.5,.7); // Z-up STL coordinates
+   const left=new THREE.Raycaster(insideSlot,new THREE.Vector3(-1,0,0)).intersectObject(mesh)[0];
+   const right=new THREE.Raycaster(insideSlot,new THREE.Vector3(1,0,0)).intersectObject(mesh)[0];
+   assert(left&&right,'Serialized STL must contain both exterior wire-aperture walls');
+   const width=left.distance+right.distance;
+   assert(Math.abs(width-profile.wireWidth)<.01,
+    'STL wire aperture '+width+' mm differs from physical F '+profile.wireWidth+' mm');
+   return width;
+  }finally{geometry.dispose();material.dispose();coupon.geometry.dispose();}
+ };
+ const tightWire=couponWireOpening(.1),looseWire=couponWireOpening(.5);
+ assert(Math.abs(tightWire-looseWire)<.001,
+  'Changing bore fit must not resize the serialized wire aperture');
  const tooShort={...asymmetric,pixelStringSpacing:25};
  assert.throws(()=>prepareFabrication({wasm,...assembly(tooShort),settings:tooShort}),/Pixel string route invalid/);
  const thin={...routedVault,baseHeight:5};
