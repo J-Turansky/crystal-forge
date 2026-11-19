@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.34.1 — Restore Model Maker startup on GitHub Pages
+
+- Publish the SVG importer and serve the 3D and fabrication dependencies with the app.
+
 ## v0.16.0-dev.34 — Native camera and wiring feedback
 
 - Centre native camera presets on the active solid.
