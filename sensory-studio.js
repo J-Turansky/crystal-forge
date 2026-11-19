@@ -7,6 +7,7 @@ import {lightPassageExportBlock,lightPassageReportEntries} from './light-passage
 import {renderPixelProfileDiagram} from './pixel-profile-diagram.js';
 import {applyPixelFittingProfile,resolvePixelFitting,withMeasuredPixelFit,saveablePixelFit} from './studio-pixel-fit.js';
 import {pixelBuilderMarkup,pixelHoleMarkup,bindPixelBuilder,pixelProfiles,stablePixels,findPixelPosition,checkedPixelBore,newPixel} from './studio-pixel-builder.js';
+import {stableMounts,newMount,mountHoleIssue} from './studio-mount-builder.js';
 import {createModel,addModel,findModel,openTab,closeTab,reorderTabs,duplicateModel,editModel,
  queueModel,beginPreparation,finishPreparation,cancelPreparation,canExport,resolveJobPrinter,movePrintJob,invalidatePrintJob,saveLibraryRevision,
  insertLibraryModel,availableLinkedUpdate,acceptLinkedUpdate,breakLink,modelFingerprint,validateProject,WORKSPACE_KEY,newId} from './studio-documents.js';
@@ -540,7 +541,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  const nativeGuideChoices=new Map();
  const showNativeGuide=model=>nativeGuideChoices.get(model.id)??!!cache.get(model.id)?.routing?.links.some(link=>link.path.length>1);
- const selectedPixels=new Map(),pixelMessages=new Map(),pixelProfileChoices=new Map();
+ const selectedPixels=new Map(),selectedMounts=new Map(),pixelMessages=new Map(),pixelProfileChoices=new Map();
  // Newly saved measured profiles are shared across all families, but never
  // silently alter dimensions on existing fittings.
  document.addEventListener('studio-pixel-profile-saved',event=>{
@@ -549,12 +550,16 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   pixelProfileChoices.set(model.id,id);
   if(mode==='model'&&stage==='build'){renderPalette();if(model.generator.typeId!=='crystals')renderEditor();}
  });
- let placementModel=null,pixelGesture=null,pendingDuplicate=null;
+ let placementModel=null,mountingModel=null,pixelGesture=null,pendingDuplicate=null;
  const pixelHoles=model=>stablePixels(model.build.pixelHoles||[]);
+ const mountHoles=model=>stableMounts(model.build.manualMountHoles||[]);
  const fittingProfiles=()=>pixelProfiles(adapter.pixelFitProfiles?.()||[]);
  const chosenProfile=model=>fittingProfiles().find(profile=>profile.id===(pixelProfileChoices.get(model.id)||'seed'));
  function pixelMarkers(model){
   return (cache.get(model.id)?.group?.children||[]).filter(mesh=>mesh.userData.pixelId);
+ }
+ function mountMarkers(model){
+  return (cache.get(model.id)?.group?.children||[]).filter(mesh=>mesh.userData.mountId);
  }
  function refreshPixelMarkers(model){
   if(model.generator.typeId==='crystals')return;
@@ -564,6 +569,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    marker.visible=stage==='build';
    marker.material.color.setHex(marker.userData.pixelId===selectedPixels.get(model.id)?0x48e4f1:0xffbe47);
   }
+  for(const marker of mountMarkers(model)){
+   marker.visible=stage==='build';
+   marker.material.color.setHex(marker.userData.mountId===selectedMounts.get(model.id)?0x48e4f1:0xb783ff);
+  }
+  for(const label of cache.get(model.id)?.group?.children||[])if(label.userData.mountLabel)
+   label.visible=stage==='build';
   for(const port of cache.get(model.id)?.group?.children||[])if(port.userData.pixelLabel||port.userData.pixelPort)
    port.visible=stage==='build'&&(!!port.userData.pixelLabel||port.userData.pixelPort===selectedPixels.get(model.id));
  }
@@ -579,6 +590,23 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  function pixelIssue(model,hole,others,recipe){
   try{return checkedPixelBore(recipe||pixelSource(model),hole,others);}catch(error){return error.message;}
  }
+ function mountSource(model){
+  const family=registry.get(model.generator.typeId);
+  return applyBuildModules(family.recipe(model.parameters),
+   {...model.build,pixelHoles:[],manualMountHoles:[],serialRouting:null},family.capabilities,{preview:true});
+ }
+ function mountIssue(model,mount,others){
+  try{
+   const family=registry.get(model.generator.typeId);
+   const issue=mountHoleIssue(mountSource(model),mount,others,pixelHoles(model));
+   if(issue)return issue;
+   // Verify full manufacturing eligibility, including routes that would otherwise
+   // be blocked by this new mounting cut. Never persist a silently invalid route.
+   applyBuildModules(family.recipe(model.parameters),
+    {...model.build,manualMountHoles:[...others,mount]},family.capabilities);
+   return null;
+  }catch(error){return error.message;}
+ }
  function redrawPixelEditor(focus){
   const open=$('smsPixelAdd')?.closest('details')?.open;
   renderEditor();
@@ -586,6 +614,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(focus?.selector)focus.root.querySelector(focus.selector)?.focus({preventScroll:true});
  }
  function selectPixel(model,id){
+  selectedMounts.delete(model.id);
   selectedPixels.set(model.id,id);
   refreshPixelMarkers(model);
   renderPalette();
@@ -609,6 +638,26 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const holes=pixelHoles(model);
   if(!holes[index]||model.link)return;
   holes.splice(index,1);savePixels(model,holes,holes[Math.min(index,holes.length-1)]?.id);
+ }
+ function selectMount(model,id){
+  selectedPixels.delete(model.id);
+  selectedMounts.set(model.id,id);
+  refreshPixelMarkers(model);renderPalette();
+ }
+ function saveMounts(model,mounts,id){
+  if(!commit({build:{...model.build,manualMountHoles:mounts}}))return false;
+  selectedMounts.set(model.id,id);selectedPixels.delete(model.id);
+  pixelMessages.delete(model.id);redrawPixelEditor();return true;
+ }
+ function editMount(model,index,mount){
+  const mounts=mountHoles(model);if(!mounts[index]||model.link)return false;
+  const issue=mountIssue(model,mount,mounts.filter((_,i)=>i!==index));
+  if(issue){pixelStatus(model,issue);return false;}
+  mounts[index]=mount;return saveMounts(model,mounts,mount.id);
+ }
+ function removeMount(model,index){
+  const mounts=mountHoles(model);if(!mounts[index]||model.link)return;
+  mounts.splice(index,1);saveMounts(model,mounts,mounts[Math.min(index,mounts.length-1)]?.id);
  }
  function pixelPlacementAdvice(model,reason){
   const tips=' Try a smaller profile or move the fitting into a wider solid area.';
@@ -637,7 +686,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  function projectMarker(marker){return projectPoint(marker.position);}
  function markerAt(model,event){
-  return pixelMarkers(model).map(marker=>{
+  return [...pixelMarkers(model),...mountMarkers(model)].map(marker=>{
    const p=projectMarker(marker);
    return {marker,distance:Math.hypot(p.x-event.clientX,p.y-event.clientY)};
   }).filter(hit=>hit.distance<=14).sort((a,b)=>a.distance-b.distance)[0]?.marker;
