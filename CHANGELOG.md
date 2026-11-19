@@ -1,5 +1,12 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.18 — Reusable pixel fittings across seven families
+
+- Direct Build tools for Add pixel and measured pixel profile creation across all seven model families.
+- Opt-in integrated fitting backing creates actual Manifold geometry where a native model needs a wider solid mounting surface.
+- Keep Crystal hardware placement, native Tile/Gear serial routing and measured fit coupons; other families remain honestly bore-only.
+
+
 ## v0.16.0-dev.17 — Safe backup review and recovery
 
 - Review private backups and JSON archives before changing your workspace.
