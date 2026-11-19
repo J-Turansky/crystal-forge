@@ -177,8 +177,9 @@ export function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLo
   // Facet the negative roof to the same 20 dome rings and 48 radial sectors
   // as the measured 1:1 positive. The older coarse stretched sphere omitted
   // printable tip volume despite a correctly calibrated nominal bore.
-  // A 0.35 mm axial overlap keeps the union with the straight bore robust.
-  const radial=48,rings=[[shaftEnd-.35,bodyRadius]];
+  // A 0.35 mm axial overlap sits slightly INSIDE the straight bore to
+  // avoid coincident cylindrical faces during multi-socket Booleans.
+  const radial=48,rings=[[shaftEnd-.35,bodyRadius*.995]];
   for(let i=0;i<20;i++){
    const angle=i*Math.PI/40;
    rings.push([shaftEnd+capRise*Math.sin(angle),bodyRadius*Math.cos(angle)]);
@@ -805,6 +806,12 @@ export function makePixelSeatCoupon(wasm,s,{openWireExits=true,single=false,trac
   }
   let cut=hold(bar.subtract(hold(wasm.Manifold.union([...cutters,...wireExits]))));
   if(legend.length)cut=hold(cut.subtract(hold(wasm.Manifold.union(legend))));
+  // Heal sub-printable Boolean slivers from adjacent curved sockets and labels,
+  // but never accept meaningful material loss or an invalid solid.
+  const rawVolume=cut.volume(),tolerance=.0001;
+  cut=hold(hold(cut.asOriginal()).simplify(tolerance));
+  if(cut.status()!=='NoError'||cut.isEmpty()||Math.abs(cut.volume()-rawVolume)>.01)
+   throw Error('The stepped fitting coupon cannot be cleaned without changing its physical dimensions.');
   assertSolid(cut,'Engraved stepped LED-fit coupon');
   return {geometry:fromResultMesh(cut.getMesh()),diameters:spec.diameters,
    captions:labels,profileName:profile.name,flangeDiameter:profile.flangeDiameter,
