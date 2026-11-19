@@ -243,7 +243,7 @@ for(const id of ['knob','selector']){
    assert(Math.abs(expectedVolume-manufacturedVolume)<.02,
     fixture.type+' preview negative must be same Boolean cutter and pose as manufactured model');
    assert(missingEnvelope.volume()<.02,
-    fixture.type+' actual production socket must enclose the full positive pixel, including flange, tip and wire relief');
+    fixture.type+' actual production socket must enclose the full positive pixel; mismatch volume '+missingEnvelope.volume().toFixed(5)+' mm³, positive '+positiveSolid.volume().toFixed(5)+' mm³, cutter '+negativeSolid.volume().toFixed(5)+' mm³');
   }finally{missingEnvelope.delete();expected.delete();positiveSolid.delete();negativeSolid.delete();blankSolid.delete();}
  }
  console.log('FIT-02 native Gear top/Tile underside positive and negative overlays match manufactured cutter');
