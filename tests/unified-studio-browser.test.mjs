@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {chromium} from 'playwright';
 const browser=await chromium.launch({headless:true,executablePath:process.env.CRYSTAL_FORGE_BROWSER_EXECUTABLE||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
-const page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
+let page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
 const errors=[];page.on('pageerror',error=>errors.push(error.message));
 try{
  const url=process.env.CRYSTAL_FORGE_URL||'http://127.0.0.1:4321';
@@ -18,19 +18,10 @@ try{
   await baseline.screenshot({path:'qa/unified-wt014-before-narrow.png'});
   await baseline.close();
  }
- await page.addInitScript(()=>{
-  if(!localStorage.getItem('wt-workspace-panels-v1')){
-   localStorage.setItem('wt-workspace-panels-v1',JSON.stringify({settingsWidth:335,rail:'hidden',settings:false,palette:false}));
-   localStorage.setItem('wt-viewport-height','99');
-  }
- });
- await page.goto(url,{waitUntil:'domcontentloaded'});
- await page.waitForFunction(()=>window.__sensoryStudio);
- await fs.mkdir('qa',{recursive:true});
- const shot=name=>page.screenshot({path:'qa/unified-'+name+'.png'});
  {
- const inspectionPage=await browser.newPage({viewport:{width:1440,height:1000}});
- inspectionPage.on('pageerror',error=>errors.push(error.message));
+ const inspectionPage=page;
+ await inspectionPage.bringToFront();
+ await fs.mkdir('qa',{recursive:true});
  await inspectionPage.goto(url);
  await inspectionPage.waitForFunction(()=>window.__sensoryStudio);
  await inspectionPage.evaluate(()=>window.__sensoryStudio.addModel('crystals',{
@@ -39,7 +30,7 @@ try{
  const inspector=inspectionPage.locator('#smsLightInspector');
  assert.equal(await inspector.count(),1,JSON.stringify(await inspectionPage.evaluate(()=>({mode:window.__sensoryStudio.mode,model:window.__sensoryStudio.currentModel?.name,precision:document.getElementById('smsPrecisionContent')?.innerText.slice(0,350),error:document.querySelector('#smsEditor .sms-error')?.textContent}))));
  await inspector.waitFor();
- await inspector.locator('summary').click();
+ await inspector.locator('summary').press('Enter');
  await inspector.getByText('Preview only').waitFor();
  await inspector.getByRole('button',{name:'Prepare inspection'}).click();
  await inspector.getByText('Prepared manufacturing mesh').waitFor({timeout:120000});
@@ -69,7 +60,7 @@ try{
  const strictSection=strict.locator('xpath=ancestor::details[1]');
  if(!await strictSection.evaluate(node=>node.open))await strictSection.locator(':scope > summary').click();
  await strict.check();
- await inspector.locator('summary').click();
+ await inspector.locator('summary').press('Enter');
  await inspector.getByText('Preview only').waitFor();
  await inspector.getByRole('button',{name:'Prepare inspection'}).click();
  await inspector.getByText('Prepared manufacturing mesh').waitFor({timeout:120000});
@@ -79,7 +70,7 @@ try{
  await inspectionPage.reload();
  await inspectionPage.waitForFunction(()=>window.__sensoryStudio?.currentModel?.parameters.requireAccessiblePassages===true);
  await inspectionPage.evaluate(()=>window.__sensoryStudio.addModel('light-pods',{illuminated:true},'Light Pod inspection'));
- await inspector.locator('summary').click();
+ await inspector.locator('summary').press('Enter');
  await inspector.getByRole('button',{name:'Prepare inspection'}).click();
  await inspector.getByText('Prepared Light Pod').waitFor({timeout:120000});
  await inspector.getByLabel('Section axis').selectOption('Z');
@@ -89,7 +80,19 @@ try{
  assert.deepEqual(errors,[]);
  console.log('WT-013 prepared sections, strict rejection, Pod and view-only controls verified.');
  await inspectionPage.close();
+ page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
+ page.on('pageerror',error=>errors.push(error.message));
  }
+ await page.addInitScript(()=>{
+  if(!localStorage.getItem('wt-workspace-panels-v1')){
+   localStorage.setItem('wt-workspace-panels-v1',JSON.stringify({settingsWidth:335,rail:'hidden',settings:false,palette:false}));
+   localStorage.setItem('wt-viewport-height','99');
+  }
+ });
+ await page.goto(url,{waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>window.__sensoryStudio);
+ await fs.mkdir('qa',{recursive:true});
+ const shot=name=>page.screenshot({path:'qa/unified-'+name+'.png'});
  assert(await page.locator('body.theme-light').count(),'First visit uses light mode.');
  await page.locator('#smsHomeSearch').fill('no-such-project');
  assert.match(await page.locator('#smsHomeModels').innerText(),/No matching/);
