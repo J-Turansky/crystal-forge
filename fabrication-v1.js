@@ -718,8 +718,35 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
      repaired=candidate;acceptedTolerance=tolerance;break;
     }
    }
+   // Last resort: a zero-area facet has no printable surface or volume.
+   // Drop only such facets, reimport into Manifold and accept ONLY if the
+   // reconstructed solid is closed, nonempty, dimensionally volume-stable
+   // and entirely STL-precision safe. Any open boundary fails closed.
+   let removed=0,repairNote='';
+   if(!repaired){
+    const vertices=raw.vertProperties,faces=raw.triVerts,stride=raw.numProp,kept=[];
+    for(let i=0;i<faces.length;i+=3){
+     const a=faces[i]*stride,b=faces[i+1]*stride,c=faces[i+2]*stride;
+     const ux=vertices[b]-vertices[a],uy=vertices[b+1]-vertices[a+1],uz=vertices[b+2]-vertices[a+2];
+     const vx=vertices[c]-vertices[a],vy=vertices[c+1]-vertices[a+1],vz=vertices[c+2]-vertices[a+2];
+     const area=Math.hypot(uy*vz-uz*vy,uz*vx-ux*vz,ux*vy-uy*vx);
+     if(Number.isFinite(area)&&area>=1e-12)kept.push(faces[i],faces[i+1],faces[i+2]);
+     else removed++;
+    }
+    if(removed){
+     try{
+      const mesh=new wasm.Mesh({numProp:stride,vertProperties:vertices,triVerts:new Uint32Array(kept)});
+      mesh.merge();
+      const candidate=hold(new wasm.Manifold(mesh));
+      if(candidate.status()==='NoError'&&!candidate.isEmpty()&&
+         Math.abs(candidate.volume()-before)<=.05&&printableMaterialTriangles(candidate.getMesh())){
+       repaired=candidate;acceptedTolerance='zero-area facet rebuild';
+      }
+     }catch(error){repairNote=error.message;}
+    }
+   }
    if(!repaired)
-    throw Error('The physical mesh contains sub-STL-precision triangles that bounded repair could not remove. Adjust fitting geometry; preparation was refused before export.');
+    throw Error('The physical mesh contains sub-STL-precision triangles that could not be repaired into a closed print solid (invalid facets: '+removed+(repairNote?', '+repairNote:'')+'). Preparation was refused before export.');
    combined=repaired;
    warnings.push('Sub-printable triangle slivers were removed with a bounded '+acceptedTolerance+' mm repair tolerance. Inspect the final layer geometry in Cura.');
   }
