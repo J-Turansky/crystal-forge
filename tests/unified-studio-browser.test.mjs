@@ -1169,6 +1169,30 @@ try{
  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
  await page.reload();await page.waitForFunction(()=>window.__sensoryStudio);
  assert.equal(await page.evaluate(id=>window.__sensoryStudio.project.models.find(model=>model.id===id)?.parameters.x,imported.id),4);
+ // Direct placement validates with the same worker as Print Centre before saving.
+ for(const thickness of [25,3]){
+  await page.evaluate(thickness=>window.__sensoryStudio.addModel('gears',{
+   diameter:80,bore:0,thickness,wheelStyle:'Cam',dualMaterial:false
+  },'Direct socket '+thickness),thickness);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await page.locator('[data-view=top]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await page.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+  const target=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(0,0,'top'));
+  assert(target);
+  await page.mouse.click(target.x,target.y);
+  if(thickness===25){
+   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===1);
+   const [socket]=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
+   assert(socket.socketProfile.bodyHeight>0);
+   assert(socket.surface.normal[1]>.999);
+   assert.equal(socket.entryFace,'top');
+  }else{
+   await page.locator('[data-pixel-status]').filter({hasText:/continuous stock/}).waitFor();
+   assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length??0),0);
+  }
+  await page.keyboard.press('Escape');
+ }
  assert.deepEqual(errors,[]);
  console.log('Unified Home, Design, Build, Library and Quick Print screenshots captured.');
 }catch(error){

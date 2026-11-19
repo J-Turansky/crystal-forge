@@ -30,9 +30,9 @@ export function addPixelHoleCuts(recipe,holes=[],{routed=false}={}){
     hole.diameter<2||hole.diameter>30||hole.clearance<-.5||hole.clearance>.8)
    throw Error(label+' needs numeric X/Z, a 2–30 mm diameter and −0.5 to 0.8 mm clearance.');
   const bore=radius(hole),{width,depth,height}=recipe.bounds;
-  if(Math.abs(hole.x)+bore+minimumWeb>width/2||Math.abs(hole.z)+bore+minimumWeb>depth/2)
+  if(!hole.surface&&(Math.abs(hole.x)+bore+minimumWeb>width/2||Math.abs(hole.z)+bore+minimumWeb>depth/2))
    throw Error(label+' is too close to the edge of the model bounds.');
-  if(holes.slice(0,index).some(other=>Math.hypot(hole.x-other.x,hole.z-other.z)<bore+radius(other)+minimumWeb))
+  if(!hole.surface&&holes.slice(0,index).some(other=>!other.surface&&Math.hypot(hole.x-other.x,hole.z-other.z)<bore+radius(other)+minimumWeb))
    throw Error(label+' overlaps or is too close to another pixel hole.');
   const cut={kind:'cylinder',radius:bore,height:height+12,position:[hole.x,height/2,hole.z],
    pixelHole:label,pixelId:pixelId(hole,index),pixelRotation:hole.rotation??0,pixelEntryFace:hole.entryFace};

@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.35.10 — Validate direct shaped socket placement
+
+- Place a shaped socket on eligible native model surfaces and verify its opening and stock before saving.
+
 ## v0.16.0-dev.35.9 — Inspect shaped sockets on the selected installation face
 
 - On compatible single-material stock, native shaped sockets use the selected face and refuse obstructed openings or inadequate material.
