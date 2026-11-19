@@ -588,8 +588,19 @@ try{
  assert.notEqual((await queue()).find(job=>job.id===crystalJob.id).requestId,pending.requestId);
  await page.waitForFunction(id=>window.__sensoryStudio.project.printJobs.find(job=>job.id===id)?.status==='prepared',crystalJob.id,{timeout:120000});
  async function useDownload(button){
-  const [download]=await Promise.all([page.waitForEvent('download'),button.click()]);
-  return {name:download.suggestedFilename(),bytes:await fs.readFile(await download.path())};
+  try{
+   const [download]=await Promise.all([page.waitForEvent('download'),button.click()]);
+   return {name:download.suggestedFilename(),bytes:await fs.readFile(await download.path())};
+  }catch(error){
+   // A click may return successfully when exportJob catches a failure.
+   // Keep the exact Print Centre report and state as regression evidence.
+   const card=await button.evaluate(node=>({
+    disabled:node.disabled,jobText:node.closest('[data-print-job]')?.innerText?.slice(0,1000)
+   })).catch(()=>({jobText:'Job card no longer available'}));
+   const status=await page.locator('#smsPrintStatus').textContent().catch(()=>null);
+   throw new Error('Print Centre download did not produce a file: '+error.message+
+    '\\nJob: '+JSON.stringify(card)+'\\nStatus: '+status);
+  }
  }
  function zipEntries(bytes){
   const entries=new Map();
