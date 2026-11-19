@@ -1,5 +1,10 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.34 — Native camera and wiring feedback
+
+- Centre native camera presets on the active solid.
+- Explain unavailable wiring guides and distinguish bore-only exports from routed jobs.
+
 ## v0.16.0-dev.33 — Verified native mounting through-holes
 
 - Add contextual M1…Mn placement, selection, precision editing, keyboard nudge and conservative 3D through-mount validation for native Studio builders.

@@ -1039,7 +1039,16 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const guide=document.createElement('label'),show=document.createElement('input');
   show.type='checkbox';show.dataset.nativePreview='';show.checked=showNativeGuide(model);
   show.onchange=()=>{nativeGuideChoices.set(model.id,show.checked);refreshPixelMarkers(model);};
+  const hasPaths=plan.links.some(link=>link.path.length>1);
+  show.disabled=!hasPaths;
+  if(!hasPaths)show.checked=false;
   guide.append(show,' Show routes and arrows');block.append(guide);
+  if(!hasPaths&&plan.reason&&pixelHoles(model).length){
+   const explanation=document.createElement('p');
+   explanation.dataset.nativeGuideBlocked='';
+   explanation.textContent='No wiring guide is available for these fittings. '+plan.reason;
+   block.append(explanation);
+  }
   block.insertAdjacentHTML('beforeend','<label>Physical pixel pitch<select data-native-pitch'+disabled+
    '><option value="25">25 mm</option><option value="50">50 mm</option><option value="100">100 mm</option><option value="custom">Custom</option></select></label>'+
    '<label>IN tail limit (mm)<input data-native-in-tail type="number" min="5" max="250" value="'+esc(settings.inTail)+'"'+disabled+'></label>'+

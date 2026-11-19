@@ -731,7 +731,33 @@ try{
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
   assert(await serial.locator('[data-native-route]').isDisabled());
   assert.match(await serial.innerText(),/solid decorative gear/);
-  await shot('wt012-openwork-blocked');
+  const automatic=palette.getByRole('button',{name:'Add pixel automatically',exact:true});
+  for(let count=1;count<=4;count++){
+   await automatic.click();
+   assert.equal((await getHoles()).length,count,'Openwork Gear accepts fitting P'+count);
+  }
+  const openworkFittings=await getHoles();
+  assert(await serial.locator('[data-native-preview]').isDisabled());
+  assert.match(await serial.locator('[data-native-guide-blocked]').innerText(),/openwork/);
+  assert(await serial.locator('[data-native-route]').isDisabled());
+  await shot('wt020-openwork-gear-four-pixels');
+  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+  await page.reload();await page.waitForFunction(()=>window.__sensoryStudio);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  assert.deepEqual(await getHoles(),openworkFittings);
+  assert.match(await serial.locator('[data-native-guide-blocked]').innerText(),/openwork/);
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  await routedJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const openworkPack=zipEntries((await useDownload(routedJob.locator('[data-job-export]'))).bytes);
+  assert([...openworkPack.keys()].some(name=>name.endsWith('.stl')));
+  assert(zipEntries((await useDownload(routedJob.locator('[data-job-3mf]'))).bytes).has('3D/3dmodel.model'));
+  assert.equal(JSON.parse(openworkPack.get('print-job-manifest.json')).routing?.channels?.length??0,0);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  for(let count=4;count>=1;count--){
+   await palette.getByRole('button',{name:'P'+count,exact:true}).click();
+   await palette.getByRole('button',{name:'Remove P'+count,exact:true}).click();
+  }
   await page.locator('.sms-workspace-nav [data-tab=design]').click();
   await palette.getByRole('button',{name:'Solid',exact:true}).click();
   await page.locator('.sms-workspace-nav [data-tab=build]').click();

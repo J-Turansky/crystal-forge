@@ -38,3 +38,7 @@ The WT-020 native mounting draft is based on the verified #85 six-family fixture
 ## WT-020 native camera framing
 
 The active native solid bounds drive view presets and orbit centring. Hardware overlays are excluded from those bounds. The six native browser fixtures exercise ISO, front, back, bottom and top before surface placement. This camera regression does not upgrade the fitting, mount, routing, persistence or export columns to proved.
+
+## WT-020 openwork Gear acceptance
+
+`tests/unified-studio-browser.test.mjs` exercises four automatically fitted pixels on the Forked Sun Gear, explicit unavailable wiring, workspace reload and bore-only STL and 3MF exports. The solid Gear scenario separately exercises underside viewport placement and routed geometry. Keep these cells L pending exact-head evidence and manual four-fitting workflow, face/cutaway and published-site verification.
