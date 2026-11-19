@@ -871,6 +871,21 @@ try{
  await page.locator('#pixelBodyDiameter').fill('4.5');
  await page.locator('#pixelBodyHeight').fill('9');
  await page.locator('#pixelFlangeDiameter').fill('5');
+ await page.locator('#pixelFlangeHeight').fill('0.8');
+ await page.locator('#pixelCapHeight').fill('1.5');
+ await page.locator('#pixelWireWidth').fill('1.4');
+ await page.locator('#pixelWireDepth').fill('1.2');
+ const replica=await useDownload(page.locator('#pixelReplicaSTL'));
+ assert.match(replica.name,/^pixel-replica-.*-1to1\.stl$/);
+ const count=replica.bytes.readUInt32LE(80),bounds=[[Infinity,-Infinity],[Infinity,-Infinity],[Infinity,-Infinity]];
+ for(let triangle=0;triangle<count;triangle++)for(let vertex=0;vertex<3;vertex++)for(let axis=0;axis<3;axis++){
+  const value=replica.bytes.readFloatLE(96+triangle*50+vertex*12+axis*4);
+  bounds[axis][0]=Math.min(bounds[axis][0],value);bounds[axis][1]=Math.max(bounds[axis][1],value);
+ }
+ assert.equal(replica.bytes.length,84+count*50);
+ assert(Math.abs(bounds[2][1]-bounds[2][0]-9)<.01,'B is total length including the curved cap');
+ const replica3mf=zipEntries((await useDownload(page.locator('#pixelReplica3MF'))).bytes);
+ assert(replica3mf.has('3D/3dmodel.model'));
  await page.locator('#savePixelProfileBtn').click();
  await wavePalette.getByRole('button',{name:/Reusable 4.5 mm seed/}).waitFor();
  await wavePalette.getByRole('button',{name:'Add pixel automatically',exact:true}).click();

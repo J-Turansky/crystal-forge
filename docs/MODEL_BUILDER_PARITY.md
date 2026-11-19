@@ -54,3 +54,7 @@ The six recipe-based builders share one backing-tab editor under Mounting & atta
 ### Tile backing compatibility repair
 
 Tactile Tiles now have an explicitly allowed single-material fitting backing, separate from the legacy integrated-base feature, while dual-material/partitioned recipes remain rejected. All seven-builder parity cells are still limited until actual browser interactions, saved positions, correct Manifold positive tab unions, screw cuts, STL/3MF and live-site checks pass.
+
+## WT-021 measured pixel replica
+
+The shared A–G profile editor exports a positive nominal LED replica as STL or 3MF through Manifold, independently of the negative fit coupon. The browser fixture requests both downloads and measures total B in the STL. This does not establish seven-family release acceptance or exact fit to a physical LED. See #79 and physical validation #10.

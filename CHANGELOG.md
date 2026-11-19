@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.35.3 — Measured 1:1 pixel replica exports
+
+- Download a positive measured pixel body as STL or 3MF from the A–G profile editor, independently of socket-fit coupons.
+
 ## v0.16.0-dev.35.2 — External fixing tabs with Tile backing compatibility
 
 - Add editable positive external screw tabs on compatible stationary backing across the six native model families.

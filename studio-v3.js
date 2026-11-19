@@ -1,3 +1,6 @@
+import {makePixelReplicaRecipe} from './pixel-replica.js';
+import {prepareRecipe} from './studio-geometry.js';
+import {exportMaterialBodies} from './studio-material-export.js';
 import {lightPassageExportBlock} from './light-passage-inspection.js';
 import * as THREE from 'three';
 import {installExactValueEditors} from './exact-value-editors.js';
@@ -1085,6 +1088,26 @@ $('editPixelProfileBtn').onclick=()=>{
  updatePixelProfileDiagram();
  $('pixelProfileOverlay').hidden=false;$('pixelName').focus();
 };
+for(const format of ['stl','3mf']){
+ const button=$('pixelReplica'+format.toUpperCase());
+ button.onclick=async()=>{
+  const status=$('pixelReplicaStatus');
+  const values=Object.fromEntries(Object.entries(pixelFields).map(([key,id])=>
+   [key,key==='kind'||key==='name'?$(id).value:$(id).valueAsNumber]));
+  button.disabled=true;
+  status.textContent='Preparing the 1:1 positive pixel body…';
+  try{
+   const recipe=makePixelReplicaRecipe(values);
+   const result=prepareRecipe(THREE,await loadManifold(),recipe);
+   const stem='pixel-replica-'+(values.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60)||'custom')+'-1to1';
+   const files=exportMaterialBodies(result,{name:stem});
+   download(new Blob([format==='stl'?files.stls[0].bytes:files.threeMF],
+    {type:format==='stl'?'model/stl':'model/3mf'}),stem+'.'+format);
+   status.textContent='Downloaded a 1:1 replica using the current A–G measurements.';
+  }catch(error){status.textContent=error.message;}
+  finally{button.disabled=false;}
+ };
+}
 $('closePixelProfileBtn').onclick=closePixelEditor;
 $('pixelProfileOverlay').addEventListener('pointerdown',e=>{
  if(e.target===$('pixelProfileOverlay'))closePixelEditor()
