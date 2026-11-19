@@ -1,3 +1,4 @@
+import {putSocket} from './fabrication-v1.js';
 /* Shared solid recipes. Preview components may overlap; only prepareRecipe
  * Boolean results may reach manufacturing exporters. Units mm; Y-up. */
 function ringSolidGeometry(THREE,rings,top){
@@ -128,6 +129,12 @@ export function disposeGroup(group){group.traverse(node=>{if(node.userData.pixel
 export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
  const owned=[];const hold=solid=>(owned.push(solid),solid);
  const convert=part=>{
+  if(part.kind==='pixel-seat'){
+   const {profile}=part,[x,,z]=part.position;
+   const bore=putSocket(wasm,hold,{x:0,z:0},part.radius,profile.bodyHeight+3,-3,profile,
+    {includeLocalWireRelief:part.includeLocalWireRelief});
+   return hold(hold(bore.solid.rotate([0,90-part.pixelRotation,0])).translate([x,0,z]));
+  }
   if(part.kind==='extrude'){
    // Fabricate from the planar contours rather than welding the display triangulation.
    const contours=[part.outline,...(part.holes||[])].map(loop=>loop.map(([x,z])=>[x,-z]));
@@ -154,6 +161,20 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
  try{
   onProgress('Joining physical bodies');let total=union(recipe.positive);
   if(recipe.secondary?.length&&!recipe.partitioned)total=hold(total.add(union(recipe.secondary)));
+  const seats=(recipe.negative||[]).filter(part=>part.kind==='pixel-seat');
+  for(const seat of seats){
+   const [x,,z]=seat.position,{profile}=seat,stockHeight=profile.bodyHeight+2.8;
+   const stockRadius=Math.max(profile.maxDiameter/2+1,seat.includeLocalWireRelief?profile.boreDiameter*.675+4.8:0);
+   const stock=hold(wasm.Manifold.cylinder(stockHeight,stockRadius,stockRadius,32));
+   const envelope=hold(hold(stock.rotate([-90,0,0])).translate([x,0,z]));
+   if(envelope.volume()-hold(total.intersect(envelope)).volume()>.05)
+    throw Error(seat.pixelHole+' needs continuous underside stock, including 2.8 mm above the socket. Increase thickness or move the fitting.');
+   for(const other of recipe.negative||[]){
+    if(other===seat||other.wireChannel)continue;
+    if(hold(envelope.intersect(convert(other))).volume()>.05)
+     throw Error(seat.pixelHole+' lacks clearance from another cut. Move the fitting and check the roof.');
+   }
+  }
   if(recipe.nativeRouting?.ready){
    onProgress('Cutting serial LED channels');
    // Collapse Boolean slivers below the precision of a printable channel.

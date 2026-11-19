@@ -1257,7 +1257,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const hole=holes[selected]||newPixel(chosenProfile(model));
   const fit=resolvePixelFitting(hole,adapter.pixelFitProfiles());
   root.innerHTML='<h3>Pixel fittings</h3><div class="sms-actions"><button type="button" data-pixel-profile-editor>Create / edit pixel profile</button></div>'+
-   '<p>Choose a saved measured profile before placing. A profile selection with P1/P2 selected updates <strong>only that fitting</strong>; otherwise it chooses the next fitting. Native fittings use vertical through-bores with openings on both faces. Cable cuts open on the underside. Print a coupon to check fit.</p>'+
+   '<p>Choose a saved measured profile before placing. A profile selection with P1/P2 selected updates <strong>only that fitting</strong>; otherwise it chooses the next fitting. Plain bores open on both faces. Select an underside fitting to enable a measured blind socket. Cable cuts open on the underside. Print a coupon to check fit.</p>'+
    '<label><input type="checkbox" data-pixel-backing'+(model.build.pixelBacking?' checked':'')+disabled+'> Add fitting backing (12 mm of additional material around each edge)</label>'+
    '<p>Fitting bores need continuous solid material. Thin walls, cavities and narrow rims can block placement.</p>'+
    '<div class="sms-actions" aria-label="Hardware library">'+profiles.map(profile=>
@@ -1269,6 +1269,8 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    '<div class="sms-actions" aria-label="Select pixel">'+holes.map((hole,i)=>'<button type="button" data-select-pixel="'+i+'" aria-pressed="'+(i===selected)+'">P'+(i+1)+'</button>').join('')+'</div>'+
    '<p role="status" data-pixel-status>'+esc(pixelMessages.get(model.id)||'Click a marker to select. Hold then drag to move. Arrow keys nudge 1 mm, or 5 mm with Shift.')+'</p>'+
    (selected<0?'':pixelHoleMarkup(holes[selected],selected,esc,disabled,profiles)+
+    '<label><input type="checkbox" data-shaped-socket'+(hole.socketProfile?' checked':'')+disabled+'> Shape this underside socket from the measured profile</label>'+
+    (hole.socketProfile?'<label>Retention lip (mm)<input type="number" data-seat-retention min="0" max=".7" step=".05" value="'+esc(hole.socketProfile.retentionLip)+'"'+disabled+'></label>':'')+
     '<div class="sms-actions"><button type="button" data-pixel-previous'+(selected===0?' disabled':disabled)+'>Move earlier</button><button type="button" data-pixel-next'+(selected===holes.length-1?' disabled':disabled)+'>Move later</button><button type="button" data-duplicate-pixel'+noAdd+'>Duplicate fitting in 3D</button></div>')+
    '<section aria-label="Test print"><h3>Test print</h3><p>'+esc(fit.profileName)+' · '+fit.nominalDiameter+' mm nominal · '+fit.diameter+' mm body · '+fit.boreDiameter+' mm bore · '+fit.clearance+' mm clearance.</p>'+
    '<p>'+esc(fit.warning)+' Print flat with the intended material and nozzle. Test the actual pixel and record the bore that fits.</p>'+
@@ -1298,6 +1300,22 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    renderPalette();
    root.querySelectorAll('[data-fit-profile]').forEach(control=>{if(control.dataset.fitProfile===profileId)control.focus({preventScroll:true});});
   });
+  const shaped=root.querySelector('[data-shaped-socket]');
+  if(shaped)shaped.onchange=()=>{
+   const enabled=shaped.checked;
+   if(enabled&&(hole.entryFace!=='underside'||!fit.profile?.bodyHeight)){
+    shaped.checked=false;pixelStatus(model,'Place or select an underside fitting and choose a measured profile first.');return;
+   }
+   const next={...hole};
+   if(enabled)next.socketProfile={...fit.profile,retentionLip:0};
+   else delete next.socketProfile;
+   if(!editPixel(model,selected,next))shaped.checked=!!hole.socketProfile;
+  };
+  const lip=root.querySelector('[data-seat-retention]');
+  if(lip)lip.onchange=()=>{
+   if(!lip.value||!lip.checkValidity()||!editPixel(model,selected,{...hole,
+    socketProfile:{...hole.socketProfile,retentionLip:lip.valueAsNumber}}))lip.value=hole.socketProfile.retentionLip;
+  };
   const armPlacement=duplicate=>{
    placementModel=model.id;pendingDuplicate=duplicate;viewport.dataset.nativePlacement='outside';
    renderPalette();viewport.tabIndex=0;viewport.focus({preventScroll:true});

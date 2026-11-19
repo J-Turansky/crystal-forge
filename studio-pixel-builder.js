@@ -13,7 +13,7 @@ export function newPixel(profile=defaultProfile,x=0,z=0){
 export const checkedPixelBore=(recipe,hole,others)=>pixelBoreIssue(recipe,hole,others);
 const radius=hole=>(hole.diameter+hole.clearance)/2;
 
-export function addPixelHoleCuts(recipe,holes=[]){
+export function addPixelHoleCuts(recipe,holes=[],{routed=false}={}){
  if(!Array.isArray(holes)||holes.length>maximumHoles)throw Error('Use up to 16 pixel holes per model.');
  for(let index=0;index<holes.length;index++){
   const hole=holes[index],label='Pixel hole '+(index+1);
@@ -25,9 +25,27 @@ export function addPixelHoleCuts(recipe,holes=[]){
    throw Error(label+' is too close to the edge of the model bounds.');
   if(holes.slice(0,index).some(other=>Math.hypot(hole.x-other.x,hole.z-other.z)<bore+radius(other)+minimumWeb))
    throw Error(label+' overlaps or is too close to another pixel hole.');
-  recipe.negative.push({kind:'cylinder',radius:bore,height:height+12,position:[hole.x,height/2,hole.z],pixelHole:label,pixelId:pixelId(hole,index),pixelRotation:hole.rotation??0,pixelEntryFace:hole.entryFace});
+  const cut={kind:'cylinder',radius:bore,height:height+12,position:[hole.x,height/2,hole.z],
+   pixelHole:label,pixelId:pixelId(hole,index),pixelRotation:hole.rotation??0,pixelEntryFace:hole.entryFace};
+  if(hole.socketProfile){
+   if(hole.entryFace!=='underside'||recipe.partitioned||recipe.dualMaterial)
+    throw Error(label+' requires an underside entry and single-material stock for a shaped socket.');
+   const profile=hole.socketProfile;
+   if(![profile.bodyHeight,profile.capHeight,profile.flangeDiameter,profile.flangeHeight,profile.wireWidth,profile.wireDepth,profile.retentionLip].every(Number.isFinite)||
+    profile.bodyHeight<3||profile.bodyHeight>50||profile.capHeight<=0||profile.capHeight>=profile.bodyHeight||
+    profile.flangeDiameter<0||profile.flangeDiameter>38||profile.flangeHeight<0||profile.flangeHeight+profile.capHeight>=profile.bodyHeight||
+    profile.wireWidth<0||profile.wireWidth>12||profile.wireDepth<0||profile.wireDepth>8||profile.retentionLip<0||profile.retentionLip>.7)
+    throw Error(label+' has invalid measured socket dimensions.');
+   if(height<profile.bodyHeight+2.8)throw Error(label+' needs '+(profile.bodyHeight+2.8).toFixed(1)+' mm of stock for its socket and roof.');
+   cut.kind='pixel-seat';
+   cut.includeLocalWireRelief=!routed;
+   cut.profile={...profile,id:hole.profileId,bodyDiameter:hole.diameter,clearance:hole.clearance,
+    boreDiameter:bore*2,maxDiameter:Math.max(hole.diameter,profile.flangeDiameter)+hole.clearance};
+  }
+  recipe.negative.push(cut);
  }
- if(holes.length)recipe.warnings.push('Pixel bores are cut vertically through the model. Inspect the prepared mesh and print a fit test before making the full part.');
+ if(holes.some(hole=>!hole.socketProfile))recipe.warnings.push('Plain pixel bores pass vertically through the model. Inspect the prepared mesh before printing.');
+ if(holes.some(hole=>hole.socketProfile))recipe.warnings.push('Inspect the prepared underside seats and test physical fit before printing the full part.');
 }
 
 export function pixelProfiles(customProfiles=[]){

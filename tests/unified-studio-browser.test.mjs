@@ -905,6 +905,10 @@ try{
  }
  assert(Math.abs(signedVolume)>1000&&Math.abs(signedVolume)<32*32*15,'The exported block retains stock and loses cavity volume');
  assert(zipEntries((await useDownload(page.locator('#pixelSocket3MF'))).bytes).has('3D/3dmodel.model'));
+ const routedSpecimen=await useDownload(page.locator('#routeSpecimenSTL'));
+ assert.equal(routedSpecimen.name,'two-pixel-route-test.stl');
+ assert.equal(routedSpecimen.bytes.length,84+50*routedSpecimen.bytes.readUInt32LE(80));
+ assert(zipEntries((await useDownload(page.locator('#routeSpecimen3MF'))).bytes).has('3D/3dmodel.model'));
  await page.locator('#applyPixelSocketFit').click();
  await wavePalette.getByRole('button',{name:/Reusable 4.5 mm seed/}).waitFor();
  await wavePalette.getByRole('button',{name:'Add pixel automatically',exact:true}).click();

@@ -140,7 +140,7 @@ function positionedInnerCrystal(c,s,openingY,wall){
  mesh.updateMatrixWorld(true);
  return mesh;
 }
-function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLocalWireRelief=true}={}){
+export function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLocalWireRelief=true}={}){
  // Legacy standalone LED seats can have local cable exit reliefs.
  // They MUST NOT be combined with any external planned wiring grooves:
  // those cuts use a different fixed axis and appear as disconnected stubs.
