@@ -45,3 +45,9 @@ Physical-only gate (#10): owner reported a tight but successful fit and a roughl
 - tests/fabrication.test.mjs now independently decodes a complete Crystal's STL and 3MF. The single-pixel IN/OUT fixture samples the usable channel at intervals of at most 1 mm, across a 5.8 mm span and to 1.95 mm depth. Both formats pass. A shallow backing is refused. Exact bend/edge cross sections and multi-pixel junction coverage remain open.
 - Both exports match the conical apex and a 2 mm rise over a 2 mm radial run in print-Z coordinates. A shallow full model refuses the conical socket. Previous cutter containment and coupon tests supply separate fit evidence. Other orientations and builders are still outstanding.
 - Next: establish an asymmetric multi-pixel serial fixture with an actual turn, then measure its exterior apertures and junctions across the full usable section.
+
+### Asymmetric two-pixel Crystal evidence
+
+- tests/fabrication.test.mjs: two offset gumdrop sockets with retention, sampled curved link, IN and OUT. The independently decoded STL and 3MF pass route clearance point probes and both roof apex and radial slope measurements. A 25 mm inter-pixel cable is rejected. Existing single-pixel, thin backing and shallow socket checks remain.
+- The fixture reproduced degenerate STL facets from overlapping vaulted cuts. fabrication-v1.js rebuilds and simplifies the Manifold at 0.0001 mm tolerance, and refuses volume drift over 0.01 cubic millimetres.
+- Next: use explicit exterior-face cross sections and bend-radius checks, add blocked-exit and collision cases with state preservation, and implement FIT-02 physical preview. Keep DIM-04 and FAB-01/02 PARTIAL.

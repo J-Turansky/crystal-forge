@@ -436,19 +436,31 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
  assert.equal(serialMesh.wireChannelsCut,serialPlan.wirePlan.routes.length,
   'Manifold removes every approved IN/OUT groove in the string plan');
  const routedVault={...serialOne,baseHeight:35,wireWidth:6,wireDepth:2,wireVaulted:true,socketConical:true};
- const routed=prepareFabrication({wasm,...assembly(routedVault),settings:routedVault});
+ const asymmetric={...routedVault,lightingMode:'multi',pixelCount:2,pixelStringSpacing:100,
+  pixelRetentionLip:.15,manualPixelHoles:[{x:-18,z:-4,wireAngle:0},{x:18,z:6,wireAngle:0}]};
+ for(const installation of [routedVault,asymmetric]){
+ const routed=prepareFabrication({wasm,...assembly(installation),settings:installation});
  const routes=routed.report.hardware.wirePlan.routes;
- const socket=routed.report.socketCeilings[0];
- assert(socket&&routes.length>1);
+ const sockets=routed.report.socketCeilings;
+ assert.equal(sockets.length,installation.pixelCount===2&&installation.lightingMode==='multi'?2:1);
+ assert(routes.length>1);
+ if(installation===asymmetric){
+  const links=routed.report.hardware.wirePlan.connections;
+  assert.deepEqual(links.map(link=>link.kind),['input','link','output']);
+  assert(links[1].segments>1,'Asymmetric link must use the sampled curve');
+  assert(links[1].lengthMm<=100);
+ }
  for(const [format,positions] of crystalExportTriangles(routed)){
   const geometry=new THREE.BufferGeometry();
   geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
   const mesh=new THREE.Mesh(geometry,material);
   const ceiling=(x,z)=>new THREE.Raycaster(new THREE.Vector3(x,-z,-1),new THREE.Vector3(0,0,1)).intersectObject(mesh)[0]?.point.z;
+  for(const socket of sockets){
   const apex=ceiling(socket.x,socket.z);
   assert(Math.abs(apex-socket.tipY)<.001,format+' full-model conical apex');
   assert(Math.abs(apex-ceiling(socket.x+2,socket.z)-2)<.001,format+' conical roof falls 2 mm over 2 mm');
+  }
   for(const {a,b} of routes){
    const span=Math.hypot(b.x-a.x,b.z-a.z);
    for(let i=0;i<=Math.ceil(span);i++){
@@ -463,6 +475,9 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
   geometry.dispose();material.dispose();
  }
  routed.geometry.dispose();
+ }
+ const tooShort={...asymmetric,pixelStringSpacing:25};
+ assert.throws(()=>prepareFabrication({wasm,...assembly(tooShort),settings:tooShort}),/Pixel string route invalid/);
  const thin={...routedVault,baseHeight:5};
  assert.throws(()=>prepareFabrication({wasm,...assembly(thin),settings:thin}),/Pixel string route invalid/);
  const shallowSocket={...routedVault,baseHeight:25,wireChannels:false};

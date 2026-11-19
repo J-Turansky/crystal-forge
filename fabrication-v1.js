@@ -577,7 +577,18 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
     }
     return hold(hold(groove.rotate([0,angle,0])).translate([mx,0,mz]));
    });
-   const cut=hold(combined.subtract(hold(wasm.Manifold.union(grooves))));
+   // Overlapping vaulted segments can produce slivers below STL precision.
+   const joined=hold(wasm.Manifold.union(grooves));
+   let cut=hold(combined.subtract(joined));
+   if(s.wireVaulted){
+    const tolerance=.0001;
+    const rounded=hold(new wasm.Manifold(cut.getMesh()));
+    const simplified=hold(hold(rounded.asOriginal()).simplify(tolerance));
+    assertSolid(simplified,'Vaulted track mesh cleanup');
+    if(Math.abs(simplified.volume()-cut.volume())>.01)
+     throw Error('Vaulted track cleanup changed the model volume. Adjust the route before exporting.');
+    cut=simplified;
+   }
    assertSolid(cut,'Underside wiring grooves');combined=cut;
    wireChannelsCut=grooves.length;
    warnings.push('Shallow underside wiring grooves are not complete enclosed conduits. Check physical wire bend radius, exit and strain relief.');
