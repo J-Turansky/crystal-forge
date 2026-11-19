@@ -779,8 +779,17 @@ try{
  // WT-019: use actual model-camera input at a known solid location on
  // each native fixture. Restore the auto seed on an unsupported face.
  const checkNativeDoubleClick=async (type,palette,hole)=>{
-  await page.locator('[data-view=top]').click();
-  await page.waitForTimeout(500);
+  for(const [view,direction] of [['iso',[1,.75,1]],['front',[0,.12,1]],['back',[0,.12,-1]],['bottom',[0,-1,.0001]],['top',[0,1,.0001]]]){
+   await page.locator('[data-view='+view+']').click();
+   await page.waitForFunction(direction=>{
+    const {modelSize,center,target,camera,screen}=window.__crystalForgeViewMetrics();
+    const offset=camera.map((value,i)=>value-target[i]);
+    const dot=offset.reduce((sum,value,i)=>sum+value*direction[i],0);
+    const aligned=dot/(Math.hypot(...offset)*Math.hypot(...direction))>.999;
+    return aligned&&modelSize.every(size=>size>0)&&Math.abs(screen[0])<.02&&Math.abs(screen[1])<.02&&
+     Math.hypot(...center.map((value,i)=>value-target[i]))<.1;
+   },direction);
+  }
   await palette.getByRole('button',{name:'Remove P1',exact:true}).click();
   const screen=await page.evaluate(({x,z})=>window.__sensoryStudio.fittingPointScreen(x,z,'top'),hole);
   assert(screen,type+' projects the solid face at the fitted point');

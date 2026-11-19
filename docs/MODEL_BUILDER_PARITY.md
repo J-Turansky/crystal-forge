@@ -34,3 +34,7 @@ WT019-06 extends real viewport double-click coverage to the six native fixtures,
 ## WT020-01 — Native mounting integration candidate
 
 The WT-020 native mounting draft is based on the verified #85 six-family fixture tip, not on deployed main. It adds contextual Add mounting feature, toolbar continuous placement, numbered direct-select M markers, 2–8 mm through-hole precision edits, delete and keyboard nudge, guarded negative geometry and preview rings. A positive result must pass the existing solid-column certificate and have a real cutting intersection, with actual Manifold/STL/3MF tests for all six native generator families; it must refuse unsupported side-facing mounts, voids, shaft/cavity interference, pixel overlap and unsafe routing. Native mount placement uses vertical through-holes, not arbitrary normal-aligned sockets, inserts or load-rated fasteners. Crystal keeps its established mount editor. Do not mark the L cells P until latest-head browser/production tests, storage round-trip and full user walk-through are proven. Hardware load, fit and Cura acceptance stay in #10.
+
+## WT-020 native camera framing
+
+The active native solid bounds drive view presets and orbit centring. Hardware overlays are excluded from those bounds. The six native browser fixtures exercise ISO, front, back, bottom and top before surface placement. This camera regression does not upgrade the fitting, mount, routing, persistence or export columns to proved.

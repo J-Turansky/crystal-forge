@@ -703,10 +703,17 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const normal=hit.face.normal.clone().applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld));
   return {point:hit.point,normal};
  }
+ function nativeModelBounds(meshes){
+  const model=active();
+  if(mode!=='model'||!model||model.generator.typeId==='crystals')return null;
+  const bounds=new THREE.Box3();
+  for(const mesh of meshes??fittingMeshes(model))bounds.expandByObject(mesh);
+  return bounds;
+ }
  function fittingPointScreen(x,z,face){
   const model=active(), meshes=model?fittingMeshes(model):[];
-  const bounds=new THREE.Box3();
-  for(const mesh of meshes)bounds.expandByObject(mesh);
+  const bounds=nativeModelBounds(meshes);
+  if(!bounds)return null;
   if(bounds.isEmpty())return null;
   const underside=face==='underside';
   const origin=new THREE.Vector3(x,underside?bounds.min.y-1:bounds.max.y+1,z);
@@ -2077,5 +2084,5 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  if(shell)showHome();
  save();
  window.__sensoryStudio={project,registry,get currentModel(){return active();},get mode(){return mode;},switchModel,addModel:add,showLibrary,showPrint,send,prepare,saveImmediately,fittingPointScreen,pixelMarkerScreen:id=>{const marker=pixelMarkers(active()).find(item=>item.userData.pixelId===id);return marker?projectMarker(marker):null;},get cacheSize(){return cache.size;},get metrics(){return {previewBuilds,geometries:renderer.info.memory.geometries,activeWorkers:workers.size};}};
- return {onCrystalChange:captureCrystal,backup};
+ return {onCrystalChange:captureCrystal,backup,nativeModelBounds};
 }

@@ -640,6 +640,8 @@ function updateAppearance(){
  }
 }
 function modelBounds(){
+ const nativeBounds=studioBridge?.nativeModelBounds();
+ if(nativeBounds)return nativeBounds;
  const box=new THREE.Box3();
  const meshes=manufacturingMesh?.visible?[manufacturingMesh]:[...crystalMeshes,...(baseMesh?[baseMesh]:[]),...baseAccents];
  for(const mesh of meshes)if(mesh.visible)box.expandByObject(mesh);
@@ -681,8 +683,7 @@ function tweenCamera(to,target){
  cameraTween={from:camera.position.clone(),to,origin:orbit.target.clone(),target,start:performance.now()};
 }
 function snapView(key){
- const box=new THREE.Box3();for(const m of [...crystalMeshes,...(baseMesh?[baseMesh]:[]),...baseAccents])if(m.visible)box.expandByObject(m);
- if(manufacturingMesh?.visible)box.expandByObject(manufacturingMesh);
+ const box=modelBounds();
  const target=box.isEmpty()?new THREE.Vector3(0,45,0):box.getCenter(new THREE.Vector3());
  const dist=Math.max(125,minFramingDistance(box));
  const directions={iso:[1,.75,1],front:[0,.12,1],back:[0,.12,-1],left:[-1,.12,0],right:[1,.12,0],top:[0,1,.0001],bottom:[0,-1,.0001]};
