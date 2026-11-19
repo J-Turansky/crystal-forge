@@ -169,7 +169,7 @@ export function nativeFittingPreviews(THREE,wasm,recipe){
    if(positive.status()!=='NoError'||negative.status()!=='NoError')throw Error('Invalid physical fitting preview.');
    return {pixelId:seat.pixelId,
     positive:positive.getMesh(),negative:negative.getMesh(),
-    insertionDepth:bore.usableBodyDepth,remainingRoof:bore.remainingWall,
+    insertionDepth:bore.usableBodyDepth,nominalRoofAllowance:bore.remainingWall,
     exposedVolume:exposed.volume(),collisionVolume:collision.volume()};
   });
  }finally{owned.reverse().forEach(solid=>{try{solid.delete();}catch{}});}
