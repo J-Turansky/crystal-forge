@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import Module from 'manifold-3d';
 import {generateFormation,crystalGeometry,baseGeometry,baseAccentSpecs,baseSurfaceHeight,baseProfileHeight,baseEdgeHeight,crystalRootOffset,crystalOrientation,crystalEndRatios} from '../geometry-v3.js';
-import {setThreeInstance,prepareFabrication,makeCalibrationStrip,makePixelSeatCoupon,splitPreparedMesh,splitPreparedMeshGrid,makeSplitPinCoupon,makeDetachablePlate,makeSteppedPixelCoupon,encodeSTL,saveSTL,save3MF} from '../fabrication-v1.js';
+import {setThreeInstance,prepareFabrication,probeLightPassageSegment,makeCalibrationStrip,makePixelSeatCoupon,splitPreparedMesh,splitPreparedMeshGrid,makeSplitPinCoupon,makeDetachablePlate,makeSteppedPixelCoupon,encodeSTL,saveSTL,save3MF} from '../fabrication-v1.js';
 setThreeInstance(THREE);
 import {planHardware} from '../hardware-layout.js';
 import {planBedAwareSplit} from '../bed-split.js';
@@ -22,10 +22,7 @@ const wasm=await Module();wasm.setup();
  const open=block.subtract(opening);
  const inspect=solid=>auditLightPassages({solid,crystals:[{id:'test-spike'}],mode:'targeted',
   paths:new Map([['test-spike',{source:'LED socket P1',access:true,points:[[5,4,5],[5,9,5]]}]]),skipped:new Map(),
-  probe:(from,to)=>{
-   const probe=wasm.Manifold.cylinder(to[1]-from[1],.2,.2).rotate([-90,0,0]).translate(from);
-   const overlap=solid.intersect(probe),volume=overlap.volume();overlap.delete();probe.delete();return volume;
-  }});
+  probe:(from,to)=>probeLightPassageSegment(wasm,solid,from,to)});
  const clear=inspect(open),blocked=inspect(block);
  assert.equal(clear.rows[0].status,'clear');assert.equal(blocked.rows[0].status,'blocked');
  assert.equal(lightPassageExportBlock(false,blocked),'');
@@ -407,6 +404,8 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
  assert(ready.targetedLightCount>0,'Manifold actually subtracts a physical optical passage');
  const inspection=ready.lightPassageInspection;
  assert.equal(inspection.mode,'targeted');
+ assert(Number.isFinite(inspection.samplingMs));
+ console.log('WT-013 targeted inspection',JSON.stringify({counts:inspection.counts,samplingMs:inspection.samplingMs,meshTriangles:inspection.meshTriangles}));
  assert.equal(inspection.physicalOpticalVerification,false);
  assert.equal(inspection.rows.length,Object.values(inspection.counts).reduce((sum,count)=>sum+count,0));
  for(const id of ready.targetedLightAcceptedIds){

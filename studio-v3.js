@@ -192,7 +192,7 @@ function syncForm(){
   else e.value=s[k]??'';
  }
  const strictLight=document.querySelector('[data-state="requireAccessiblePassages"]');
- if(strictLight)strictLight.disabled=!s.requireAccessiblePassages&&!(s.cutSockets&&(s.targetedLightPaths||s.hollowCrystals||(s.baseVault&&s.lightPorts)));
+ if(strictLight)strictLight.disabled=!s.requireAccessiblePassages&&!(s.cutSockets&&s.lightingMode!=='none'&&(s.targetedLightPaths||s.hollowCrystals||(s.baseVault&&s.lightPorts)));
  for(const e of document.querySelectorAll('[data-out]'))e.textContent=format(e.dataset.out,s[e.dataset.out]);
  const weights=s.familyWeights||{};
  for(const e of document.querySelectorAll('[data-family-weight]')){
@@ -1199,7 +1199,11 @@ async function buildManufacturing(){
   geometry.setAttribute('position',new THREE.BufferAttribute(result.positions,3));
   geometry.computeVertexNormals();
   manufacturingReport=result.report;preparedSource=source;
-  if(manufacturingReport.lightPassageInspection)manufacturingReport.lightPassageInspection.preparedFingerprint=source;
+  if(manufacturingReport.lightPassageInspection){
+   let signature=2166136261;
+   for(let index=0;index<source.length;index++)signature=Math.imul(signature^source.charCodeAt(index),16777619);
+   manufacturingReport.lightPassageInspection.preparedFingerprint=(signature>>>0).toString(16).padStart(8,'0');
+  }
   manufacturingMesh=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({
    color:s.colour,metalness:0,roughness:.42,flatShading:true,side:THREE.DoubleSide
   }));

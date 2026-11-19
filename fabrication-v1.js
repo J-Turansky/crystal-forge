@@ -196,6 +196,18 @@ function lightTunnel(wasm,start,end,rStart,rEnd,minLength=1){
  const solid=convertMesh(wasm,tube);
  geom.dispose();return solid;
 }
+// Intersect the exact finite centreline segment against the final material.
+export function probeLightPassageSegment(wasm,solid,from,to){
+ const start=new THREE.Vector3(...from),end=new THREE.Vector3(...to);
+ let tube,overlap;
+ try{
+  tube=lightTunnel(wasm,start,end,.2,.2,0);
+  overlap=solid.intersect(tube);
+  const status=overlap.status();
+  return !status||['NoError','no-error','Success'].includes(status)?Math.abs(overlap.volume()):NaN;
+ }catch{return NaN;}
+ finally{overlap?.delete();tube?.delete();}
+}
 // Real open underside and integral 45-degree flared buttresses, independent of
 // Cura infill. This does NOT manufacture an empty space within each spike.
 function vaultCylinder(wasm,hold,x,z,y,height,r0,r1=r0){
@@ -595,24 +607,17 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
    }
   }
   onProgress('Auditing the final manifold geometry and printer limits…');
-  const inspectionMode=s.hollowCrystals?'hollow':s.targetedLightPaths?'targeted':portPlan.requested?'vault':'none';
+  const inspectionMode=s.lightingMode==='none'?'none':s.hollowCrystals?'hollow':portPlan.requested&&vault.applied?'vault':s.targetedLightPaths?'targeted':portPlan.requested?'vault':'none';
+  const auditStarted=performance.now();
   const lightPassageInspection=auditLightPassages({solid:combined,crystals,mode:inspectionMode,paths:inspectedPaths,
    skipped:new Map([...inspectionSkips,...[...portPlan.skipped,...targetedPlan.skipped].map(item=>[item.id,item.reason])]),
    required:s.requireAccessiblePassages,crystalPositions:new Map(live.filter(object=>object.userData?.crystalId!=null).map(object=>{
     object.geometry.computeBoundingBox();
     const point=new THREE.Vector3(0,object.geometry.boundingBox.max.y*.65,0).applyMatrix4(object.matrixWorld);
     return [object.userData.crystalId,point.toArray()];
-   })),probe:(from,to)=>{
-    const a=new THREE.Vector3(...from),b=new THREE.Vector3(...to);
-    // The probe uses the exact segment even if shorter than a manufacturing cut.
-    let tube, overlap;
-    try{
-     tube=lightTunnel(wasm,a,b,.2,.2,0);
-     overlap=combined.intersect(tube);
-     return ['NoError','no-error','Success',undefined].includes(overlap.status())?Math.abs(overlap.volume()):NaN;
-    }catch{return NaN;}
-    finally{overlap?.delete();tube?.delete();}
-   }});
+   })),probe:(from,to)=>probeLightPassageSegment(wasm,combined,from,to)});
+  lightPassageInspection.samplingMs=Math.round(performance.now()-auditStarted);
+  lightPassageInspection.meshTriangles=combined.numTri();
   const resultMesh=combined.getMesh();
   const geom=fromResultMesh(resultMesh),indexed=compactMesh(resultMesh);
   const bounds=combined.boundingBox();
