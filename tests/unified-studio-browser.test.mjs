@@ -565,10 +565,21 @@ try{
  assert(threeMF.has('3D/3dmodel.model'));
  const manifest=JSON.parse(pack.get('print-job-manifest.json'));
  const preparedTile=(await queue()).find(job=>job.id===tileJob.id);
+ const meshXML=threeMF.get('3D/3dmodel.model').toString();
+ assert.match(meshXML,/<model unit="millimeter"/);
+ const vertices=[...meshXML.matchAll(/<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"/g)].map(vertex=>vertex.slice(1).map(Number));
+ assert(vertices.length>0);
+ for(let axis=0;axis<3;axis++){
+  const values=vertices.map(vertex=>vertex[axis]);
+  const exportedSize=values.reduce((a,b)=>Math.max(a,b),-Infinity)-values.reduce((a,b)=>Math.min(a,b),Infinity);
+  assert(Math.abs(manifest.dimensionsMm[axis]-exportedSize)<.001,'Manifest dimensions must match the actual Z-up export');
+ }
+ await shot('production-print-handoff');
  assert.deepEqual(manifest,{
   schemaVersion:1,modelId:fixture.tile,modelName:queueTileName,generatorType:'tactile-tiles',
   modelRevision:preparedTile.revision,jobId:tileJob.id,preparedRevision:preparedTile.preparedRevision,
-  printer:'Ultimaker 2+',nozzleMm:.8,material:'PETG',quality:35,curaProfile:'included',files:[...pack.keys()]
+  printer:'Ultimaker 2+',nozzleMm:.8,material:'PETG',quality:35,units:'mm',coordinateFrame:'Z-up',
+  dimensionsMm:manifest.dimensionsMm,curaProfile:'included',files:[...pack.keys()]
  });
  assert.match(printPack.name,/^cafe-weather-[a-z0-9-]+-rev[0-9]+-[0-9a-f]{16}\.zip$/);
  assert(printPack.name.length<85);
