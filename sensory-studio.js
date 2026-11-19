@@ -524,7 +524,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
       overlay.renderOrder=kind==='positive'?96:95;
       c.group.add(overlay);
      }
-     messages.push('P'+(index+1)+' · insertion '+fit.insertionDepth.toFixed(2)+' mm · centre roof '+fit.remainingRoof.toFixed(2)+' mm · '+fit.exposedVolume.toFixed(2)+' mm³ outside stock · '+fit.collisionVolume.toFixed(2)+' mm³ stock interference');
+     messages.push('P'+(index+1)+' · insertion '+fit.insertionDepth.toFixed(2)+' mm · nominal cutter roof allowance '+fit.nominalRoofAllowance.toFixed(2)+' mm (local stock not measured) · '+fit.exposedVolume.toFixed(2)+' mm³ outside stock · '+fit.collisionVolume.toFixed(2)+' mm³ stock interference');
     }
     report(messages.join(' | ')||'Select a measured shaped socket to preview its physical fit.');
    }catch(error){if(cache.get(model.id)===c&&c.fitToken===token)report('Physical fitting preview unavailable: '+error.message);}
