@@ -1086,6 +1086,9 @@ $('editPixelProfileBtn').onclick=()=>{
  const p=resolvePixelProfile(s);
  for(const [k,id] of Object.entries(pixelFields))$(id).value=p[k];
  updatePixelProfileDiagram();
+ $('pixelSocketClearance').value=p.measuredFit
+  ?(p.measuredFit.printedBoreDiameter-p.measuredFit.bodyDiameter).toFixed(2):s.pixelFit;
+ $('pixelSocketStatus').textContent='';
  $('pixelProfileOverlay').hidden=false;$('pixelName').focus();
 };
 for(const format of ['stl','3mf']){
@@ -1112,12 +1115,49 @@ $('closePixelProfileBtn').onclick=closePixelEditor;
 $('pixelProfileOverlay').addEventListener('pointerdown',e=>{
  if(e.target===$('pixelProfileOverlay'))closePixelEditor()
 });
-$('savePixelProfileBtn').onclick=()=>{
+function socketFitFromEditor(){
+ const input=$('pixelSocketClearance');
+ if(!input.checkValidity()||!Number.isFinite(input.valueAsNumber))throw Error('Enter a clearance between −0.50 and +0.80 mm.');
+ return input.valueAsNumber;
+}
+for(const format of ['stl','3mf']){
+ const button=$('pixelSocket'+format.toUpperCase());
+ button.onclick=async()=>{
+  const status=$('pixelSocketStatus');
+  button.disabled=true;
+  try{
+   for(const [key,id] of Object.entries(pixelFields)){
+    if(key!=='name'&&key!=='kind'&&(!$(id).value||!$(id).checkValidity()))
+     throw Error('Enter valid A–G profile dimensions before printing a test socket.');
+   }
+   const profile=normalisePixelProfile({...Object.fromEntries(Object.entries(pixelFields).map(([key,id])=>
+    [key,key==='kind'||key==='name'?$(id).value:$(id).valueAsNumber])),id:'custom-test-socket'});
+   const fit=socketFitFromEditor(),single=!$('pixelSocketPlate').checked;
+   const settings={...s,pixelProfileId:profile.id,pixelProfiles:[profile],pixelDiameter:profile.bodyDiameter,pixelFit:fit};
+   status.textContent='Preparing the negative test socket…';
+   const coupon=makePixelSeatCoupon(await loadManifold(),settings,{single,openWireExits:!single});
+   try{
+    const save=format==='3mf'?save3MF:saveSTL;
+    save(coupon.geometry,(single?'pixel-test-socket':'pixel-socket-tolerance-plate')+'.'+format);
+    status.textContent='Downloaded underside socket bore '+coupon.diameters.map(n=>n.toFixed(2)).join(', ')+' mm.';
+   }finally{coupon.geometry.dispose();}
+  }catch(error){status.textContent=error.message;}
+  finally{button.disabled=false;}
+ };
+}
+function savePixelProfileFromEditor(applySocketFit=false){
  const data={};
  for(const [k,id] of Object.entries(pixelFields))
   data[k]=['name','kind'].includes(k)?$(id).value:Number($(id).value);
  if(!String(data.name||'').trim()){alert('Enter a profile name.');return}
  data.id=s.pixelProfileId.startsWith('custom-')?s.pixelProfileId:'custom-'+Date.now().toString(36);
+ if(applySocketFit){
+  let fit;
+  try{fit=socketFitFromEditor();}catch(error){$('pixelSocketStatus').textContent=error.message;return;}
+  const nominal=normalisePixelProfile(data).bodyDiameter;
+  data.measuredFit={bodyDiameter:nominal,printedBoreDiameter:Math.round((nominal+fit)*100)/100};
+  s.pixelFit=fit;s.fitCalibration=null;
+ }else data.measuredFit=readPixelFitProfiles().find(profile=>profile.id===data.id)?.measuredFit;
  const p=normalisePixelProfile(data);
  s.pixelProfiles=[...(s.pixelProfiles||[]).filter(x=>x.id!==p.id),p].slice(-30);
  s.pixelProfileId=p.id;s.pixelDiameter=p.bodyDiameter;
@@ -1126,7 +1166,9 @@ $('savePixelProfileBtn').onclick=()=>{
  closePixelEditor();syncForm();rebuild();snapshot();
  document.dispatchEvent(new CustomEvent('studio-pixel-profile-saved',{detail:{profileId:p.id}}));
  setStatus('Custom pixel profile saved: '+p.name+'. Prepare print mesh again.');
-};
+}
+$('savePixelProfileBtn').onclick=()=>savePixelProfileFromEditor();
+$('applyPixelSocketFit').onclick=()=>savePixelProfileFromEditor(true);
 $('deletePixelProfileBtn').onclick=()=>{
  const id=s.pixelProfileId;
  if(!id.startsWith('custom-')){alert('Built-in presets cannot be deleted.');return}

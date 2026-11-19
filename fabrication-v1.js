@@ -693,8 +693,9 @@ export function encodeSTL(geometry){
 }
 // A real stepped pixel-body and flange fitting coupon. Each of five pockets
 // uses the EXACT socket cutter from the full build, not a plain round hole.
-export function makePixelSeatCoupon(wasm,s,{openWireExits=true}={}){
- const spec=calibrationSpec(s,'stepped'),profile=resolvePixelProfile(s),keep=[],hold=m=>{keep.push(m);return m};
+export function makePixelSeatCoupon(wasm,s,{openWireExits=true,single=false}={}){
+ const profile=resolvePixelProfile(s),keep=[],hold=m=>{keep.push(m);return m};
+ const spec=single?{fits:[profile.clearance],captions:[],diameters:[profile.boreDiameter]}:calibrationSpec(s,'stepped');
  const labels=spec.captions,pitch=Math.max(32,profile.maxDiameter+20),
   width=Math.max(32,profile.maxDiameter+22),roof=Math.max(12,profile.bodyHeight+6);
  try{
@@ -714,14 +715,14 @@ export function makePixelSeatCoupon(wasm,s,{openWireExits=true}={}){
     wireExits.push(hold(wasm.Manifold.cube([laneWidth,laneDepth+.6,width+2])
       .translate([centreX-laneWidth/2,-.5,-1])));
    }
-   legend.push(...couponLegendCuts(wasm,hold,labels[i],centreX,width-8,roof));
+   if(!single)legend.push(...couponLegendCuts(wasm,hold,labels[i],centreX,width-8,roof));
   }
   let cut=hold(bar.subtract(hold(wasm.Manifold.union([...cutters,...wireExits]))));
   if(legend.length)cut=hold(cut.subtract(hold(wasm.Manifold.union(legend))));
   assertSolid(cut,'Engraved stepped LED-fit coupon');
   return {geometry:fromResultMesh(cut.getMesh()),diameters:spec.diameters,
    captions:labels,profileName:profile.name,flangeDiameter:profile.flangeDiameter,
-   labelsEngraved:labels.length,wireExitsOpen:openWireExits&&wireExits.length===spec.fits.length,
+   blankVolumeMm3:bar.volume(),labelsEngraved:labels.length,wireExitsOpen:openWireExits&&wireExits.length===spec.fits.length,
    wireExitCount:wireExits.length*2,volumeMm3:cut.volume(),triangles:cut.numTri()};
  }finally{cleanupAll(keep)}
 }

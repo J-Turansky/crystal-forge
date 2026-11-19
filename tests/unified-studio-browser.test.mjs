@@ -886,10 +886,24 @@ try{
  assert(Math.abs(bounds[2][1]-bounds[2][0]-9)<.01,'B is total length including the curved cap');
  const replica3mf=zipEntries((await useDownload(page.locator('#pixelReplica3MF'))).bytes);
  assert(replica3mf.has('3D/3dmodel.model'));
- await page.locator('#savePixelProfileBtn').click();
+ await page.locator('#pixelSocketClearance').fill('0.25');
+ const socket=await useDownload(page.locator('#pixelSocketSTL'));
+ assert.equal(socket.name,'pixel-test-socket.stl');
+ const socketCount=socket.bytes.readUInt32LE(80);
+ assert.equal(socket.bytes.length,84+socketCount*50);
+ let signedVolume=0;
+ for(let i=0;i<socketCount;i++){
+  const coordinates=Array.from({length:9},(_,axis)=>socket.bytes.readFloatLE(96+i*50+axis*4));
+  const [ax,ay,az,bx,by,bz,cx,cy,cz]=coordinates;
+  signedVolume+=(ax*(by*cz-bz*cy)+ay*(bz*cx-bx*cz)+az*(bx*cy-by*cx))/6;
+ }
+ assert(Math.abs(signedVolume)>1000&&Math.abs(signedVolume)<32*32*15,'The exported block retains stock and loses cavity volume');
+ assert(zipEntries((await useDownload(page.locator('#pixelSocket3MF'))).bytes).has('3D/3dmodel.model'));
+ await page.locator('#applyPixelSocketFit').click();
  await wavePalette.getByRole('button',{name:/Reusable 4.5 mm seed/}).waitFor();
  await wavePalette.getByRole('button',{name:'Add pixel automatically',exact:true}).click();
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].diameter),4.5);
+ assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].clearance),.25);
  await shot('wt017-pixel-profile-build');
  await checkNativeDoubleClick('waves',wavePalette,(await getHoles())[0]);
  const nativeFamilies=[

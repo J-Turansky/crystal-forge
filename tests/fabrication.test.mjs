@@ -531,6 +531,13 @@ assert.equal(stepped.diameters.length,5,'Stepped pixel housing and flange coupon
 assert(stepped.geometry.getAttribute('position').count>200,'Stepped coupon has real printable geometry');
 assert.equal(geometryEdges(stepped.geometry).open,0,'Stepped coupon remains watertight');
 stepped.geometry.dispose();
+const singleSocket=makePixelSeatCoupon(wasm,{...settings,pixelProfileId:'gumdrop',pixelDiameter:12,pixelFit:.25,pixelRetentionLip:.35},{single:true,openWireExits:false});
+assert.deepEqual(singleSocket.diameters,[12.25]);
+assert.equal(singleSocket.labelsEngraved,0);
+assert(singleSocket.blankVolumeMm3-singleSocket.volumeMm3>1000,'The gumdrop cavity subtracts volume from the printable block');
+assert(singleSocket.volumeMm3>1000,'Printable walls and roof remain around the cavity');
+assert.equal(geometryEdges(singleSocket.geometry).open,0,'The solid surrounding the underside opening is watertight');
+singleSocket.geometry.dispose();
 const seedCal=makeCalibrationStrip(wasm,5.15);
 assert.equal(seedCal.diameters.length,5);
 assert(Math.abs(seedCal.diameters[2]-5.15)<1e-5,'Calibration uses selected seed pixel size');

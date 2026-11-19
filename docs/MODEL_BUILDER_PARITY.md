@@ -58,3 +58,5 @@ Tactile Tiles now have an explicitly allowed single-material fitting backing, se
 ## WT-021 measured pixel replica
 
 The shared A–G profile editor exports a positive nominal LED replica as STL or 3MF through Manifold, independently of the negative fit coupon. The browser fixture requests both downloads and measures total B in the STL. This does not establish seven-family release acceptance or exact fit to a physical LED. See #79 and physical validation #10.
+
+The profile editor also exports a single negative Test Socket or an optional five-socket plate. The coupon and Crystal manufacturing share the same underside cutter. Save the tested diametral allowance to the measured profile and current Crystal settings. Recipe-based builders use the measured allowance for their straight bores; full shape parity remains open.
