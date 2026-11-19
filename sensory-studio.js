@@ -1556,12 +1556,6 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    button.onclick=()=>target.click();controls.append(button);
   };
   if(build){
-   if(inspection){
-    const render=document.createElement('button');
-    render.type='button';render.textContent='Render actual model';
-    render.onclick=()=>inspection.openManufacturingMesh();
-    controls.append(render);
-   }
    if(model.generator.typeId==='crystals'){
     addAction('Create / edit pixel profile',$('editPixelProfileBtn'));
     addAction('Add pixel',$('placePixelBtn'));
@@ -1633,6 +1627,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
      controls.append(group);
     }
    }
+  }
+  if(build&&inspection){
+   const render=document.createElement('button');
+   render.type='button';render.textContent='Render actual model';
+   render.onclick=()=>inspection.openManufacturingMesh();
+   controls.append(render);
   }
   shell.searchSettings();
  }
