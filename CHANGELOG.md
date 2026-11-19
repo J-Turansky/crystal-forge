@@ -1,5 +1,10 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.16 — Library collections, favourites and reusable templates
+
+- Organise saved models and projects with collections and favourites.
+- Create reusable templates from saved projects and pinned model revisions.
+
 ## v0.16.0-dev.15 — Prepared light-path inspection
 
 - Inspect prepared Crystal Clusters and illuminated Light Pods with movable X and Z cutaways.

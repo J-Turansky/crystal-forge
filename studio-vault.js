@@ -1,3 +1,4 @@
+import {readOrganisation} from './studio-organisation.js';
 /* Content-addressed private-vault assets. Immutable assets are uploaded first;
  * the guarded manifest is the commit point. Interrupted uploads leave the
  * previous complete manifest usable. Credentials remain on the existing client. */
@@ -15,6 +16,7 @@ export async function packStudioVault(state){
  const manifest={schemaVersion:1,project:await project(state.project),
   library:await Promise.all(state.library.map(async record=>({id:record.id,versions:await Promise.all(record.versions.map(async version=>({revision:version.revision,model:await model(version.model)})))}))),
   savedProjects:await Promise.all((state.savedProjects||[]).map(project)),legacyTemplates:await add(state.legacyTemplates||[])};
+ if(state.organisation!==undefined)manifest.organisation=await add(readOrganisation(state.organisation));
  return {manifest,assets};
 }
 export async function unpackStudioVault(manifest,readAsset){
@@ -23,7 +25,7 @@ export async function unpackStudioVault(manifest,readAsset){
  async function read(hash){assetPath(hash);if(!loaded.has(hash)){const value=await readAsset(hash);if(await assetHash(value)!==hash)throw Error('Studio asset failed its integrity check.');loaded.set(hash,value);}return structuredClone(loaded.get(hash));}
  async function model(hash){const value=await read(hash);if(value.thumbnailAsset){value.thumbnail=await read(value.thumbnailAsset);delete value.thumbnailAsset;}return value;}
  async function project(hash){const value=await read(hash);value.models=await Promise.all(value.models.map(model));return validateProject(value);}
- return {schemaVersion:1,project:await project(manifest.project),
+ return {schemaVersion:1,organisation:readOrganisation(manifest.organisation?await read(manifest.organisation):undefined),project:await project(manifest.project),
   library:await Promise.all(manifest.library.map(async record=>({id:record.id,versions:await Promise.all(record.versions.map(async version=>({revision:version.revision,model:await model(version.model)})))}))),
   savedProjects:await Promise.all(manifest.savedProjects.map(project)),legacyTemplates:await read(manifest.legacyTemplates)};
 }
