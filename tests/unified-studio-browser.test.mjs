@@ -1190,7 +1190,7 @@ try{
    const nativeToggle=page.getByRole('checkbox',{name:'Show physical pixels and socket cutters'});
    await nativeToggle.check();
    const nativePreview=page.locator('[data-native-fit-preview-status]');
-   await nativePreview.filter({hasText:/insertion 22\\.00 mm/}).waitFor({timeout:120000});
+   await nativePreview.filter({hasText:/insertion 22\.00 mm/}).waitFor({timeout:120000});
    assert.match(await nativePreview.innerText(),/centre roof .*mm/);
    assert.match(await nativePreview.innerText(),/stock interference/);
    await nativeToggle.uncheck();
@@ -1216,7 +1216,7 @@ try{
  const tileToggle=page.getByRole('checkbox',{name:'Show physical pixels and socket cutters'});
  await tileToggle.check();
  const tilePreview=page.locator('[data-native-fit-preview-status]');
- await tilePreview.filter({hasText:/insertion 9\\.00 mm/}).waitFor({timeout:120000});
+ await tilePreview.filter({hasText:/insertion 9\.00 mm/}).waitFor({timeout:120000});
  assert.match(await tilePreview.innerText(),/stock interference/);
  await tileToggle.uncheck();
  await page.keyboard.press('Escape');
