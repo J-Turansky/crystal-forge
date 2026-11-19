@@ -702,7 +702,7 @@ export function makePixelSeatCoupon(wasm,s,{openWireExits=true,single=false}={})
   const bar=hold(wasm.Manifold.cube([pitch*spec.fits.length,roof,width]));
   const cutters=[],legend=[],wireExits=[];
   for(let i=0;i<spec.fits.length;i++){
-   const fit=spec.fits[i],adjusted=resolvePixelProfile({...s,pixelFit:fit});
+   const fit=spec.fits[i],adjusted=resolvePixelProfile(s,fit);
    const centreX=(i+.5)*pitch,pos={x:centreX,z:width/2};
    const bore=putSocket(wasm,hold,pos,adjusted.maxDiameter/2,roof,-3,adjusted);
    cutters.push(bore.solid);
@@ -937,7 +937,7 @@ export function makeSteppedPixelCoupon(wasm,settings,{openWireExits=true}={}){
   const cuts=[],wireExits=[],legend=[];
   for(let i=0;i<3;i++){
    const centreX=pitch*(i+.5),at={x:centreX,z:width/2},fit=spec.fits[i];
-   const profile=resolvePixelProfile({...settings,pixelFit:fit});
+   const profile=resolvePixelProfile(settings,fit);
    const bore=putSocket(wasm,hold,at,profile.maxDiameter/2,thick,-3,profile);
    cuts.push(bore.solid);
    if(openWireExits&&profile.wireWidth>.1&&profile.wireDepth>.1){
