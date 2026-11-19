@@ -965,6 +965,19 @@ try{
  await mountX.fill(String(mounted[0].x+1));await mountX.press('Tab');
  const changed=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles);
  assert.equal(changed[0].x,mounted[0].x+1,'M1 supports precise position editing');
+ const dragPoints=await page.evaluate(({x,z})=>{
+  const studio=window.__sensoryStudio;
+  return [studio.fittingPointScreen(x,z,'top'),studio.fittingPointScreen(x+4,z,'top')];
+ },changed[0]);
+ assert(dragPoints.every(Boolean),'Both drag positions lie on the Tile’s top surface');
+ await page.mouse.move(dragPoints[0].x,dragPoints[0].y);
+ await page.mouse.down();
+ await page.waitForTimeout(225);
+ await page.mouse.move(dragPoints[1].x,dragPoints[1].y,{steps:6});
+ await page.mouse.up();
+ const dragged=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[0]);
+ assert(dragged.x>changed[0].x+2,'Hold drag moves M1 along the solid face');
+ assert.equal(dragged.entryFace,'top');
  await mountPalette.locator('[data-pixel-backing]').check();
  const addTab=mountPalette.getByRole('button',{name:'Add external tab',exact:true});
  await addTab.click();await addTab.click();
@@ -976,7 +989,7 @@ try{
  await shot('wt021-native-backing-tabs');
  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
  await page.reload();await page.waitForFunction(()=>window.__sensoryStudio);
- assert.equal((await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles))[0].x,changed[0].x,
+ assert.equal((await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles))[0].x,dragged.x,
   'Native mounting state must survive workspace reload');
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
  assert(await page.locator('.sms-palette').getByRole('button',{name:'M1',exact:true}).isVisible());
@@ -993,7 +1006,7 @@ try{
 
  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
  await page.reload();await page.waitForFunction(()=>window.__sensoryStudio);
- assert.equal((await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles))[0].x,changed[0].x,
+ assert.equal((await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles))[0].x,dragged.x,
   'Native mounting state must survive workspace reload');
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
  assert(await page.locator('.sms-palette').getByRole('button',{name:'M1',exact:true}).isVisible());

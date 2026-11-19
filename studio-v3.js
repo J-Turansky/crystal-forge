@@ -193,11 +193,12 @@ function syncForm(){
  for(const e of document.querySelectorAll('[data-state]')){
   const k=e.dataset.state;
   if(e.type==='checkbox')e.checked=!!s[k];
-  else e.value=s[k]??'';
+  else e.value=k==='pixelFit'?resolvePixelProfile(s).clearance:s[k]??'';
  }
  const strictLight=document.querySelector('[data-state="requireAccessiblePassages"]');
  if(strictLight)strictLight.disabled=!s.requireAccessiblePassages&&!(s.cutSockets&&s.lightingMode!=='none'&&(s.targetedLightPaths||s.hollowCrystals||(s.baseVault&&s.lightPorts)));
- for(const e of document.querySelectorAll('[data-out]'))e.textContent=format(e.dataset.out,s[e.dataset.out]);
+ for(const e of document.querySelectorAll('[data-out]'))e.textContent=format(e.dataset.out,
+  e.dataset.out==='pixelFit'?resolvePixelProfile(s).clearance:s[e.dataset.out]);
  const weights=s.familyWeights||{};
  for(const e of document.querySelectorAll('[data-family-weight]')){
   const n=Number(weights[e.dataset.familyWeight]??1);e.value=n;
@@ -757,7 +758,9 @@ document.querySelectorAll('[data-state]').forEach(e=>{
     else target.shape={...(target.shape||{}),[key]:value};
     rebuild();snapshot();return;
   }
-  s[key]=value;
+  if(key==='pixelFit'&&Object.hasOwn(s.pixelClearanceByProfile||{},s.pixelProfileId))
+   s.pixelClearanceByProfile={...s.pixelClearanceByProfile,[s.pixelProfileId]:value};
+  else s[key]=value;
   if((key==='autoBedSplit'||key==='splitParts')&&value){
    s[key==='autoBedSplit'?'splitParts':'autoBedSplit']=false;
    syncForm();
@@ -1134,7 +1137,7 @@ for(const format of ['stl','3mf']){
    const profile=normalisePixelProfile({...Object.fromEntries(Object.entries(pixelFields).map(([key,id])=>
     [key,key==='kind'||key==='name'?$(id).value:$(id).valueAsNumber])),id:'custom-test-socket'});
    const fit=socketFitFromEditor(),single=!$('pixelSocketPlate').checked;
-   const settings={...s,pixelProfileId:profile.id,pixelProfiles:[profile],pixelDiameter:profile.bodyDiameter,pixelFit:fit};
+   const settings={...s,pixelProfileId:profile.id,pixelProfiles:[profile],pixelDiameter:profile.bodyDiameter,pixelFit:fit,pixelClearanceByProfile:{}};
    status.textContent='Preparing the negative test socket…';
    const coupon=makePixelSeatCoupon(await loadManifold(),settings,{single,openWireExits:!single});
    try{
@@ -1181,7 +1184,7 @@ function savePixelProfileFromEditor(applySocketFit=false){
  if(applySocketFit){
   try{applyLinked=studioBridge?.planPixelProfileClearance(p)??applyLinked;}
   catch(error){$('pixelSocketStatus').textContent=error.message;return;}
-  s.pixelFit=socketFitFromEditor();s.fitCalibration=null;
+  s.pixelClearanceByProfile={...s.pixelClearanceByProfile,[p.id]:socketFitFromEditor()};s.fitCalibration=null;
  }
  s.pixelProfiles=[...(s.pixelProfiles||[]).filter(x=>x.id!==p.id),p].slice(-30);
  s.pixelProfileId=p.id;s.pixelDiameter=p.bodyDiameter;
@@ -1457,15 +1460,21 @@ $('calibrationBtn').onclick=async()=>{
 $('applyFitResultBtn').onclick=()=>{
  try{
   const selected=selectedFitResult(s,$('fitResultSelect').value);
-  s.pixelFit=selected.newFit;s.fitCalibration=selected.record;
+  if(Object.hasOwn(s.pixelClearanceByProfile||{},s.pixelProfileId))
+   s.pixelClearanceByProfile={...s.pixelClearanceByProfile,[s.pixelProfileId]:selected.newFit};
+  else s.pixelFit=selected.newFit;
+  s.fitCalibration=selected.record;
   syncForm();rebuild();snapshot();
   setStatus('Applied printed hole Ø '+selected.record.diameter.toFixed(2)+
-   ' mm. The global socket allowance is now '+s.pixelFit.toFixed(2)+' mm for every pixel type.');
+   ' mm. Effective socket allowance: '+resolvePixelProfile(s).clearance.toFixed(2)+' mm.');
  }catch(error){alert('Fit calibration error: '+error.message)}
 };
 $('resetFitOverrideBtn').onclick=()=>{
  const original=resetFitCalibration(s);if(original===null)return;
- s.pixelFit=original;s.fitCalibration=null;syncForm();rebuild();snapshot();
+ if(Object.hasOwn(s.pixelClearanceByProfile||{},s.pixelProfileId))
+  s.pixelClearanceByProfile={...s.pixelClearanceByProfile,[s.pixelProfileId]:original};
+ else s.pixelFit=original;
+ s.fitCalibration=null;syncForm();rebuild();snapshot();
  setStatus('Restored previous socket clearance '+original.toFixed(2)+' mm.');
 };
 $('fitOverrideToolBtn').onclick=()=>{

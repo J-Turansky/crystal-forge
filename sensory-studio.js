@@ -911,34 +911,42 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(!gesture.marker||!gesture.canDrag||gesture.model.link||gesture.placing)return;
   const [x,y]=gesture.start;
   if(!gesture.origin&&Math.hypot(event.clientX-x,event.clientY-y)<4)return;
-  if(!gesture.origin&&performance.now()-gesture.time<180){cancelPixelGesture();return;}
+  if(!gesture.origin&&performance.now()-gesture.time<180)return;
   if(!gesture.origin){
    gesture.origin=gesture.marker.position.clone();
    try{gesture.recipe=pixelSource(gesture.model);}catch(error){pixelStatus(gesture.model,pixelPlacementAdvice(gesture.model,error.message));cancelPixelGesture();return;}
   }
-  pixelRay(event);
-  const hit=partRay.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),-gesture.origin.y),new THREE.Vector3());
-  if(!hit)return;
   const mounts=gesture.kind==='mount',holes=mounts?mountHoles(gesture.model):pixelHoles(gesture.model);
   const id=mounts?gesture.marker.userData.mountId:gesture.marker.userData.pixelId;
   const current=holes.find(hole=>hole.id===id);
-  gesture.candidate={...current,x:Math.round(hit.x*10)/10,z:Math.round(hit.z*10)/10};
-  const issue=mounts?mountIssue(gesture.model,gesture.candidate,holes.filter(hole=>hole.id!==id)):
-   pixelIssue(gesture.model,gesture.candidate,holes.filter(hole=>hole.id!==id),gesture.recipe);
-  movePixelMarker(gesture.model,gesture.marker,gesture.candidate.x,gesture.candidate.z);
-  gesture.marker.material.color.setHex(issue?0xff3c59:0x48e4f1);
+  if(!current)return;
+  const hit=fittingSurface(gesture.model,event);
+  const underside=current.entryFace==='underside';
+  gesture.candidate=null;
+  gesture.issue=!hit?'Move onto the original solid fitting face.':fittingFaceIssue(hit);
+  if(hit&&!gesture.issue&&(hit.normal.y<0)!==underside)
+   gesture.issue='Move onto the original fitting face. A drag cannot switch installation sides.';
+  if(hit&&!gesture.issue){
+   const candidate={...current,x:Math.round(hit.point.x*10)/10,z:Math.round(hit.point.z*10)/10};
+   const others=holes.filter(hole=>hole.id!==id);
+   gesture.issue=mounts?mountIssue(gesture.model,candidate,others):pixelIssue(gesture.model,candidate,others,gesture.recipe);
+   if(!gesture.issue)gesture.candidate=candidate;
+   movePixelMarker(gesture.model,gesture.marker,candidate.x,candidate.z,hit.point.y+(underside?-.3:.3));
+  }
+  gesture.marker.material.color.setHex(gesture.issue?0xff3c59:0x48e4f1);
  },true);
- function movePixelMarker(model,marker,x,z){
-  marker.position.x=x;marker.position.z=z;
+ function movePixelMarker(model,marker,x,z,y=marker.position.y){
+  const lift=y-marker.position.y;
+  marker.position.set(x,y,z);
   const id=marker.userData.pixelId||marker.userData.mountId;
   for(const part of cache.get(model.id)?.group?.children||[]){
-   if(part.userData.pixelPort===id||part.userData.pixelLabel===id||part.userData.mountLabel===id){part.position.x=x;part.position.z=z;}
+   if(part.userData.pixelPort===id||part.userData.pixelLabel===id||part.userData.mountLabel===id){part.position.x=x;part.position.y+=lift;part.position.z=z;}
   }
  }
  function cancelPixelGesture(){
   const gesture=pixelGesture;pixelGesture=null;
   if(!gesture)return;
-  if(gesture.origin)movePixelMarker(gesture.model,gesture.marker,gesture.origin.x,gesture.origin.z);
+  if(gesture.origin)movePixelMarker(gesture.model,gesture.marker,gesture.origin.x,gesture.origin.z,gesture.origin.y);
   refreshPixelMarkers(gesture.model);
   if(viewport.hasPointerCapture(gesture.id))viewport.releasePointerCapture(gesture.id);
  }
@@ -960,6 +968,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     editPixel(model,index,gesture.candidate);
    }return;
   }
+  if(gesture.issue){pixelStatus(model,gesture.issue);return;}
   if(!gesture.placing||gesture.marker)return;
   const hit=fittingSurface(model,event);
   if(!hit){pixelStatus(model,'Click a solid model surface to place this fitting.');return;}

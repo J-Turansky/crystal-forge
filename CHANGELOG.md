@@ -4,6 +4,10 @@
 
 - Prepare measured underside sockets on suitable stock and export a two-socket test piece with recessed IN, connecting and OUT channels.
 
+## v0.16.0-dev.35.4 — Face-aware fitting movement and profile clearance
+
+- Keep native fitting drags on their installation face and isolate saved Crystal socket allowances by profile.
+
 ## v0.16.0-dev.35.3 — Print pixel test sockets and replicas
 
 - Print a single negative test socket or five-socket tolerance plate using the Crystal underside cutter, and save the tested clearance.

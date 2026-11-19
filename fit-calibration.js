@@ -8,7 +8,7 @@ const offsets={plain:[-.2,-.1,0,.1,.2],stepped:[-.2,-.1,0,.1,.2],full:[-.15,0,.1
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 export function calibrationSpec(s,kind='stepped'){
  const sample=kind==='full'?'full':kind==='plain'?'plain':'stepped';
- const profile=resolvePixelProfile(s),baseline=Number(s.pixelFit??.15);
+ const profile=resolvePixelProfile(s),baseline=resolvePixelProfile({...s,pixelFit:s.pixelFit??.15}).clearance;
  const fits=offsets[sample].map(delta=>round(clamp(baseline+delta,-.5,.8)));
  const diameters=fits.map(value=>round(profile.bodyDiameter+value));
  return {kind:sample,profileId:s.pixelProfileId,profileName:profile.name,
@@ -23,7 +23,7 @@ export function selectedFitResult(s,index){
  if(sample.profileId!==s.pixelProfileId)throw Error('Select the same LED profile used for the printed sample.');
  const i=Number(index);
  if(!Number.isInteger(i)||i<0||i>=sample.fits.length)throw Error('Select a valid printed hole position.');
- const previous=Number(s.fitCalibration?.originalFit??s.pixelFit??.15),fitted=Number(sample.fits[i]);
+ const previous=Number(s.fitCalibration?.originalFit??resolvePixelProfile({...s,pixelFit:s.pixelFit??.15}).clearance),fitted=Number(sample.fits[i]);
  return {newFit:fitted,record:{originalFit:previous,selected:i,
   diameter:Number(sample.diameters[i]),profileId:sample.profileId,
   sampleKind:sample.kind,delta:round(fitted-previous)}};

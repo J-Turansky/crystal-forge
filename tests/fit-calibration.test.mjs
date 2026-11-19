@@ -25,3 +25,9 @@ couponLegendCuts(fake,hold,'12.35',20,25,28);
 assert(strokes.length>15,'Numeral generator creates actual shallow cut volumes');
 assert(strokes.every(x=>x.p[1]<28&&x.p[1]+x.size[1]>28),'Legend engraves the top face');
 console.log('PR7 physical coupon calibrated sizes, global fit changes, reset and solid numeric engraving passed');
+
+const isolatedFit={...s,pixelClearanceByProfile:{gumdrop:.35}};
+assert.equal(resolvePixelProfile(isolatedFit).boreDiameter,12.35);
+assert.equal(resolveSocketProfile(isolatedFit,{profileId:'bullet'}).clearance,.15);
+assert.equal(resolvePixelProfile(isolatedFit,.05).clearance,.05,'Coupon variants override the stored allowance for this print only');
+assert.equal(calibrationSpec(isolatedFit).baselineFit,.35);
