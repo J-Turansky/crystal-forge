@@ -788,7 +788,9 @@ try{
   await palette.locator('[data-pixel-previous]').click();
   assert.match(await serial.innerText(),/No safe tangent-compatible path/);
   await page.locator('.sms-workspace-nav [data-tab=print]').click();
-  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  await routedJob.getByText('Stale',{exact:true}).waitFor();
+  assert(await routedJob.locator('[data-job-export]').isDisabled());
+  await routedJob.locator('[data-job-prepare]').click();
   await routedJob.getByText('Failed',{exact:true}).waitFor({timeout:120000});
   assert(await routedJob.locator('[data-job-export]').isDisabled());
   assert(await routedJob.locator('[data-job-3mf]').isDisabled());
