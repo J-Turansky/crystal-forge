@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {chromium} from 'playwright';
 const browser=await chromium.launch({headless:true,executablePath:process.env.CRYSTAL_FORGE_BROWSER_EXECUTABLE||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
-const page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
+let page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
 const errors=[];page.on('pageerror',error=>errors.push(error.message));
 try{
  const url=process.env.CRYSTAL_FORGE_URL||'http://127.0.0.1:4321';
@@ -17,6 +17,75 @@ try{
   await baseline.setViewportSize({width:390,height:844});
   await baseline.screenshot({path:'qa/unified-wt014-before-narrow.png'});
   await baseline.close();
+ }
+ {
+ const inspectionPage=page;
+ await inspectionPage.bringToFront();
+ await fs.mkdir('qa',{recursive:true});
+ await inspectionPage.goto(url);
+ await inspectionPage.waitForFunction(()=>window.__sensoryStudio);
+ await inspectionPage.evaluate(()=>window.__sensoryStudio.addModel('crystals',{
+  count:5,cutSockets:true,baseVault:false,hollowCrystals:false,targetedLightPaths:true,lightReach:15,wireChannels:false,lightingMode:'single'
+ },'Inspection fixture'));
+ const inspector=inspectionPage.locator('#smsLightInspector');
+ assert.equal(await inspector.count(),1,JSON.stringify(await inspectionPage.evaluate(()=>({mode:window.__sensoryStudio.mode,model:window.__sensoryStudio.currentModel?.name,precision:document.getElementById('smsPrecisionContent')?.innerText.slice(0,350),error:document.querySelector('#smsEditor .sms-error')?.textContent}))));
+ await inspector.waitFor();
+ await inspector.locator('summary').press('Enter');
+ await inspector.getByText('Preview only').waitFor();
+ await inspector.getByRole('button',{name:'Prepare inspection'}).click();
+ await inspector.getByText('Prepared manufacturing mesh').waitFor({timeout:120000});
+ const inspectedRevision=await inspectionPage.evaluate(()=>window.__sensoryStudio.currentModel.revision);
+ await inspectionPage.screenshot({path:'qa/unified-wt013-crystal-x.png'});
+ await inspector.getByLabel('Section axis').selectOption('Z');
+ const section=inspector.getByRole('slider');
+ const before=await section.inputValue();
+ await section.press('ArrowRight');
+ assert.notEqual(await section.inputValue(),before);
+ await inspectionPage.screenshot({path:'qa/unified-wt013-crystal-z.png'});
+ const crystalResult=inspector.getByRole('button',{name:/^Inspect /}).first();
+ await crystalResult.click();
+ assert.equal(await crystalResult.getAttribute('aria-pressed'),'true');
+ await inspectionPage.screenshot({path:'qa/unified-wt013-crystal-selected.png'});
+ const issue=inspector.getByRole('listitem').filter({hasText:/skipped|blocked|unknown/}).first();
+ await issue.getByRole('button').click();
+ await inspectionPage.screenshot({path:'qa/unified-wt013-crystal-obstruction.png'});
+ await inspector.getByLabel('Show light paths').uncheck();
+ await inspector.getByRole('button',{name:'Reset section'}).click();
+ assert.equal(await inspector.getByLabel('Section axis').inputValue(),'X');
+ await inspector.getByRole('button',{name:'Close inspection'}).click();
+ assert.equal(await inspector.evaluate(node=>node.open),false);
+ assert.equal(await inspectionPage.evaluate(()=>window.__sensoryStudio.currentModel.revision),inspectedRevision,'Inspection is view-only');
+ await inspectionPage.locator('.sms-workspace-nav [data-tab=build]').click();
+ const strict=inspectionPage.getByLabel('Require accessible passages');
+ const strictSection=strict.locator('xpath=ancestor::details[1]');
+ if(!await strictSection.evaluate(node=>node.open))await strictSection.locator(':scope > summary').click();
+ await strict.check();
+ await inspectionPage.locator('#smsGlobalUndo').click();
+ assert.equal(await strict.isChecked(),false,'Undo restores optional passage enforcement');
+ await inspectionPage.locator('#smsGlobalRedo').click();
+ assert.equal(await strict.isChecked(),true,'Redo restores strict passage enforcement');
+ await inspector.locator('summary').press('Enter');
+ await inspector.getByText('Preview only').waitFor();
+ await inspector.getByRole('button',{name:'Prepare inspection'}).click();
+ await inspector.getByText('Prepared manufacturing mesh').waitFor({timeout:120000});
+ await inspectionPage.locator('.sms-workspace-nav [data-tab=print]').click();
+ await inspectionPage.getByText(/Export blocked:.*crystal passage/).waitFor();
+ assert(await inspectionPage.locator('[data-job-3mf]').isDisabled());
+ await inspectionPage.reload();
+ await inspectionPage.waitForFunction(()=>window.__sensoryStudio?.currentModel?.parameters.requireAccessiblePassages===true);
+ await inspectionPage.evaluate(()=>window.__sensoryStudio.addModel('light-pods',{illuminated:true},'Light Pod inspection'));
+ await inspector.locator('summary').press('Enter');
+ await inspector.getByRole('button',{name:'Prepare inspection'}).click();
+ await inspector.getByText('Prepared Light Pod').waitFor({timeout:120000});
+ await inspector.getByLabel('Section axis').selectOption('Z');
+ await inspectionPage.screenshot({path:'qa/unified-wt013-pod-section.png'});
+ await inspectionPage.setViewportSize({width:390,height:844});
+ await inspectionPage.screenshot({path:'qa/unified-wt013-inspector-narrow.png'});
+ assert.deepEqual(errors,[]);
+ console.log('WT-013 prepared sections, strict rejection, Pod and view-only controls verified.');
+ await inspectionPage.close();
+ page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
+ page.on('pageerror',error=>errors.push(error.message));
  }
  await page.addInitScript(()=>{
   if(!localStorage.getItem('wt-workspace-panels-v1')){
@@ -427,6 +496,12 @@ try{
  const crystalFile=await useDownload(crystal.locator('[data-job-3mf]'));
  assert.notEqual(crystalFile.name.match(/[0-9a-f]{16}(?=\.3mf$)/)?.[0],modelFile.name.match(/[0-9a-f]{16}(?=\.3mf$)/)?.[0]);
  assert(zipEntries(crystalFile.bytes).has('3D/3dmodel.model'));
+ const crystalPack=zipEntries((await useDownload(crystal.locator('[data-job-export]'))).bytes);
+ const opticalReport=JSON.parse(crystalPack.get('03_Reports/light-passage-inspection.json'));
+ assert.equal(opticalReport.softwareSamplingOnly,true);
+ assert.equal(opticalReport.physicalOpticalVerification,false);
+ assert.equal(opticalReport.modelRevision,JSON.parse(crystalPack.get('print-job-manifest.json')).modelRevision);
+ assert(crystalPack.has('03_Reports/light-passage-inspection.txt'));
  for(const name of ['editable-model.json','material-roles.json','print-report.json','cura-manual-settings.txt'])assert(pack.has(name),name);
  assert([...pack.keys()].some(name=>name.endsWith('.stl')));
  const inner3MF=[...pack.keys()].find(name=>name.endsWith('.3mf'));

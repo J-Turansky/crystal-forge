@@ -1,3 +1,4 @@
+import {lightPassageExportBlock} from './light-passage-inspection.js';
 import * as THREE from 'three';
 import {installExactValueEditors} from './exact-value-editors.js';
 import {installCollapsibleSections} from './collapsible-sections.js';
@@ -37,6 +38,7 @@ let studioBridge=null;
 const studioBootstrap=(()=>{try{return migrateLegacyStorage(localStorage);}catch(error){console.error('Studio migration paused; original Crystal data is intact.',error);return null;}})();
 installResizablePanels();
 const defaults={
+ requireAccessiblePassages:false,
   title:'Untitled cluster',batchSelectionIds:[],count:16,height:155,width:130,crystalSize:1,widthRandomness:0,studioBrightness:.85,seed:42,pattern:'Central Spire',spacing:42,leanMode:'Organic / natural',leanAmount:35,angleRandomness:32,
   familyMix:'Quartz',familyWeights:{Quartz:1,Shard:1,Blade:1,Cubic:1,'Double terminated':1,Fantasy:1},bottomScale:1,topScale:.80,cornerRadius:.7,shoulderRound:0,tipRound:3.5,
   tipFlat:.25,tipLength:.27,roundSteps:3,
@@ -189,6 +191,8 @@ function syncForm(){
   if(e.type==='checkbox')e.checked=!!s[k];
   else e.value=s[k]??'';
  }
+ const strictLight=document.querySelector('[data-state="requireAccessiblePassages"]');
+ if(strictLight)strictLight.disabled=!s.requireAccessiblePassages&&!(s.cutSockets&&s.lightingMode!=='none'&&(s.targetedLightPaths||s.hollowCrystals||(s.baseVault&&s.lightPorts)));
  for(const e of document.querySelectorAll('[data-out]'))e.textContent=format(e.dataset.out,s[e.dataset.out]);
  const weights=s.familyWeights||{};
  for(const e of document.querySelectorAll('[data-family-weight]')){
@@ -222,7 +226,7 @@ function download(blob,name){
 function setStatus(t){const node=$('status');node.classList.remove('issue-box');delete node.dataset.severity;node.setAttribute('role','status');node.textContent=t;}
 
 let manufacturingMesh=null,manufacturingReport=null,preparedSource=null;
-function sourceHash(){return manufacturingFingerprint(s,crystals)}
+function sourceHash(){return manufacturingFingerprint(s,crystals)+(s.requireAccessiblePassages===true?"|strict-light":"")}
 function clearHardwareAnnotations(){
  for(const m of [...hardwareAnnotations.children]){
   hardwareAnnotations.remove(m);
@@ -1195,6 +1199,11 @@ async function buildManufacturing(){
   geometry.setAttribute('position',new THREE.BufferAttribute(result.positions,3));
   geometry.computeVertexNormals();
   manufacturingReport=result.report;preparedSource=source;
+  if(manufacturingReport.lightPassageInspection){
+   let signature=2166136261;
+   for(let index=0;index<source.length;index++)signature=Math.imul(signature^source.charCodeAt(index),16777619);
+   manufacturingReport.lightPassageInspection.preparedFingerprint=(signature>>>0).toString(16).padStart(8,'0');
+  }
   manufacturingMesh=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({
    color:s.colour,metalness:0,roughness:.42,flatShading:true,side:THREE.DoubleSide
   }));
@@ -1203,9 +1212,11 @@ async function buildManufacturing(){
   $('prepareStatus').textContent='✓ Mesh prepared off-thread in '+(result.report.preparationMs/1000).toFixed(1)+
    ' s (Manifold '+((result.report.timings?.manifoldMs||0)/1000).toFixed(1)+' s; engine '+
    ((result.report.timings?.engineReadyMs||0)/1000).toFixed(1)+' s). Review warnings.';
-  $('stlBtn').disabled=false;$('threeMfBtn').disabled=false;$('productionPackBtn').disabled=false;
-  $('splitExportBtn').disabled=!s.splitParts;
-   $('detachablePlateBtn').disabled=s.mount!=='Detachable plate';
+  const lightBlock=lightPassageExportBlock(s.requireAccessiblePassages,result.report.lightPassageInspection);
+  if(lightBlock)$('prepareStatus').append(' '+lightBlock);
+  for(const id of ['stlBtn','threeMfBtn','productionPackBtn'])$(id).disabled=!!lightBlock;
+  $('splitExportBtn').disabled=!!lightBlock||!s.splitParts;
+   $('detachablePlateBtn').disabled=!!lightBlock||s.mount!=='Detachable plate';
   $('showManufacturing').checked=true;manufacturingView(true);applyPrintHeatmap();
   setStatus('Prepared '+result.report.triangleCount.toLocaleString()+' triangles · editor remained responsive');
  }catch(error){
@@ -1227,6 +1238,8 @@ function verifyPrepared(){
  if(!manufacturingMesh||!manufacturingReport||preparedSource!==sourceHash()){
   alert('Please run Prepare print mesh first. Your existing manufacturing mesh is missing or out of date.');return false;
  }
+ const lightBlock=lightPassageExportBlock(s.requireAccessiblePassages,manufacturingReport.lightPassageInspection);
+ if(lightBlock){alert(lightBlock);return false;}
  return true;
 }
 $('prepareBtn').onclick=buildManufacturing;

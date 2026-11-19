@@ -1,3 +1,4 @@
+import {lightPassageReportEntries} from './light-passage-inspection.js';
 /* One archive for practical fabrication handoff.
  * Zip uses the same store-only ZIP encoder as Cura profiles, with binary STL.
  */
@@ -71,7 +72,7 @@ export function buildProductionPack({settings,crystals,report,stlBytes,extraFile
   estimatedPLAgrams:report.materialPLAgrams,socketsCut:report.socketsCut,
   mountingHolesCut:report.mountingHolesCut,wireChannelsCut:report.wireChannelsCut,
   hollowPorts:report.hollowPorts,directLightPorts:report.directLightPorts,skippedDirectLightPorts:report.skippedDirectLightPorts,lightPortDetails:report.lightPortDetails,roofReview:report.roofReview,warnings:report.warnings};
- assets.push(['03_Reports/manufacturing-report.json',JSON.stringify(condensed,null,2)]);
+ assets.push(['03_Reports/manufacturing-report.json',JSON.stringify(condensed,null,2)],...lightPassageReportEntries(report.lightPassageInspection));
  let curaIncluded=false,curaWarning='';
  try{
   const profile=createCuraProfile({machine:s.printer,nozzle:s.curaNozzle,material:s.curaMaterial,quality:s.curaQuality,intent:s.curaIntent,qualityType:s.curaQualityType||'auto'});
@@ -101,6 +102,7 @@ export function buildProductionPack({settings,crystals,report,stlBytes,extraFile
    'Cura profile omitted: '+curaWarning,
   '', 'This pack is not a guarantee of printable, support-free, safe or illuminated geometry.'
  ];
+ instructions.push(report.lightPassageInspection?'See 03_Reports/light-passage-inspection.txt for geometric sampling and manual checks.':'Light passage inspection: not run.');
  assets.push(['START_HERE.txt',instructions.join('\n')+'\n']);
  const bytes=zipProfileEntries(assets);
  return {bytes,filename:'crystal-forge-production-pack.zip',files:assets.map(([name])=>name),

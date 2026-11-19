@@ -1,5 +1,10 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.15 — Prepared light-path inspection
+
+- Inspect prepared Crystal Clusters and illuminated Light Pods with movable X and Z cutaways.
+- Review sampled Crystal passage results in production reports and optionally require clear samples before export.
+
 ## v0.16.0-dev.14 — Pixel Model Maker compact workspace
 
 - Keep workspace actions visible in a compact header and switch models along the bottom.

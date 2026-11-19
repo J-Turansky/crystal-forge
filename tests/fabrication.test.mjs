@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import Module from 'manifold-3d';
 import {generateFormation,crystalGeometry,baseGeometry,baseAccentSpecs,baseSurfaceHeight,baseProfileHeight,baseEdgeHeight,crystalRootOffset,crystalOrientation,crystalEndRatios} from '../geometry-v3.js';
-import {setThreeInstance,prepareFabrication,makeCalibrationStrip,makePixelSeatCoupon,splitPreparedMesh,splitPreparedMeshGrid,makeSplitPinCoupon,makeDetachablePlate,makeSteppedPixelCoupon,encodeSTL,saveSTL,save3MF} from '../fabrication-v1.js';
+import {setThreeInstance,prepareFabrication,probeLightPassageSegment,makeCalibrationStrip,makePixelSeatCoupon,splitPreparedMesh,splitPreparedMeshGrid,makeSplitPinCoupon,makeDetachablePlate,makeSteppedPixelCoupon,encodeSTL,saveSTL,save3MF} from '../fabrication-v1.js';
 setThreeInstance(THREE);
 import {planHardware} from '../hardware-layout.js';
 import {planBedAwareSplit} from '../bed-split.js';
@@ -12,7 +12,25 @@ import {planDetachablePlate} from '../detachable-plate.js';
 import {estimateRoofReview} from '../print-advisor.js';
 import {PIXEL_PRESETS,normalisePixelProfile,resolvePixelProfile,resolveSocketProfile} from '../pixel-profiles.js';
 
+import {auditLightPassages,lightPassageExportBlock,lightPassageReportEntries} from '../light-passage-inspection.js';
+
 const wasm=await Module();wasm.setup();
+
+{
+ const block=wasm.Manifold.cube([10,10,10]);
+ const opening=wasm.Manifold.cylinder(12,1,1).rotate([-90,0,0]).translate([5,-1,5]);
+ const open=block.subtract(opening);
+ const inspect=solid=>auditLightPassages({solid,crystals:[{id:'test-spike'}],mode:'targeted',
+  paths:new Map([['test-spike',{source:'LED socket P1',access:true,points:[[5,4,5],[5,9,5]]}]]),skipped:new Map(),
+  probe:(from,to)=>probeLightPassageSegment(wasm,solid,from,to)});
+ const clear=inspect(open),blocked=inspect(block);
+ assert.equal(clear.rows[0].status,'clear');assert.equal(blocked.rows[0].status,'blocked');
+ assert.equal(lightPassageExportBlock(false,blocked),'');
+ assert.equal(lightPassageExportBlock(true,clear),'');
+ assert.match(lightPassageExportBlock(true,blocked),/Export blocked/);
+ assert.equal(lightPassageReportEntries(blocked).length,2);
+ open.delete();opening.delete();block.delete();
+}
 
 function geometryEdges(g){
  const p=g.attributes.position.array,edges=new Map();
@@ -344,6 +362,17 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
  }finally{impossibleAssembly.meshes.forEach(m=>m.geometry.dispose())}
  const serialTwoMesh=validate('PR9 two-pixel serial cable grooves',serialTwo);
  assert.equal(serialTwoMesh.wireChannelsCut,serialTwoPlan.wirePlan.routes.length);
+ const combined=validate('WT-013 multiple sources with mounts and wiring',{
+  ...serialTwo,targetedLightPaths:true,lightReach:100,lightBoreDiameter:3,mount:'Wall screws'
+ });
+ const combinedAudit=combined.lightPassageInspection;
+ assert.equal(combinedAudit.mode,'targeted');
+ assert.equal(combined.socketsCut,2);
+ assert(combined.mountingHolesCut>0);
+ assert(combined.wireChannelsCut>0);
+ assert(combinedAudit.rows.length>=6);
+ assert.equal(new Set(combinedAudit.rows.map(row=>row.id)).size,combinedAudit.rows.length);
+ assert.equal(Object.values(combinedAudit.counts).reduce((sum,count)=>sum+count,0),combinedAudit.rows.length);
  assert(serialTwoMesh.socketCeilings.every(p=>p.wireReliefDepth===0),
   'Every socket in a multi-pixel string must have only planned string routes');
 
@@ -384,6 +413,19 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
  }
  const ready=validate('PR7 targeted light passages',wide);
  assert(ready.targetedLightCount>0,'Manifold actually subtracts a physical optical passage');
+ const inspection=ready.lightPassageInspection;
+ assert.equal(inspection.mode,'targeted');
+ assert.equal(inspection.counts.clear,1,'The one-LED fixture has a clear route through the final material solid');
+ assert(Number.isFinite(inspection.samplingMs));
+ console.log('WT-013 targeted inspection',JSON.stringify({counts:inspection.counts,samplingMs:inspection.samplingMs,meshTriangles:inspection.meshTriangles}));
+ assert.equal(inspection.physicalOpticalVerification,false);
+ assert.equal(inspection.rows.length,Object.values(inspection.counts).reduce((sum,count)=>sum+count,0));
+ for(const id of ready.targetedLightAcceptedIds){
+  const row=inspection.rows.find(item=>item.id===id);
+  assert(row?.manufactured&&row.points?.length>=3);
+  assert.match(row.source,/^LED socket P\d+$/);
+  assert(['clear','blocked','unknown'].includes(row.status));
+ }
  assert.equal(ready.disconnected,1,'Targeted bore preserves the connected solid');
  assert.equal(ready.internalCavities,0,'No hidden sealed cavities introduced by optical passages');
  const restricted=planTargetedLightPaths(construction.crystals,{...wide,lightReach:15},
@@ -435,8 +477,10 @@ assert.equal(builtTabs.edgeTabs,plannedTabs.tabs.length,'All planned tabs are fu
 assert.equal(builtTabs.mountingHolesCut,plannedTabs.tabHoles.length,'All accepted tab holes are drilled');
 assert.equal(builtTabs.disconnected,1,'Tabs and body remain connected');
 const vaultCheck=validate('zero-infill-vault',{...settings,count:8,baseHeight:25,baseDome:12,
- baseVault:true,vaultSupportPitch:25,cutSockets:true,pixelCount:1,hollowCrystals:false});
+ baseVault:true,lightPorts:true,vaultSupportPitch:25,cutSockets:true,pixelCount:1,hollowCrystals:false});
 assert(vaultCheck.vault.applied,'Zero-infill base vault is cut in the manufacturing mesh');
+assert.equal(vaultCheck.lightPassageInspection.mode,'vault');
+for(const row of vaultCheck.lightPassageInspection.rows.filter(row=>row.manufactured))assert.equal(row.source,'Open underside vault');
 assert(vaultCheck.vault.supportCount>0,'Integral support columns are generated');
 assert(vaultCheck.volumeMm3<vaultCheck.initialVolume,'Cavity removes solid material');
 assert.equal(vaultCheck.disconnected,1,'Roof buttresses stay part of the printed model');
@@ -447,6 +491,8 @@ assert.equal(domedBalloon.internalCavities,0,'Domed hollow cluster has no inacce
 assert.equal(domedBalloon.disconnected,1,'Domed balloon remains a connected printable body');
 const solidMass=validate('solid',settings);
 const hollow=validate('hollow',{...settings,hollowCrystals:true,cutSockets:true});
+assert.equal(hollow.lightPassageInspection.mode,'hollow');
+assert.equal(hollow.lightPassageInspection.counts.clear,0);
 assert(hollow.volumeMm3<solidMass.volumeMm3,'Balloon cavity with an LED port reduces material volume');
 assert.equal(hollow.internalCavities,0,'Sealed inaccessible pockets must be eliminated from exported geometry');
 console.log('balloon-material-ratio', (hollow.volumeMm3/solidMass.volumeMm3).toFixed(3),

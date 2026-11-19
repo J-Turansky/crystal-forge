@@ -1,3 +1,4 @@
+import {auditLightPassages} from './light-passage-inspection.js';
 /* Crystal Forge manufacturing pipeline v0.4
  * Uses Manifold WASM for robust Boolean unions, cavity subtraction and socket cuts.
  * The interactive preview stays lightweight and separate from the manufacturing mesh.
@@ -185,15 +186,27 @@ function cleanupAll(list){
 }
 // Closed tapered light tunnel aligned with an individual crystal's actual
 // orientation. Geometry is part of the manufacturable Boolean cut.
-function lightTunnel(wasm,start,end,rStart,rEnd){
+function lightTunnel(wasm,start,end,rStart,rEnd,minLength=1){
  const direction=new THREE.Vector3().subVectors(end,start),length=direction.length();
- if(length<1)return null;
+ if(length<minLength)return null;
  const geom=new THREE.CylinderGeometry(rEnd,rStart,length,16,1,false);
  const tube=new THREE.Mesh(geom);
  tube.position.copy(start).add(end).multiplyScalar(.5);
  tube.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.normalize());
  const solid=convertMesh(wasm,tube);
  geom.dispose();return solid;
+}
+// Intersect the exact finite centreline segment against the final material.
+export function probeLightPassageSegment(wasm,solid,from,to){
+ const start=new THREE.Vector3(...from),end=new THREE.Vector3(...to);
+ let tube,overlap;
+ try{
+  tube=lightTunnel(wasm,start,end,.2,.2,0);
+  overlap=solid.intersect(tube);
+  const status=overlap.status();
+  return !status||['NoError','no-error','Success'].includes(status)?Math.abs(overlap.volume()):NaN;
+ }catch{return NaN;}
+ finally{overlap?.delete();tube?.delete();}
 }
 // Real open underside and integral 45-degree flared buttresses, independent of
 // Cura infill. This does NOT manufacture an empty space within each spike.
@@ -322,6 +335,7 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
    assertSolid(joined,'Semicircular edge fixing tabs');
    combined=joined;
   }
+  const inspectedPaths=new Map(), inspectionSkips=new Map();
   let hollowed=0,hollowPorts=0,skippedHollowPorts=0;
   let directLightPorts=0,skippedDirectLightPorts=0,lightPortDetails=[];
   let vault={applied:false,supportCount:0,pitch:0,gapEstimate:0};
@@ -344,7 +358,7 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
     const cutters=[];
     for(const port of portPlan.ports){
      const c=crystals.find(x=>x.id===port.id),obj=live.find(m=>m.userData?.crystalId===port.id);
-     if(!c||!obj){skippedDirectLightPorts++;continue}
+     if(!c||!obj){skippedDirectLightPorts++;inspectionSkips.set(port.id,'Crystal geometry was unavailable for the vault bore.');continue}
      obj.updateMatrixWorld(true);
      const baseY=baseSurfaceHeight(crystals,s,c.x,c.z);
      const root=new THREE.Vector3(0,0,0).applyMatrix4(obj.matrixWorld);
@@ -353,11 +367,12 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
      const upper=Math.min(c.h*.72,port.reach/sy);
      const end=new THREE.Vector3((c.leanX||0)*upper,upper,(c.leanZ||0)*upper).applyMatrix4(obj.matrixWorld);
      if(!Number.isFinite(end.y)||end.y<baseY+3||end.distanceTo(start)<9){
-      skippedDirectLightPorts++;continue;
+      skippedDirectLightPorts++;inspectionSkips.set(port.id,'Vault bore endpoints did not leave enough vertical clearance.');continue;
      }
      const bore=lightTunnel(wasm,start,end,port.radius,Math.max(.5,port.radius*.65));
      if(!bore){skippedDirectLightPorts++;continue}
      cutters.push(hold(bore));directLightPorts++;
+     inspectedPaths.set(port.id,{source:'Open underside vault',access:true,points:[start.toArray(),end.toArray()]});
      lightPortDetails.push({id:port.id,name:port.name,diameter:port.diameter,
       startY:+start.y.toFixed(2),endY:+end.y.toFixed(2),status:'Modeled bore — inspect in Cura'});
     }
@@ -401,19 +416,19 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
     for(const c of crystals){
       if(c.hidden)continue;
       const obj=live.find(m=>m.userData?.crystalId===c.id);
-      if(!obj){skippedHollowPorts++;continue}
+      if(!obj){skippedHollowPorts++;inspectionSkips.set(c.id,'Crystal geometry was unavailable for a hollow conduit.');continue}
       obj.updateMatrixWorld(true);
       const shape={...s,...(c.shape||{})};
       const minScale=Math.min(c.sx||c.scale||1,c.sz||c.scale||1);
       const safeRadius=c.r*Math.min(shape.bottomScale,shape.topScale)*minScale-thickness*2.2;
-      if(safeRadius<1.25){skippedHollowPorts++;continue}
+      if(safeRadius<1.25){skippedHollowPorts++;inspectionSkips.set(c.id,'Crystal is too narrow for a conduit at this wall thickness.');continue}
       const rRoot=Math.min(4.2,Math.max(1.05,safeRadius*.43));
       const rEnd=Math.min(rRoot*.65,Math.max(.65,safeRadius*.19));
       const tipFraction=Math.min(.48,Math.max(.1,shape.tipLength||.27));
       const up=c.h*(1-tipFraction*.40);
       const root=new THREE.Vector3(0,0,0).applyMatrix4(obj.matrixWorld);
       const tip=new THREE.Vector3((c.leanX||0)*up,up,(c.leanZ||0)*up).applyMatrix4(obj.matrixWorld);
-      if(tip.y-root.y<Math.max(6,thickness*3)){skippedHollowPorts++;continue}
+      if(tip.y-root.y<Math.max(6,thickness*3)){skippedHollowPorts++;inspectionSkips.set(c.id,'Crystal is too short or too tilted for its hollow conduit.');continue}
       // Vertical base conduit joins the eroded dome; the upper conduit
       // follows the leaning / rotated crystal spine rather than cutting
       // straight through the external facets.
@@ -423,6 +438,7 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
       const shaft=lightTunnel(wasm,rootEntry,tip,rRoot,rEnd);
       if(stem)channels.push(hold(stem));
       if(shaft)channels.push(hold(shaft));
+      if(stem&&shaft)inspectedPaths.set(c.id,{source:'Shared internal cavity',points:[floor.toArray(),rootEntry.toArray(),tip.toArray()]});
       connected++;
     }
     hollowPorts=connected;
@@ -514,6 +530,8 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
     if(lower)channels.push(hold(lower));
     const shaft=lightTunnel(wasm,step,top,path.boreRadius,Math.max(.7,path.boreRadius*.65));
     if(shaft)channels.push(hold(shaft));
+    inspectedPaths.set(path.id,{source:'LED socket P'+(path.sourceIndex+1),access:socketsCut>path.sourceIndex,
+     points:[...path.baseSegments.map(([a])=>[a.x,a.y,a.z]),rootPoint.toArray(),step.toArray(),top.toArray()]});
     targetedLightCount++;acceptedTargetedLightIds.push(path.id);
    }
    if(channels.length){
@@ -589,6 +607,17 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
    }
   }
   onProgress('Auditing the final manifold geometry and printer limits…');
+  const inspectionMode=s.lightingMode==='none'?'none':s.hollowCrystals?'hollow':portPlan.requested&&vault.applied?'vault':s.targetedLightPaths?'targeted':portPlan.requested?'vault':'none';
+  const auditStarted=performance.now();
+  const lightPassageInspection=auditLightPassages({solid:combined,crystals,mode:inspectionMode,paths:inspectedPaths,
+   skipped:new Map([...inspectionSkips,...[...portPlan.skipped,...targetedPlan.skipped].map(item=>[item.id,item.reason])]),
+   required:s.requireAccessiblePassages,crystalPositions:new Map(live.filter(object=>object.userData?.crystalId!=null).map(object=>{
+    object.geometry.computeBoundingBox();
+    const point=new THREE.Vector3(0,object.geometry.boundingBox.max.y*.65,0).applyMatrix4(object.matrixWorld);
+    return [object.userData.crystalId,point.toArray()];
+   })),probe:(from,to)=>probeLightPassageSegment(wasm,combined,from,to)});
+  lightPassageInspection.samplingMs=Math.round(performance.now()-auditStarted);
+  lightPassageInspection.meshTriangles=combined.numTri();
   const resultMesh=combined.getMesh();
   const geom=fromResultMesh(resultMesh),indexed=compactMesh(resultMesh);
   const bounds=combined.boundingBox();
@@ -644,7 +673,7 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
   if(orientation.name!=='Base down (upright)')warnings.push('A different orientation may reduce unsupported area: '+orientation.name+'. Stability and support requirements still need slicer verification.');
   if(s.hollowCrystals&&!s.cutSockets&&!s.undersideAccess)warnings.push('Hollow chambers may be sealed. Enable socket openings or underside access for LED service and venting.');
   const report={ready:true,status:'Manifold mesh validated',printerFits,printerLimit:volumeLimit||null,roofReview,orientation,triangleCount:combined.numTri(),volumeMm3:volume,materialPLAgrams:volume/1000*1.24,initialVolume,disconnected,internalCavities,shellVolumes,
-    bounds:size,quality,hollowed,hollowPorts,skippedHollowPorts,directLightPorts,skippedDirectLightPorts,lightPortDetails,targetedLightCount,targetedLightAcceptedIds:acceptedTargetedLightIds,targetedLightSkipped:targetedPlan.skipped,baseFitsPixel,lightPathScreened,sealedCavitiesFilled,vault,ventCuts,socketCeilings,socketsCut,mountingHolesCut,edgeTabs:hardware.tabs.length,wireChannelsCut,wireLengthMm:hardware.wirePlan?.lengthMm||0,unroutedPixels:hardware.wirePlan?.unrouted||0,wireExitAdded:!!hardware.wirePlan?.exitAdded,
+    bounds:size,quality,lightPassageInspection,hollowed,hollowPorts,skippedHollowPorts,directLightPorts,skippedDirectLightPorts,lightPortDetails,targetedLightCount,targetedLightAcceptedIds:acceptedTargetedLightIds,targetedLightSkipped:targetedPlan.skipped,baseFitsPixel,lightPathScreened,sealedCavitiesFilled,vault,ventCuts,socketCeilings,socketsCut,mountingHolesCut,edgeTabs:hardware.tabs.length,wireChannelsCut,wireLengthMm:hardware.wirePlan?.lengthMm||0,unroutedPixels:hardware.wirePlan?.unrouted||0,wireExitAdded:!!hardware.wirePlan?.exitAdded,
      plannedSockets:hardware.sockets,plannedMounts:[...hardware.mounts,...hardware.tabHoles],hardware,warnings,mesh:indexed};
   return {geometry:geom,report};
  }finally{cleanupAll(owned)}

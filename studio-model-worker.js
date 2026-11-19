@@ -26,6 +26,7 @@ self.onmessage=async({data})=>{
    try{
     const settings={...ticket.model.parameters,...ticket.printer};
     const result=prepareFabrication({wasm,meshes,crystals:ticket.model.editableState.crystals,settings,onProgress:progress});
+    result.report.lightPassageInspection.modelRevision=ticket.model.revision;
     const mesh=result.report.mesh;let volume=0;
     for(let i=0;i<mesh.triangles.length;i+=3){const [a,b,c]=[mesh.triangles[i],mesh.triangles[i+1],mesh.triangles[i+2]].map(n=>n*3),p=mesh.points;volume+=(p[a]*(p[b+1]*p[c+2]-p[b+2]*p[c+1])+p[a+1]*(p[b+2]*p[c]-p[b]*p[c+2])+p[a+2]*(p[b]*p[c+1]-p[b+1]*p[c]))/6;}
     prepared={report:{...result.report,engine:'Manifold',coordinateFrame:'Y-up'},bodies:[{role:'primary',volume:Math.abs(volume),mesh}]};result.geometry.dispose();
