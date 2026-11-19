@@ -28,56 +28,15 @@ body.sms-workspace .sms-panel-details{background:var(--panel);border-left:3px so
 .sms-picture-empty{display:grid;place-items:center;min-height:130px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;color:var(--muted);font-weight:400}
 @media(max-width:440px){#smsPicker .sms-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sms-picker-tile img,.sms-picture-empty{height:94px;min-height:94px}}
 
-/* Unified shell. The classic canvas and its controls keep their IDs and handlers. */
-body.sms-unified{display:flex;flex-flow:column;height:100dvh;min-height:0;overflow:hidden}
-body.sms-unified .studio-modelbar{order:-1;position:static;min-height:0}
-body.sms-unified .layout{height:auto;min-height:0;flex:1;position:relative;grid-template-rows:minmax(0,1fr)}
-.sms-unified .layout>.sms-rail,.sms-unified .layout>.sms-centre,.sms-unified .layout>.sms-settings{min-width:0;min-height:0}
-.sms-rail,.sms-settings{padding:12px;background:var(--panel);overflow:auto}
-.sms-rail{display:flex;flex-direction:column;gap:10px;border-right:1px solid var(--border)}
-.sms-rail .studio-modeltabs{display:flex;flex:0 1 auto;flex-direction:column;overflow:auto}
-.sms-rail .studio-modeltabs button{white-space:normal;display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:8px;align-items:center;text-align:left;padding:7px}
-.sms-rail img,.sms-rail .sms-picture-empty{width:44px;height:35px;min-height:0;object-fit:contain;font-size:0;background:#edf2f8;border-radius:4px}
-.sms-centre{display:grid;grid-template-rows:minmax(0,var(--sms-view-height)) 22px minmax(0,1fr);position:relative}
-.sms-centre .viewarea{height:auto;min-height:0;overflow:hidden}
-.sms-split{width:calc(100% - 28px);margin:0 14px;accent-color:var(--teal)}
-.sms-palette{overflow:auto;padding:16px;background:var(--bg);border-top:1px solid var(--border)}
-.sms-palette h2{margin:0 0 12px}
 .sms-preset-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:9px;margin-bottom:15px}
 .sms-preset-strip button{display:grid;gap:6px;text-align:left;font-weight:700}
 .sms-preset-strip img{width:100%;height:80px;object-fit:contain;border-radius:5px;background:#edf2f8}
-.sms-settings{border-left:1px solid var(--border)}
-.sms-settings>:is(.left,.right){height:auto;min-height:0;overflow:visible;border:0;padding:8px 0}
-.sms-settings>input{width:100%;margin-bottom:8px;padding:8px}
-.sms-settings [data-filtered],.sms-unified .sms-replaced-print{display:none!important}
 .sms-unified .workspace-tabs [aria-current]{outline:2px solid currentColor;outline-offset:-3px}
 .sms-unified :focus-visible{outline:3px solid #1681d4;outline-offset:2px}
-.sms-unified[data-studio-view=home] .sms-settings{visibility:hidden}
-.sms-unified[data-studio-view=home] .sms-centre>.viewarea,.sms-unified[data-studio-view=library] .sms-centre>.viewarea,.sms-unified[data-studio-view=print] .sms-centre>.viewarea{visibility:hidden}
-.sms-unified .sms-overlay{background:var(--bg)}
 .sms-unified.sms-focused .viewarea{position:fixed!important;inset:0;z-index:30;height:100dvh}
 #smsPrintCurrent{margin-bottom:12px}
 #smsPrintModels{margin:12px 0}
-@media(max-width:850px){
- body.sms-unified{height:auto;min-height:100dvh;overflow:auto}
- body.sms-unified .layout{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(515px,78dvh) auto;height:auto}
- .sms-rail{border:0;overflow-x:auto}
- .sms-rail .studio-modeltabs{flex-direction:row;max-width:100%}
- .sms-rail .studio-modeltabs button{min-width:125px}
- .sms-settings{overflow:visible}
- .sms-unified[data-studio-view=home] .sms-settings{display:none}
-}
-
 .sms-unified #smsFocus{pointer-events:auto;position:relative;z-index:1}
-
-@media(max-width:850px){
- body.sms-unified{overflow-x:clip}
- .sms-unified :is(.topbar,.topcluster,.workspace-tabs,.studio-modelbar){min-width:0;max-width:100%;flex-wrap:wrap}
- .sms-unified .layout{width:100%;max-width:100%;overflow-x:clip}
- .sms-unified .sms-overlay{overflow-wrap:anywhere}
- .sms-unified #smsHomeSearch{max-width:100%}
-}
-
 .sms-context-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px;margin-top:12px}
 .sms-context-controls label,.sms-context-controls fieldset{min-width:0;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px}
 .sms-context-controls label{display:grid;grid-template-columns:1fr auto;gap:6px;font-weight:700}
@@ -85,38 +44,65 @@ body.sms-unified .layout{height:auto;min-height:0;flex:1;position:relative;grid-
 .sms-context-controls fieldset button{margin:3px}
 .sms-context-controls button[aria-pressed=true]{outline:2px solid var(--teal);font-weight:700}
 
-/* Global controls stay above the workspace navigation. */
-.sms-unified .topbar{flex-wrap:wrap;gap:8px;padding:8px 12px;z-index:32}
-.sms-unified .topbar .utility{gap:5px}
-.sms-workspace-nav{flex:0 0 auto;padding:5px 12px;border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--panel);align-items:center}
-.sms-workspace-nav button{padding:4px 11px}
-.sms-more{position:relative}
-.sms-more summary{cursor:pointer;padding:7px;border:1px solid var(--border);border-radius:7px}
-.sms-more[open]{display:flex;gap:5px;flex-wrap:wrap;align-items:center;max-width:100%}
-.sms-more label{display:flex;gap:6px;align-items:center}
-.sms-more input{width:80px}
-body.sms-unified .layout{grid-template-columns:var(--sms-rail-width) minmax(0,1fr) var(--sms-settings-width)!important}
+/* Unified workspace keeps the live editor and camera mounted. */
+body.sms-unified{display:flex;flex-direction:column;height:100dvh;min-height:0;overflow:hidden}
+body.sms-unified .layout{display:grid;flex:1;min-height:0;height:auto;position:relative;
+ grid-template-columns:var(--sms-tools-width) 8px minmax(0,1fr) 8px var(--sms-settings-width);
+ grid-template-rows:minmax(0,1fr) 58px}
 .sms-unified .layout>.workspace-resizer{display:none!important}
-.sms-unified .sms-rail{grid-column:1;grid-row:1}
-.sms-unified .sms-centre{grid-column:2;grid-row:1}
-.sms-unified .sms-settings{grid-column:3;grid-row:1}
-.sms-unified [hidden]:is(.sms-rail,.sms-settings,.sms-palette,.sms-split){display:none!important}
-.sms-unified .sms-centre[data-palette=hidden]{grid-template-rows:minmax(0,1fr)}
-.sms-unified .layout[data-rail=icons] .sms-rail{padding:5px}
-.sms-unified .layout[data-rail=icons] .sms-rail button{font-size:0;padding:4px;display:block}
-.sms-unified .layout[data-rail=icons] .sms-rail button img,.sms-unified .layout[data-rail=icons] .sms-picture-empty{width:100%;display:block}
-.sms-unified .layout[data-rail=icons] .sms-rail .close-tab{display:none}
-.sms-unified .layout[data-rail=icons] #smsToggleRail::after{content:'»';font-size:16px}
-.sms-unified .layout[data-rail=icons] #smsNew::after{content:'＋';font-size:16px}
-@media(max-width:850px){
- body.sms-unified .layout{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:auto minmax(515px,78dvh) auto}
- .sms-unified .sms-rail,.sms-unified .sms-centre,.sms-unified .sms-settings{grid-column:1}
- .sms-unified .sms-rail{grid-row:1}
- .sms-unified .sms-centre{grid-row:2}
- .sms-unified .sms-settings{grid-row:3}
- .sms-unified .layout[data-rail=icons] .sms-rail button{min-width:46px;width:46px}
+.sms-unified .topbar{min-height:44px;flex:0 0 auto;flex-wrap:wrap;gap:4px 10px;padding:4px 10px;z-index:32}
+.sms-unified .topcluster{gap:6px;min-width:0}
+.sms-unified .topbar .utility{gap:4px;flex-wrap:wrap}
+.sms-unified .topbar button{padding:3px 7px;white-space:nowrap}
+.sms-unified .modebar{padding:1px;gap:2px}
+.sms-product{display:grid;line-height:1.1;gap:2px}
+.sms-unified .sms-product .brand{font-size:15px;white-space:nowrap}
+.sms-product .version{padding:0;border:0;font-size:10px;border-radius:0}
+.sms-unified #projectName{display:none}
+.sms-unified #smsProjectTitle{display:block;max-width:140px;width:clamp(92px,10vw,140px);padding:3px 6px;text-overflow:ellipsis}
+.sms-unified #smsProjectTitle:focus{text-overflow:clip}
+.sms-unified #smsSaveState{color:var(--muted);font-size:11px}
+.sms-workspace-nav{flex:0 0 auto;padding:3px 10px;border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--panel);align-items:center}
+.sms-workspace-nav button{padding:3px 10px}
+.sms-tools,.sms-settings{display:grid;grid-template-rows:auto minmax(0,1fr);min-width:0;min-height:0;background:var(--panel)}
+.sms-tools{grid-column:1;grid-row:1}.sms-settings{grid-column:5;grid-row:1}
+.sms-side-heading{display:flex;align-items:center;gap:7px;min-height:35px;padding:4px 7px;border-bottom:1px solid var(--border)}
+.sms-side-heading button{padding:2px 6px}
+.sms-collapsed .sms-side-heading strong{display:none}
+.sms-side-body{overflow:auto;min-width:0;min-height:0}
+.sms-side-body[hidden],.sms-tools .left [hidden],.sms-settings #smsEditor[hidden]{display:none!important}
+.sms-palette{padding:10px;background:var(--bg)}
+.sms-palette h2{margin:0 0 8px}
+.sms-side-body>:is(.left,.right){height:auto;min-height:0;overflow:visible;border:0;padding:8px}
+.sms-side-body>input[type=search]{width:calc(100% - 16px);margin:8px;padding:6px}
+.sms-settings [data-filtered]{display:none!important}
+.sms-edge{grid-row:1;cursor:col-resize;touch-action:none;background:var(--panel2);border-inline:1px solid var(--border)}
+.sms-edge[aria-controls=smsTools]{grid-column:2}
+.sms-edge[aria-controls=smsPrecision]{grid-column:4}
+.sms-edge:focus-visible,.sms-edge:hover{background:var(--teal)}
+.sms-edge[aria-disabled=true]{cursor:default}
+.sms-centre{grid-column:3;grid-row:1;display:grid;grid-template-rows:minmax(0,1fr);position:relative;min-width:0;min-height:0}
+.sms-centre .viewarea{height:auto;min-height:0;overflow:hidden}
+.sms-unified:not([data-studio-view=model]) .sms-centre>.viewarea{visibility:hidden}
+.sms-unified:not([data-studio-view=model]) .sms-palette{display:none}
+.sms-unified[data-studio-view=home] :is(.sms-tools,.sms-settings){visibility:hidden}
+.sms-unified .sms-overlay{background:var(--bg);overflow-wrap:anywhere}
+.sms-unified.sms-focused .viewarea{position:fixed!important;inset:0;z-index:30;height:100dvh}
+.sms-rail{grid-column:1/-1;grid-row:2;display:flex;align-items:center;min-width:0;gap:6px;padding:4px 8px;background:var(--panel);border-top:1px solid var(--border)}
+.sms-rail .studio-modeltabs{display:flex;flex:1;min-width:0;overflow-x:auto;overflow-y:hidden;padding:3px;gap:5px}
+.sms-rail .studio-modeltabs button{flex:none;display:flex;align-items:center;gap:6px;padding:4px 7px;white-space:nowrap}
+.sms-rail img,.sms-rail .sms-picture-empty{width:31px;height:26px;min-height:0;object-fit:contain;font-size:0;background:#edf2f8;border-radius:4px}
+.sms-rail #smsNew{white-space:nowrap;padding:4px 7px}
+@media(max-width:900px){
+ body.sms-unified{height:auto;min-height:100dvh;overflow:auto;padding-bottom:58px}
+ body.sms-unified .layout{width:100%;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(400px,62dvh) auto auto}
+ .sms-centre{grid-column:1;grid-row:1}.sms-tools{grid-column:1;grid-row:2}.sms-settings{grid-column:1;grid-row:3}
+ .sms-edge{display:none}
+ .sms-side-body{max-height:48dvh}
+ .sms-rail{position:fixed;inset:auto 0 0;z-index:20;min-height:54px}
+ .sms-unified[data-studio-view=home] :is(.sms-tools,.sms-settings){display:none}
+ .sms-unified #smsHomeSearch{max-width:100%}
 }
-
 #smsJobs{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));margin-top:14px}
 #smsJobs fieldset{min-width:0;border:1px solid var(--border);border-radius:8px;padding:8px;display:grid;gap:6px}
 #smsJobs fieldset label{display:grid;gap:3px;font-size:13px}

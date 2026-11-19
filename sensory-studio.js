@@ -37,83 +37,112 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  function setupShell(){
   document.body.classList.add('sms-unified');
   const layout=document.querySelector('.layout'),left=layout.querySelector('.left'),right=layout.querySelector('.right'),viewer=layout.querySelector('.viewarea');
-  const rail=document.createElement('aside');rail.className='sms-rail';rail.setAttribute('aria-label','Models');
-  rail.append($('smsTabs'),$('smsNew'));
-  const centre=document.createElement('section');centre.className='sms-centre';
-  const palette=document.createElement('section');palette.className='sms-palette';palette.setAttribute('aria-label','Visual choices');
-  const split=document.createElement('input');split.type='range';split.min=35;split.max=78;split.value=56;
-  split.className='sms-split';split.setAttribute('aria-label','3D viewport height');
-  try{split.value=localStorage.getItem('wt-viewport-height')||56;}catch{}
-  const resize=()=>centre.style.setProperty('--sms-view-height',split.value+'%');
-  split.oninput=resize;split.onchange=()=>{try{localStorage.setItem('wt-viewport-height',split.value);}catch{}};
-  resize();centre.append(viewer,split,palette,overlay);
-  const settings=document.createElement('aside');settings.className='sms-settings';settings.setAttribute('aria-label','Precision settings');
-  const search=document.createElement('input');search.type='search';search.placeholder='Search settings';search.setAttribute('aria-label','Search settings');
-  const searchSettings=()=>{
-   const query=search.value.trim().toLowerCase();
-   for(const item of settings.querySelectorAll('.sms-panel-details,.collapsible-section')){
-    item.toggleAttribute('data-filtered',!!query&&!item.textContent.toLowerCase().includes(query));
-    if(query&&!item.hasAttribute('data-filtered')&&item.tagName==='DETAILS')item.open=true;
-   }
-  };
-  search.oninput=searchSettings;settings.append(search,left,right);
-  layout.prepend(rail,centre,settings);
   const button=(label,action,id)=>{const node=document.createElement('button');node.type='button';node.textContent=label;if(id)node.id=id;node.onclick=action;return node;};
   const home=button('⌂ Home',()=>showHome(),'smsHome');
   const undoButton=button('↶ Undo',()=>shellUndo(-1),'smsGlobalUndo');
   const redoButton=button('↷ Redo',()=>shellUndo(1),'smsGlobalRedo');
-  const styleNav=document.querySelector('.workspace-tabs');
-  const top=document.querySelector('.topbar');
+  const rail=document.createElement('aside');rail.className='sms-rail';rail.id='smsModelRail';rail.setAttribute('aria-label','Models');
+  rail.append($('smsTabs'),$('smsNew'));
+  const centre=document.createElement('section');centre.className='sms-centre';centre.append(viewer,overlay);
+  const palette=document.createElement('section');palette.className='sms-palette';palette.id='smsVisualPalette';palette.setAttribute('aria-label','Visual choices');
+  function side(name,id,...contents){
+   const region=document.createElement('aside');region.id=id;region.setAttribute('aria-label',name);
+   const heading=document.createElement('header');heading.className='sms-side-heading';
+   const label=document.createElement('strong');label.textContent=name;
+   const body=document.createElement('div');body.className='sms-side-body';body.id=id+'Content';body.append(...contents);
+   const toggle=button('≡',()=>{view[id].collapsed=!view[id].collapsed;applyPanels();});
+   toggle.setAttribute('aria-controls',body.id);
+   heading.append(toggle,label);region.append(heading,body);
+   return {region,body,toggle,name};
+  }
+  const search=document.createElement('input');search.type='search';search.placeholder='Search settings';search.setAttribute('aria-label','Search settings');
+  const tools=side('Design and Build','smsTools',palette,left);
+  const precision=side('Precision settings','smsPrecision',search,panel,right);
+  tools.region.className='sms-tools';precision.region.className='sms-settings';
+  const searchSettings=()=>{
+   const query=search.value.trim().toLowerCase();
+   for(const item of precision.body.querySelectorAll('.sms-panel-details,.collapsible-section')){
+    item.toggleAttribute('data-filtered',!!query&&!item.textContent.toLowerCase().includes(query));
+    if(query&&!item.hasAttribute('data-filtered')&&item.tagName==='DETAILS')item.open=true;
+   }
+  };
+  search.oninput=searchSettings;
+  const styleNav=document.querySelector('.workspace-tabs'),top=document.querySelector('.topbar');
   styleNav.prepend(home,$('smsLibrary'));styleNav.setAttribute('aria-label','Workspaces');
   top.after(styleNav);styleNav.classList.add('sms-workspace-nav');
-  const utility=top.querySelector('.utility');
-  const more=document.createElement('details');more.className='sms-more';
-  const moreLabel=document.createElement('summary');moreLabel.textContent='More';more.append(moreLabel);
-  for(const item of [utility.querySelector('.modebar'),$('themeBtn'),$('helpBtn'),$('descriptionsBtn'),$('changelogBtn')])more.append(item);
   top.querySelector('.topcluster').append($('smsProjectTitle'),$('smsSaveState'));
-  utility.append($('smsReload'),undoButton,redoButton,more,$('smsPrint'));bar.remove();
+  const projectName=$('smsProjectTitle');
+  const describeTitle=()=>{projectName.title=projectName.value;};
+  describeTitle();projectName.addEventListener('input',describeTitle);projectName.addEventListener('focus',describeTitle);
+  top.querySelector('.utility').append($('smsReload'),undoButton,redoButton);
+  bar.remove();
 
-  const preferenceKey='wt-workspace-panels-v1';
-  let saved={};try{saved=JSON.parse(localStorage.getItem(preferenceKey))||{};}catch{}
-  const view={rail:['icons','hidden'].includes(saved.rail)?saved.rail:'expanded',settings:saved.settings!==false,palette:saved.palette!==false,
-   railWidth:Number.isFinite(saved.railWidth)?Math.min(240,Math.max(140,saved.railWidth)):176,
-   settingsWidth:Number.isFinite(saved.settingsWidth)?Math.min(490,Math.max(250,saved.settingsWidth)):300};
-  const menus=document.createElement('details');menus.className='sms-more';
-  const menuLabel=document.createElement('summary');menuLabel.textContent='Panels';menus.append(menuLabel);utility.append(menus);
-  const toggleRail=button('Collapse model rail',()=>{view.rail=view.rail==='expanded'?'icons':'expanded';applyPanels();},'smsToggleRail');
-  const hideRail=button('',()=>{view.rail=view.rail==='hidden'?'expanded':'hidden';applyPanels();menuLabel.focus();},'smsHideRail');
-  const toggleSettings=button('',()=>{view.settings=!view.settings;applyPanels();},'smsToggleSettings');
-  const togglePalette=button('',()=>{view.palette=!view.palette;applyPanels();},'smsTogglePalette');
-  rail.prepend(toggleRail);menus.append(hideRail,toggleSettings,togglePalette);
-  const resizePanel=(key,label,min,max)=>{
-   const row=document.createElement('label');row.textContent=label;
-   const slider=document.createElement('input');slider.type='range';slider.min=min;slider.max=max;slider.value=view[key];slider.setAttribute('aria-label',label);
-   slider.oninput=()=>{view[key]=Number(slider.value);applyPanels();};row.append(slider);menus.append(row);
-  };
-  resizePanel('railWidth','Model rail width',140,240);
-  resizePanel('settingsWidth','Settings width',250,490);
-  for(const [region,id] of [[rail,'smsModelRail'],[settings,'smsPrecision'],[palette,'smsVisualPalette']])region.id=id;
-  for(const [control,region] of [[toggleRail,rail],[hideRail,rail],[toggleSettings,settings],[togglePalette,palette]])control.setAttribute('aria-controls',region.id);
-  const describe=(control,expanded,label)=>{control.setAttribute('aria-expanded',String(expanded));control.textContent=label;control.title=label;control.setAttribute('aria-label',label);};
-  function applyPanels(){
-   layout.dataset.rail=view.rail;layout.dataset.settings=view.settings?'visible':'hidden';centre.dataset.palette=view.palette?'visible':'hidden';
-   layout.style.setProperty('--sms-rail-width',view.rail==='hidden'?'0px':view.rail==='icons'?'56px':view.railWidth+'px');
-   layout.style.setProperty('--sms-settings-width',view.settings?view.settingsWidth+'px':'0px');
-   rail.hidden=view.rail==='hidden';settings.hidden=!view.settings;palette.hidden=!view.palette;split.hidden=!view.palette;
-   describe(toggleRail,view.rail==='expanded',view.rail==='expanded'?'Collapse model rail':'Expand model rail');
-   describe(hideRail,view.rail!=='hidden',view.rail==='hidden'?'Show model rail':'Hide model rail');
-   describe(toggleSettings,view.settings,view.settings?'Hide settings':'Show settings');
-   describe(togglePalette,view.palette,view.palette?'Hide visual palette':'Show visual palette');
-   try{localStorage.setItem(preferenceKey,JSON.stringify(view));}catch{}
+  const preferenceKey='wt-workspace-panels-v2';
+  function readLayout(key){
+   try{return JSON.parse(localStorage.getItem(key))||{};}catch{return {};}
   }
-  applyPanels();
+  const saved=readLayout(preferenceKey),legacy=readLayout('wt-workspace-panels-v1');
+  const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
+  function sidePrefs(value,fallback){
+   return {width:clamp(Number.isFinite(value?.width)?value.width:fallback,220,460),collapsed:value?.collapsed===true};
+  }
+  const view={smsTools:sidePrefs(saved.smsTools,280),smsPrecision:sidePrefs(saved.smsPrecision,Number.isFinite(legacy.settingsWidth)?legacy.settingsWidth:300)};
+  const narrow=matchMedia('(max-width: 900px)');
+  const regions=[tools,precision];
+  function maxWidth(other){
+   const width=view[other.region.id];
+   const reserve=width.collapsed?42:Math.min(width.width,Math.max(220,(layout.clientWidth-436)/2));
+   return clamp(layout.clientWidth-436-reserve,220,460);
+  }
+  function separator(side,other,direction){
+   const grip=document.createElement('div');grip.className='sms-edge';grip.tabIndex=0;
+   grip.setAttribute('role','separator');grip.setAttribute('aria-orientation','vertical');
+   grip.setAttribute('aria-label','Resize '+side.name.toLowerCase());
+   grip.setAttribute('aria-controls',side.region.id);grip.title='Drag to resize. Use arrow keys or Shift + arrow keys.';
+   const state=view[side.region.id];
+   const update=width=>{state.width=clamp(width,220,maxWidth(other));applyPanels();};
+   let drag=null;
+   grip.onpointerdown=event=>{
+    if(event.button!==0||narrow.matches||state.collapsed)return;
+    event.preventDefault();grip.focus({preventScroll:true});
+    drag={id:event.pointerId,x:event.clientX,width:side.region.getBoundingClientRect().width};
+    grip.setPointerCapture(event.pointerId);
+   };
+   grip.onpointermove=event=>{if(drag?.id===event.pointerId)update(drag.width+direction*(event.clientX-drag.x));};
+   grip.onlostpointercapture=()=>{drag=null;};
+   grip.onkeydown=event=>{
+    if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||state.collapsed||narrow.matches)return;
+    event.preventDefault();
+    const delta=direction*(event.key==='ArrowLeft'?-1:1)*(event.shiftKey?24:8);
+    update(event.key==='Home'?220:event.key==='End'?maxWidth(other):side.region.getBoundingClientRect().width+delta);
+   };
+   return grip;
+  }
+  const grips=[separator(tools,precision,1),separator(precision,tools,-1)];
+  function applyPanels(persist=true){
+   for(const [i,side] of regions.entries()){
+    const state=view[side.region.id],width=state.collapsed?42:Math.min(state.width,maxWidth(regions[1-i]));
+    layout.style.setProperty(i?'--sms-settings-width':'--sms-tools-width',width+'px');
+    side.region.classList.toggle('sms-collapsed',state.collapsed);
+    side.body.hidden=state.collapsed;
+    const label=(state.collapsed?'Expand ':'Collapse ')+side.name.toLowerCase();
+    side.toggle.title=label;side.toggle.setAttribute('aria-label',label);
+    side.toggle.setAttribute('aria-expanded',String(!state.collapsed));
+    grips[i].tabIndex=state.collapsed?-1:0;
+    grips[i].setAttribute('aria-disabled',String(state.collapsed));
+    grips[i].setAttribute('aria-valuemin','220');
+    grips[i].setAttribute('aria-valuemax',String(maxWidth(regions[1-i])));
+    grips[i].setAttribute('aria-valuenow',String(state.collapsed?220:width));
+   }
+   if(persist)try{localStorage.setItem(preferenceKey,JSON.stringify(view));}catch{}
+  }
+  layout.prepend(tools.region,grips[0],centre,grips[1],precision.region,rail);
+  applyPanels(false);
+  window.addEventListener('resize',()=>applyPanels(false));
   document.addEventListener('keydown',event=>{
-   if(event.key!=='Escape')return;
-   const opened=[menus,more].filter(menu=>menu.open);
-   if(opened.length){opened.forEach(menu=>{menu.open=false;menu.querySelector('summary').focus();});return;}
-   if(mode!=='model'&&!document.querySelector('dialog[open]')&&currentId)document.querySelector('.workspace-tabs [data-tab=design]').click();
+   if(event.key==='Escape'&&mode!=='model'&&!document.querySelector('dialog[open]')&&currentId)
+    document.querySelector('.workspace-tabs [data-tab=design]').click();
   });
-  $('smsPrint').hidden=true;$('smsPrint').classList.add('sms-replaced-print');
   const focus=button('Focus 3D',()=>{
    const full=document.body.classList.toggle('sms-focused');focus.textContent=full?'Exit focus':'Focus 3D';focus.setAttribute('aria-pressed',String(full));
   },'smsFocus');
@@ -314,7 +343,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    button.onclick=e=>{if(e.target===close){closeModel(id);return;}switchModel(id);};
    button.title='Double-click to rename. Drag or use Alt+Up/Down to reorder. Delete closes the tab.';
    button.ondblclick=()=>{const name=prompt('Model name',model.name);if(name?.trim()){if(model.link){adapter.status('Make an independent variant before renaming a linked model.');return;}editModel(project,id,{name:name.trim()});renderTabs();save();}};
-   button.onkeydown=e=>{const i=project.tabs.indexOf(id);if(shell&&e.altKey&&['ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();const to=Math.max(0,Math.min(project.tabs.length-1,i+(e.key==='ArrowUp'?-1:1)));const ids=[...project.tabs];ids.splice(i,1);ids.splice(to,0,id);reorderTabs(project,ids);renderTabs();save();$('model-tab-'+id)?.focus();return;}if(e.key==='Delete'){e.preventDefault();closeModel(id);}if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();const target=e.key==='Home'?0:e.key==='End'?project.tabs.length-1:(i+(e.key==='ArrowRight'?1:-1)+project.tabs.length)%project.tabs.length;switchModel(project.tabs[target]);$('model-tab-'+project.tabs[target])?.focus();}};
+   button.onkeydown=e=>{const i=project.tabs.indexOf(id);if(shell&&e.altKey&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();const to=Math.max(0,Math.min(project.tabs.length-1,i+(['ArrowUp','ArrowLeft'].includes(e.key)?-1:1)));const ids=[...project.tabs];ids.splice(i,1);ids.splice(to,0,id);reorderTabs(project,ids);renderTabs();save();$('model-tab-'+id)?.focus();return;}if(e.key==='Delete'){e.preventDefault();closeModel(id);}if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();const target=e.key==='Home'?0:e.key==='End'?project.tabs.length-1:(i+(e.key==='ArrowRight'?1:-1)+project.tabs.length)%project.tabs.length;switchModel(project.tabs[target]);$('model-tab-'+project.tabs[target])?.focus();}};
    button.ondragstart=e=>e.dataTransfer.setData('text/plain',id);button.ondragover=e=>e.preventDefault();button.ondrop=e=>{e.preventDefault();const from=e.dataTransfer.getData('text/plain');if(!project.tabs.includes(from))return;const ids=project.tabs.filter(x=>x!==from);ids.splice(ids.indexOf(id),0,from);reorderTabs(project,ids);renderTabs();save();};root.append(button);
   }
  }
@@ -1384,7 +1413,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  // own explicit import control in Library.
  const crystalTools=document.createElement('div');crystalTools.className='sms-actions';
  crystalTools.innerHTML='<button id="smsSaveCrystal">Save model to Library</button><button id="smsSendCrystal">Send model to Print Centre</button><button id="smsIndependentCrystal" hidden>Make independent to edit</button>';
- document.querySelector('.left').insertBefore(crystalTools,panel.nextSibling);
+ document.querySelector('.left').append(crystalTools);
  $('smsSaveCrystal').onclick=()=>saveModel(active());$('smsSendCrystal').onclick=()=>send(currentId);
  $('smsIndependentCrystal').onclick=()=>{breakLink(project,currentId);setCrystalReadonly(false);save();};
  function setCrystalReadonly(enabled){

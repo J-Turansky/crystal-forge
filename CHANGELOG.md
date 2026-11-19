@@ -1,5 +1,10 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.14 — Pixel Model Maker compact workspace
+
+- Keep workspace actions visible in a compact header and switch models along the bottom.
+- Resize or collapse the side panels directly while the 3D viewport keeps the centre.
+
 ## v0.16.0-dev.13 — Creative catalogue and native pixel routing
 
 - Create contour and quilt tiles, forked window gears and fluted beacon pods.
