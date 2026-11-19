@@ -1692,6 +1692,13 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  document.addEventListener('click',e=>{
   const button=e.target.closest('[data-tab]');if(!button)return;
+  // Ensure Crystal Build/Design is authoritative before palette refresh.
+  // A queued rerender can otherwise observe the previous native tab state.
+  if(active()?.generator.typeId==='crystals'&&['design','build'].includes(button.dataset.tab)){
+   stage=button.dataset.tab;
+   for(const item of document.querySelectorAll('.workspace-tabs [data-tab]'))
+    item.classList.toggle('active',item===button);
+  }
   queueMicrotask(()=>{renderTabs();if(active()?.generator.typeId==='crystals')renderPalette();});
   if(button.dataset.tab==='print'){e.preventDefault();e.stopImmediatePropagation();showPrint();}
   else if(active()?.generator.typeId!=='crystals'){e.preventDefault();e.stopImmediatePropagation();stage=button.dataset.tab;mode='model';overlay.hidden=true;renderTabs();renderEditor();}
