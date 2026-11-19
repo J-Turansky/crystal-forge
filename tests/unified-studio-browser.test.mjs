@@ -840,6 +840,36 @@ try{
   assert(await pal.locator('[data-native-route]').count(),type+' shows routing availability');
   await checkNativeDoubleClick(type,pal,saved[0]);
  }
+ // WT-020: true double-click mount placement, edit and persisted source.
+ await page.evaluate(()=>window.__sensoryStudio.addModel('tactile-tiles',{pattern:'grass',dualMaterial:false},'WT020 native mounting'));
+ await page.locator('.sms-workspace-nav [data-tab=build]').click();
+ const mountPalette=page.locator('.sms-palette');
+ assert(await mountPalette.getByRole('button',{name:'Place mounting hole in 3D'}).isVisible());
+ await page.locator('[data-view=top]').click();await page.waitForTimeout(400);
+ const mountPoint=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(10,8,'top'));
+ assert(mountPoint,'Tile should provide a visible mountable solid surface');
+ await page.mouse.dblclick(mountPoint.x,mountPoint.y);
+ const addMount=fittingActions.getByRole('button',{name:'Add mounting feature',exact:true});
+ await addMount.waitFor();
+ assert(!(await addMount.isDisabled()),'Selected tile solid surface must support mounting');
+ await addMount.click();
+ const mounted=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles);
+ assert.equal(mounted.length,1,'Context click commits exactly one M1');
+ assert.equal(mounted[0].diameter,3.4);
+ assert.equal(mounted[0].entryFace,'top');
+ const mountX=mountPalette.locator('[data-mount-field=x]');
+ assert(await mountPalette.getByRole('button',{name:'M1',exact:true}).isVisible());
+ await mountX.fill(String(mounted[0].x+1));await mountX.press('Tab');
+ const changed=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles);
+ assert.equal(changed[0].x,mounted[0].x+1,'M1 supports precise position editing');
+ await shot('wt020-native-mounting');
+ await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+ await page.reload();await page.waitForFunction(()=>window.__sensoryStudio);
+ assert.equal((await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles))[0].x,changed[0].x,
+  'Native mounting state must survive workspace reload');
+ await page.locator('.sms-workspace-nav [data-tab=build]').click();
+ assert(await page.locator('.sms-palette').getByRole('button',{name:'M1',exact:true}).isVisible());
+
  await page.evaluate(()=>window.__sensoryStudio.addModel('crystals',null,'WT017 Crystals'));
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
  assert(await page.locator('.sms-palette').getByRole('button',{name:'Add pixel',exact:true}).isVisible());
