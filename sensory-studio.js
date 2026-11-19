@@ -341,6 +341,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  function renderTabs(){
   for(const job of project.printJobs)if(job.status==='stale')discardPrintResult(job.id);
   if(inspection){
+   if(!inspection.root.isConnected)$('smsPrecisionContent').prepend(inspection.root);
    const model=active(),job=project.printJobs.find(item=>item.modelId===currentId);
    const type=model?.generator.typeId;
    const supported=mode==='model'&&(type==='crystals'||(type==='light-pods'&&model.parameters.illuminated));

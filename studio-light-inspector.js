@@ -2,7 +2,7 @@ import {manualLightChecks} from './light-passage-inspection.js';
 
 export function createLightInspector({THREE, scene, camera, prepare, cancel}) {
  const root=document.createElement('details');
- root.className='sms-panel-details';
+ root.id='smsLightInspector';root.className='sms-panel-details';
  root.innerHTML=`<summary>Light Path Inspection<span data-summary-status></span></summary>
   <p role="status"></p>
   <div class="sms-actions"><button type="button" data-prepare>Prepare inspection</button><button type="button" data-cancel hidden>Cancel preparation</button></div>

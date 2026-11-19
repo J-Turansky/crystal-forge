@@ -36,7 +36,9 @@ try{
  await inspectionPage.evaluate(()=>window.__sensoryStudio.addModel('crystals',{
   count:5,cutSockets:true,baseVault:false,hollowCrystals:false,targetedLightPaths:true,lightReach:15,wireChannels:false,lightingMode:'single'
  },'Inspection fixture'));
- const inspector=inspectionPage.locator('#smsPrecisionContent > details').first();
+ const inspector=inspectionPage.locator('#smsLightInspector');
+ assert.equal(await inspector.count(),1,JSON.stringify(await inspectionPage.evaluate(()=>({mode:window.__sensoryStudio.mode,model:window.__sensoryStudio.currentModel?.name,precision:document.getElementById('smsPrecisionContent')?.innerText.slice(0,350),error:document.querySelector('#smsEditor .sms-error')?.textContent}))));
+ await inspector.waitFor();
  await inspector.locator('summary').click();
  await inspector.getByText('Preview only').waitFor();
  await inspector.getByRole('button',{name:'Prepare inspection'}).click();
