@@ -1,5 +1,12 @@
 # AI handover — read immediately after AGENTS.md
 
+## WT-017 — Consistent Build pixel tools and shared measured profiles
+
+All seven model families now show Add pixel and a shortcut to the existing A–G measured-dimensions profile editor before placement. Crystal uses the original `placePixelBtn`/Hardware Editor and retains its established automatic LEDs, P1 ordering, opposing IN/OUT ports, wire pitch and hand-edit state. Native families continue to use stable Pn IDs, click-place/hold-drag and safe automatic material search. Saving a custom measured profile broadcasts `studio-pixel-profile-saved` so the new profile is selected for the *next* native placement; an already placed fitting is never silently resized. Existing local pixel profiles and saved model IDs remain compatible.
+
+Opt-in `build.pixelBacking` adds a real 12 mm perimeter extension and a 4 mm thick positive base to single-material native models. It is not enabled for existing projects; unsupported thin/cavity/edge and nearby mount configurations still fail `pixelBoreIssue`, and final Manifold/STL/3MF checks must pass. This backing is for printable through-bores, not verified strain relief or retained seating. Native Tile/Gear routing remains qualified/opt-in; Waves/Caps/Characters/Pods remain bore-only. Do not claim universal channel cutting or physical fit on curved/hollow shells. Actual printed bores, installed Cura, wall/roof testing and cable routing remain physical acceptance gates.
+
+
 ## WT-016 — Backup review and recovery
 
 The Library reviews private vault and local JSON backups without changing the workspace. Recovery can add complete archives or selected project/model revisions. A verified local snapshot precedes the workspace write. Conflicting records use deterministic copy identities and their linked sources and organisation references transfer together. A complete reviewed recovery acknowledges the remote manifest SHA. Upload remains manual and commits immutable assets before the guarded manifest. Credentials stay on the existing in-memory client. Real private GitHub setup and second-computer testing remain manual.

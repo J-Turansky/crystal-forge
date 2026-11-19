@@ -482,6 +482,19 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
   r.warnings.push('Through mounting holes are un-rated; test actual mounting loads.');
  }
  if(build.base&&capabilities.supportsBase){const thickness=Number(build.baseThickness||3);if(thickness<2||thickness>15)throw Error('Base thickness must be 2-15 mm.');r.positive.push(box([b.width+6,thickness,b.depth+6]));r.bounds={...b,width:b.width+6,depth:b.depth+6};if(r.materialBand)r.materialBand={...r.materialBand,size:[r.bounds.width+2,r.materialBand.size[1],r.bounds.depth+2]};}
+ // An opt-in, real positive backing provides material for pixel seats on
+ // curves and open shells. Old models never receive this automatically.
+ if(build.pixelBacking){
+  if(!capabilities.supportsBase||r.partitioned)
+   throw Error('Fitting backing needs a compatible single-material model. Turn off dual-material mode.');
+  const thickness=Number(build.pixelBackingThickness??4);
+  if(!Number.isFinite(thickness)||thickness<3||thickness>10)
+   throw Error('Choose 3–10 mm fitting backing thickness.');
+  const b=r.bounds,spread=12;
+  r.positive.push(box([b.width+spread*2,thickness,b.depth+spread*2]));
+  r.bounds={...b,width:b.width+spread*2,depth:b.depth+spread*2,height:Math.max(b.height,thickness)};
+  r.warnings.push('Expanded fitting backing was explicitly enabled. Inspect underside openings, material joins and support requirements in Cura and on a printed sample.');
+ }
  if(build.pixelBuilderVersion===1){
   const holes=build.pixelHoles||[];
   for(const [index,hole] of holes.entries())if(hole.checked){

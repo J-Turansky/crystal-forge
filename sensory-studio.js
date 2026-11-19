@@ -428,6 +428,14 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  const hiddenNativeRoutes=new Set();
  const selectedPixels=new Map(),pixelMessages=new Map(),pixelProfileChoices=new Map();
+ // Newly saved measured profiles are shared across all families, but never
+ // silently alter dimensions on existing fittings.
+ document.addEventListener('studio-pixel-profile-saved',event=>{
+  const model=active(),id=event.detail?.profileId;
+  if(!model||!id)return;
+  pixelProfileChoices.set(model.id,id);
+  if(mode==='model'&&stage==='build'){renderPalette();if(model.generator.typeId!=='crystals')renderEditor();}
+ });
  let placementModel=null,pixelGesture=null,pendingDuplicate=null;
  const pixelHoles=model=>stablePixels(model.build.pixelHoles||[]);
  const fittingProfiles=()=>pixelProfiles(adapter.pixelFitProfiles?.()||[]);
@@ -480,7 +488,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const holes=pixelHoles(model);
   if(!holes[index]||model.link)return false;
   const issue=pixelIssue(model,hole,holes.filter((_,i)=>i!==index));
-  if(issue){pixelStatus(model,issue);return false;}
+  if(issue){pixelStatus(model,pixelPlacementAdvice(model,issue));return false;}
   holes[index]={...hole,checked:true};
   return savePixels(model,holes,hole.id,focus);
  }
@@ -489,14 +497,20 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(!holes[index]||model.link)return;
   holes.splice(index,1);savePixels(model,holes,holes[Math.min(index,holes.length-1)]?.id);
  }
+ function pixelPlacementAdvice(model,reason){
+  const tips=' Try a smaller profile or move the fitting into a wider solid area.';
+  const backing=model.build.pixelBacking?' Inspect the backing and existing cavities.':
+   ' If no safe material exists, explicitly enable Add fitting backing (12 mm extra each side).';
+  return reason+tips+backing;
+ }
  function addAutomaticPixel(model){
   try{
    const holes=pixelHoles(model),recipe=pixelSource(model);
    if(holes.length>=16){pixelStatus(model,'Use up to 16 fittings per model.');return;}
    const hole=findPixelPosition(recipe,holes,chosenProfile(model));
    if(hole)savePixels(model,[...holes,{...hole,checked:true}],hole.id);
-   else pixelStatus(model,'No clear material for this bore. '+(checkedPixelBore(recipe,newPixel(chosenProfile(model)),holes)||'Try a smaller fitting.'));
-  }catch(error){pixelStatus(model,error.message);}
+   else pixelStatus(model,pixelPlacementAdvice(model,'No verified clear material for this pixel bore. '+(checkedPixelBore(recipe,newPixel(chosenProfile(model)),holes)||'')));
+  }catch(error){pixelStatus(model,pixelPlacementAdvice(model,error.message));}
  }
  function pixelRay(event){
   const rect=renderer.domElement.getBoundingClientRect();
@@ -536,7 +550,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(!gesture.origin&&performance.now()-gesture.time<180){cancelPixelGesture();return;}
   if(!gesture.origin){
    gesture.origin=gesture.marker.position.clone();
-   try{gesture.recipe=pixelSource(gesture.model);}catch(error){pixelStatus(gesture.model,error.message);cancelPixelGesture();return;}
+   try{gesture.recipe=pixelSource(gesture.model);}catch(error){pixelStatus(gesture.model,pixelPlacementAdvice(gesture.model,error.message));cancelPixelGesture();return;}
   }
   pixelRay(event);
   const hit=partRay.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),-gesture.origin.y),new THREE.Vector3());
@@ -578,13 +592,13 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   pixelRay(event);
   const group=cache.get(model.id)?.group;
   const hit=partRay.intersectObjects(group?.children.filter(mesh=>mesh.isMesh&&!mesh.userData.previewOnly)||[],false)[0];
-  if(!hit){pixelStatus(model,'Click a solid model surface to place the fitting.');return;}
+  if(!hit){pixelStatus(model,pixelPlacementAdvice(model,'Click a solid model surface to place this fitting.'));return;}
   const holes=pixelHoles(model);
   if(holes.length>=16){pixelStatus(model,'Use up to 16 fittings per model.');return;}
   const fresh=newPixel(chosenProfile(model),Math.round(hit.point.x*10)/10,Math.round(hit.point.z*10)/10);
   const hole=pendingDuplicate?{...pendingDuplicate,id:fresh.id,x:fresh.x,z:fresh.z}:fresh;
   const issue=pixelIssue(model,hole,holes);
-  if(issue){pixelStatus(model,issue);return;}
+  if(issue){pixelStatus(model,pixelPlacementAdvice(model,issue));return;}
   placementModel=null;pendingDuplicate=null;
   savePixels(model,[...holes,{...hole,checked:true}],hole.id);
  },true);
@@ -649,6 +663,47 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   remove.onclick=()=>adapter.removeCrystalPixel();
   box.append(remove);root.append(box);
  }
+ function renderCrystalWirePalette(root){
+  // Small controls mirror existing authoritative Crystal wiring settings.
+  // They never maintain a second route plan or alter a stored pixel location.
+  const length=document.querySelector('[data-state="pixelStringSpacing"]');
+  const channels=document.querySelector('[data-state="wireChannels"]');
+  const arrows=document.querySelector('[data-state="wireDirectionArrows"]');
+  if(!length||!channels||!arrows)return;
+  const field=document.createElement('fieldset');
+  field.innerHTML='<legend>Wire routing and cable lengths</legend>'+
+   '<label>Available pixel-to-pixel cable length<select data-build-wire-pitch>'+
+   '<option value="25">25 mm</option><option value="50">50 mm</option><option value="100">100 mm</option><option value="custom">Custom</option></select></label>'+
+   '<label data-build-wire-custom-row>Custom length (mm)<input data-build-wire-custom type="number" min="5" max="1000" step="1"></label>'+
+   '<label><input data-build-wire-channels type="checkbox"> Cut underside wiring channels</label>'+
+   '<label><input data-build-wire-arrows type="checkbox"> Show direction arrows</label>'+
+   '<div class="sms-actions"><button type="button" data-build-wire-snap>Snap pixels to cable length</button>'+
+   '<button type="button" data-build-wire-reverse>Reverse pixel order</button></div>'+
+   '<p>Ordered P1 → Pn; opposite 180° IN/OUT. The real curved cable length is checked and overlength routes show red. Thin or blocked paths are refused by Prepare.</p>';
+  const pitch=field.querySelector('[data-build-wire-pitch]');
+  const custom=field.querySelector('[data-build-wire-custom]');
+  const chosen=Number(length.value);
+  pitch.value=[25,50,100].includes(chosen)?String(chosen):'custom';
+  custom.value=length.value;
+  custom.parentElement.hidden=pitch.value!=='custom';
+  pitch.onchange=()=>{
+   if(pitch.value==='custom'){custom.parentElement.hidden=false;custom.focus();return;}
+   const origin=document.getElementById('wireSpacingPreset');
+   origin.value=pitch.value;origin.dispatchEvent(new Event('change',{bubbles:true}));
+   custom.value=pitch.value;custom.parentElement.hidden=true;
+  };
+  custom.onchange=()=>{
+   if(!custom.checkValidity()){custom.reportValidity();custom.value=length.value;return;}
+   length.value=custom.value;length.dispatchEvent(new Event('change',{bubbles:true}));
+  };
+  for(const [selector,origin] of [['[data-build-wire-channels]',channels],['[data-build-wire-arrows]',arrows]]){
+   const control=field.querySelector(selector);control.checked=origin.checked;
+   control.onchange=()=>{origin.click();control.checked=origin.checked;};
+  }
+  field.querySelector('[data-build-wire-snap]').onclick=()=>document.getElementById('snapPixelSpacingBtn')?.click();
+  field.querySelector('[data-build-wire-reverse]').onclick=()=>document.getElementById('reversePixelStringBtn')?.click();
+  root.append(field);
+ }
  document.addEventListener('studio-crystal-pixel-selection',()=>{
   const key=document.activeElement?.dataset.crystalPixelKey;
   renderPalette();
@@ -707,12 +762,15 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const disabled=model.link?' disabled':'',noAdd=holes.length>=16?' disabled':disabled;
   const hole=holes[selected]||newPixel(chosenProfile(model));
   const fit=resolvePixelFitting(hole,adapter.pixelFitProfiles());
-  root.innerHTML='<p>Bores are available on verified solid regions.</p>'+
+  root.innerHTML='<h3>Pixel fittings</h3><div class="sms-actions"><button type="button" data-pixel-profile-editor>Create / edit pixel profile</button></div>'+
+   '<p>Choose a saved measured profile before placing. A profile selection with P1/P2 selected updates <strong>only that fitting</strong>; otherwise it chooses the next fitting. Nominal measurements are not proof of printed fit.</p>'+
+   '<label><input type="checkbox" data-pixel-backing'+(model.build.pixelBacking?' checked':'')+disabled+'> Add fitting backing (12 mm of additional material around each edge)</label>'+
+   '<p>Fitting bores need continuous solid material. Thin walls, cavities and narrow rims can block placement.</p>'+
    '<div class="sms-actions" aria-label="Hardware library">'+profiles.map(profile=>
     '<button type="button" data-fit-profile="'+esc(profile.id)+'" aria-pressed="'+(chosenProfile(model)?.id===profile.id)+'"'+disabled+
     '>◉ '+esc(profile.name)+' · '+profile.bodyDiameter+' mm</button>').join('')+'</div>'+
    '<div class="sms-actions"><button type="button" data-place-pixel'+noAdd+'>Place LED fitting in 3D</button>'+
-   '<button type="button" data-auto-pixel'+noAdd+'>Add pixel hole</button></div>'+
+   '<button type="button" data-auto-pixel'+noAdd+'>Add pixel</button></div>'+
    '<div class="sms-actions" aria-label="Select pixel">'+holes.map((hole,i)=>'<button type="button" data-select-pixel="'+i+'" aria-pressed="'+(i===selected)+'">P'+(i+1)+'</button>').join('')+'</div>'+
    '<p role="status" data-pixel-status>'+esc(pixelMessages.get(model.id)||'Click a marker to select. Hold then drag to move. Arrow keys nudge 1 mm, or 5 mm with Shift.')+'</p>'+
    (selected<0?'':pixelHoleMarkup(holes[selected],selected,esc,disabled,profiles)+
@@ -731,6 +789,13 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    diagram.innerHTML='<summary>Fitting dimensions</summary>'+renderPixelProfileDiagram({...fit.profile,bodyDiameter:fit.diameter});
    root.querySelector('[aria-label="Hardware library"]').after(diagram);
   }
+  root.querySelector('[data-pixel-profile-editor]').onclick=()=>document.getElementById('editPixelProfileBtn')?.click();
+  root.querySelector('[data-pixel-backing]').onchange=event=>{
+   if(!commit({build:{...model.build,pixelBacking:event.target.checked}})){
+    event.target.checked=!!model.build.pixelBacking;return;
+   }
+   renderEditor();
+  };
   root.querySelectorAll('[data-fit-profile]').forEach(button=>button.onclick=()=>{
    const profileId=button.dataset.fitProfile;
    if(selected>=0&&!editPixel(model,selected,applyPixelFittingProfile(holes[selected],profileId,adapter.pixelFitProfiles())))return;
@@ -936,9 +1001,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   };
   if(build){
    if(model.generator.typeId==='crystals'){
+    addAction('Create / edit pixel profile',$('editPixelProfileBtn'));
+    addAction('Add pixel',$('placePixelBtn'));
     addAction('Fit base for gumdrop',$('fitPixelBaseBtn'));
     addAction('Print a pixel fit test',$('calibrationBtn'));
     renderCrystalPixelPalette(controls,model);
+    renderCrystalWirePalette(controls);
    }else{
     renderPixelPalette(controls,model);
    }
@@ -1624,6 +1692,13 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  document.addEventListener('click',e=>{
   const button=e.target.closest('[data-tab]');if(!button)return;
+  // Ensure Crystal Build/Design is authoritative before palette refresh.
+  // A queued rerender can otherwise observe the previous native tab state.
+  if(active()?.generator.typeId==='crystals'&&['design','build'].includes(button.dataset.tab)){
+   stage=button.dataset.tab;
+   for(const item of document.querySelectorAll('.workspace-tabs [data-tab]'))
+    item.classList.toggle('active',item===button);
+  }
   queueMicrotask(()=>{renderTabs();if(active()?.generator.typeId==='crystals')renderPalette();});
   if(button.dataset.tab==='print'){e.preventDefault();e.stopImmediatePropagation();showPrint();}
   else if(active()?.generator.typeId!=='crystals'){e.preventDefault();e.stopImmediatePropagation();stage=button.dataset.tab;mode='model';overlay.hidden=true;renderTabs();renderEditor();}
