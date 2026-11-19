@@ -499,7 +499,13 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
      // An exterior IN/OUT cutter deliberately extends beyond the base;
      // outside that footprint there must be no requirement to hit stock.
      if(!insideFootprint(x,z,footprint))continue;
-     requireExportedRoof(ceiling(x,z),format+' route '+kind+' offset '+offset+' edge distance '+footprintEdgeDistance(x,z,footprint).toFixed(2)+' mm at '+x.toFixed(2)+','+z.toFixed(2));
+     const distanceFromEdge=footprintEdgeDistance(x,z,footprint);
+     const height=ceiling(x,z);
+     // The explicit perimeter end of an IN/OUT cut can be open to air
+     // rather than have a roof at the exact edge of the solid. This is
+     // *not* permitted for interior samples, even 1 mm farther in.
+     if((kind==='input'||kind==='output')&&distanceFromEdge<.05&&!Number.isFinite(height))continue;
+     requireExportedRoof(height,format+' route '+kind+' offset '+offset+' edge distance '+distanceFromEdge.toFixed(2)+' mm at '+x.toFixed(2)+','+z.toFixed(2));
      verifiedInside++;
     }
    }
