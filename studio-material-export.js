@@ -5,16 +5,34 @@ import {zipProfileEntries} from './cura-profiles.js';
 const escapeXML = value => String(value).replace(/[&<>"']/g, c => ({
  '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'
 }[c]));
+function exportPoint(input,i){
+ // Right-handed rotation (X,Y,Z) -> (X,-Z,Y), in millimetres.
+ const point=[input[i],-input[i+2],input[i+1]];
+ if(!point.every(Number.isFinite))throw Error('Non-finite material vertex.');
+ return point;
+}
+export function preparedDimensionsMm(prepared){
+ const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
+ for(const {mesh} of prepared.bodies){
+  const stride=mesh.numProp??3,input=mesh.vertProperties??mesh.points;
+  if(!input?.length||stride<3||input.length%stride)throw Error('Invalid material vertices.');
+  for(let i=0;i<input.length;i+=stride){
+   const point=exportPoint(input,i);
+   for(let axis=0;axis<3;axis++){
+    min[axis]=Math.min(min[axis],point[axis]);max[axis]=Math.max(max[axis],point[axis]);
+   }
+  }
+ }
+ if(!min.every(Number.isFinite))throw Error('No prepared material vertices.');
+ return max.map((value,axis)=>value-min[axis]);
+}
 function meshData(mesh) {
  const stride=mesh.numProp ?? 3, input=mesh.vertProperties ?? mesh.points, triangles=mesh.triVerts ?? mesh.triangles;
  if (!input || !triangles || stride<3 || input.length%stride || triangles.length%3)
   throw Error('Invalid material mesh.');
  const points=[];
  for(let i=0;i<input.length;i+=stride) {
-  // Right-handed rotation (X,Y,Z) -> (X,-Z,Y); common origin for all bodies.
-  const xyz=[input[i],-input[i+2],input[i+1]];
-  if(!xyz.every(Number.isFinite))throw Error('Non-finite material vertex.');
-  points.push(...xyz);
+  points.push(...exportPoint(input,i));
  }
  if([...triangles].some(index=>!Number.isSafeInteger(index)||index<0||index>=points.length/3))
   throw Error('Invalid material triangle index.');

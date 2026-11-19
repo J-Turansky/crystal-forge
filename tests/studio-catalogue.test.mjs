@@ -7,8 +7,37 @@ import Module from 'manifold-3d';
 import {waveGenerator,tileGenerator,gearGenerator,capGenerator,characterGenerator,pebbleGenerator,generators,applyBuildModules} from '../studio-catalogue.js';
 import {findPixelPosition,newPixel} from '../studio-pixel-builder.js';
 import {previewRecipe,disposeGroup,prepareRecipe} from '../studio-geometry.js';
-import {exportMaterialBodies} from '../studio-material-export.js';
+import {exportMaterialBodies,preparedDimensionsMm} from '../studio-material-export.js';
 const wasm=await Module();wasm.setup();
+// Independently read both exports of an asymmetric, translated solid.
+{
+ const fixture=prepareRecipe(THREE,wasm,{positive:[{kind:'box',size:[37,11,23],position:[8,9,-5]}],negative:[],secondary:[]});
+ const {stls,threeMF}=exportMaterialBodies(fixture);
+ const expected=[37,23,11],bounds=points=>[0,1,2].map(axis=>{
+  const coords=points.map(p=>p[axis]);return Math.max(...coords)-Math.min(...coords);
+ });
+ assert.deepEqual(preparedDimensionsMm(fixture),expected);
+ const stl=Buffer.from(stls[0].bytes),vertices=[];
+ for(let face=0;face<stl.readUInt32LE(80);face++)for(let i=0;i<3;i++){
+  const offset=96+face*50+i*12;
+  vertices.push([0,4,8].map(axis=>stl.readFloatLE(offset+axis)));
+ }
+ assert.deepEqual(bounds(vertices),expected);
+ const zip=Buffer.from(threeMF);
+ let model;
+ for(let i=0;zip.readUInt32LE(i)===0x04034b50;){
+  const nameLength=zip.readUInt16LE(i+26),start=i+30+nameLength+zip.readUInt16LE(i+28),size=zip.readUInt32LE(i+18);
+  if(zip.toString('utf8',i+30,i+30+nameLength)==='3D/3dmodel.model'){
+   assert.equal(zip.readUInt16LE(i+8),0);
+   model=zip.toString('utf8',start,start+size);break;
+  }
+  i=start+size;
+ }
+ assert.match(model,/<model unit="millimeter"/);
+ assert.match(model,/<item objectid="2" transform="1 0 0 0 1 0 0 0 1 0 0 0"/);
+ assert.deepEqual(bounds([...model.matchAll(/<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"\/>/g)].map(m=>m.slice(1).map(Number))),expected);
+ console.log('Prepared, STL and 3MF fixture bounds agree: 37 x 23 x 11 mm');
+}
 const joystick=capGenerator.presets.find(preset=>preset.id==='joystick');
 assert.equal(joystick.parameters.controlStyle,'Thumb joystick');
 for(const dualMaterial of [false,true]){

@@ -13,7 +13,7 @@ import {createModel,addModel,findModel,openTab,closeTab,reorderTabs,duplicateMod
  insertLibraryModel,availableLinkedUpdate,acceptLinkedUpdate,breakLink,modelFingerprint,validateProject,WORKSPACE_KEY,newId} from './studio-documents.js';
 import {makeCatalogue,applyBuildModules,generators} from './studio-catalogue.js';
 import {previewRecipe,disposeGroup} from './studio-geometry.js';
-import {exportMaterialBodies} from './studio-material-export.js';
+import {exportMaterialBodies,preparedDimensionsMm} from './studio-material-export.js';
 import {installExactValueEditors} from './exact-value-editors.js';
 import {createToolFinder} from './studio-tool-finder.js';
 import {createCuraProfile,zipProfileEntries,curaFallbackText,calculateCuraSettings} from './cura-profiles.js';
@@ -2131,20 +2131,9 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    return 'Choose Ultimaker 3 Extended for two materials, or switch the model to one material and prepare again.';
   return '';
  }
- // Match the exporter’s X, -Z, Y rotation. Sign does not affect extents.
  function preparedSize(result){
-  let size=printSizes.get(result);
-  if(size)return size;
-  const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
-  for(const {mesh} of result.bodies){
-   const points=mesh.vertProperties||mesh.points,stride=mesh.numProp||3;
-   for(let i=0;i<points.length;i+=stride)for(let axis=0;axis<3;axis++){
-    min[axis]=Math.min(min[axis],points[i+axis]);max[axis]=Math.max(max[axis],points[i+axis]);
-   }
-  }
-  size=[0,2,1].map(axis=>max[axis]-min[axis]);
-  printSizes.set(result,size);
-  return size;
+  if(!printSizes.has(result))printSizes.set(result,preparedDimensionsMm(result));
+  return printSizes.get(result);
  }
  function printEnvelope(result,settings){
   if(!result)return '';
