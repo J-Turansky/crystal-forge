@@ -160,7 +160,7 @@ export function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLo
  const shaftEnd=conical?requestedBodyDepth:tipY-capRise,depth=Math.max(.5,shaftEnd-start);
  const cutters=[];
  let relievedDepth=0;
- const cylinder=(r,y,h)=>hold(wasm.Manifold.cylinder(h,r,r,32).rotate([-90,0,0]).translate([pos.x,y,pos.z]));
+ const cylinder=(r,y,h)=>hold(wasm.Manifold.cylinder(h,r,r,48).rotate([-90,0,0]).translate([pos.x,y,pos.z]));
  const lip=Math.min(.7,Math.max(0,Number(p.retentionLip)||0));
  const lipFrom=Math.max(1.9,Number(p.flangeHeight||0)+.8),lipWidth=1.4;
  if(lip>0&&depth>lipFrom-start+lipWidth+2&&bodyRadius-lip>1.4){
@@ -171,7 +171,7 @@ export function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLo
  }else cutters.push(cylinder(bodyRadius,start,depth));
  if(p.kind!=='seed'&&p.flangeHeight>.1&&p.maxDiameter>p.boreDiameter+.1)
   cutters.push(cylinder(p.maxDiameter/2,-.5,Math.min(depth,p.flangeHeight+.5)));
- if(conical)cutters.push(hold(wasm.Manifold.cylinder(bodyRadius,bodyRadius,0,32)
+ if(conical)cutters.push(hold(wasm.Manifold.cylinder(bodyRadius,bodyRadius,0,48)
   .rotate([-90,0,0]).translate([pos.x,shaftEnd,pos.z])));
  else{
   // Facet the negative roof to the same 20 dome rings and 48 radial sectors
