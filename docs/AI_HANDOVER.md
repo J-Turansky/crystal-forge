@@ -1,25 +1,13 @@
 # AI handover — read immediately after AGENTS.md
 
-## WT-020 current development handover — 19 November 2026
+## WT-020 review baseline
 
-- **Active software parity tracker:** Issue #79. **Pinned specification:** `prompts/020-final-software-parity-release.md @ f9c248fc6933da3d0451f5168e4eab830b5af6fe` on `planning/prompts`.
-- **Last verified main:** `50be3d8dc8fcbe8971c84692edb91993c64566c7`, with WT-018 #80 merged and GitHub Pages workflow reporting success for that SHA. The owner's live Gear P1–P4 double-click/face/wiring scenario still needs a fresh public-browser check.
-- **Draft integration order:** #84 main-targeted Gear corrections → #85 native family pointer checks, stacked on #84 → this WT-020 native mounting draft, stacked on #85. After each owner-authorised merge, retarget/reconcile successors and test their **new exact heads**. Do not merge automatically or double-cherry-pick historical #82/#83.
-- **This draft:** `studio-mount-builder.js` certifies source-material, diameter and collision rules for 2–8 mm native vertical through-mounts; `studio-catalogue.js` inserts actual M1…Mn negative cutters, `studio-geometry.js` draws purple numbered editable markers and checks they remove material, `sensory-studio.js` provides direct 3D context, continuous placement, selection, drag, precise edits and keyboard actions, plus real browser and Manifold fixtures. It does **not** provide arbitrary 3D normal-aligned inserts or load-rated mounting.
-- **Remaining WT-020 release blockers:** full shared Design, Build, mounting, wiring, optics, Library, Print Centre, SVG/STL/OBJ, persistence and external clean-browser parity acceptance still **L/M**, not complete. Real Cura/LED/strength validation is Issue #10; modular assembly #51 remains ON HOLD; Jordan #36/#37 and owner/Copilot #33/#42 remain independent.
-- **Current app documentation below includes historical draft records.** Never use those dated records in place of fresh Git ancestry, PR checks and the acceptance matrix.
+- Main `7ad5326ea87020dc8e9ee7d3a9512ea157ee5617` includes WT-018 #80 and WT-019 #84. #84 preserves #82 and #83. #85 closed with its tested commit `e39755f` reachable from both WT-020 drafts.
+- Owner review order is [#86](https://github.com/connorturansky-svg/crystal-forge/pull/86) for verified-column mounting, then [#87](https://github.com/connorturansky-svg/crystal-forge/pull/87) for native camera framing. Compare latest heads and main after each owner merge and rerun the relevant checks.
+- `sensory-studio.js` owns native interaction and `studio-v3.js` owns shared camera controls. `studio-mount-builder.js` and `studio-catalogue.js` validate and generate native cuts. `studio-native-routing.js` plans cable paths and `studio-geometry.js` generates preview overlays and Manifold geometry.
+- [#79](https://github.com/connorturansky-svg/crystal-forge/issues/79) and the [acceptance matrix](MODEL_BUILDER_PARITY.md) are authoritative for remaining software work. Recorded CI evidence needs its tested SHA. Verify the published app in a clean browser after owner merges. Physical work remains #10, #51 stays held, and Jordan’s #36/#37 remain independent.
 
-## Current direction
-
-Verified main at `421f050b9d980356b502ad22483712c1105e2f54`. Its tree equals the common ancestor `c4f5b6d56a366f24b20be75550eb9fa906de9ee9`. #71 reached main. #72–#75 and #78 landed on feature branches. #77 remains draft; its exact tested head `7997df537739b6fe630b1669dd24e92f05b69db0` incorporates those changes. #76 landed on planning/prompts. This main-targeted candidate carries the tested branch tree over the identical main baseline. [Source checks](https://github.com/connorturansky-svg/crystal-forge/pull/77/checks).
-
-The sole owner merge dependency is this main-targeted consolidation PR. Retire #77 once its work is confirmed reachable from main. #70 is already closed; #74 preserves the importer. #1, #6, #7 and #9 are superseded by #79 and #10, and #8 is a duplicate tracked under held #51. #31 is complete. Jordan’s #36/#37 and owner decisions #33/#38/#39/#42 remain separate. Keep #10 open for Cura, LED fit, cable seating, optics and installation.
-
-Advance WT-019 through #79 after verifying this candidate. See [the builder matrix](MODEL_BUILDER_PARITY.md).
-
-## WT-018 review candidate
-
-Use the [integration ledger](BACKLOG_TRIAGE.md) for exact GitHub refs, owner gates and issue dispositions. The [Builder matrix](MODEL_BUILDER_PARITY.md) distinguishes partial parity from verified acceptance.
+## Feature reference and historical release notes
 
 ## STL and OBJ in Studio
 

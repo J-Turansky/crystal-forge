@@ -731,7 +731,33 @@ try{
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
   assert(await serial.locator('[data-native-route]').isDisabled());
   assert.match(await serial.innerText(),/solid decorative gear/);
-  await shot('wt012-openwork-blocked');
+  const automatic=palette.getByRole('button',{name:'Add pixel automatically',exact:true});
+  for(let count=1;count<=4;count++){
+   await automatic.click();
+   assert.equal((await getHoles()).length,count,'Openwork Gear accepts fitting P'+count);
+  }
+  const openworkFittings=await getHoles();
+  assert(await serial.locator('[data-native-preview]').isDisabled());
+  assert.match(await serial.locator('[data-native-guide-blocked]').innerText(),/openwork/);
+  assert(await serial.locator('[data-native-route]').isDisabled());
+  await shot('wt020-openwork-gear-four-pixels');
+  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+  await page.reload();await page.waitForFunction(()=>window.__sensoryStudio);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  assert.deepEqual(await getHoles(),openworkFittings);
+  assert.match(await serial.locator('[data-native-guide-blocked]').innerText(),/openwork/);
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  await routedJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const openworkPack=zipEntries((await useDownload(routedJob.locator('[data-job-export]'))).bytes);
+  assert([...openworkPack.keys()].some(name=>name.endsWith('.stl')));
+  assert(zipEntries((await useDownload(routedJob.locator('[data-job-3mf]'))).bytes).has('3D/3dmodel.model'));
+  assert.equal(JSON.parse(openworkPack.get('print-job-manifest.json')).routing?.channels?.length??0,0);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  for(let count=4;count>=1;count--){
+   await palette.getByRole('button',{name:'P'+count,exact:true}).click();
+   await palette.getByRole('button',{name:'Remove P'+count,exact:true}).click();
+  }
   await page.locator('.sms-workspace-nav [data-tab=design]').click();
   await palette.getByRole('button',{name:'Solid',exact:true}).click();
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
@@ -762,7 +788,9 @@ try{
   await palette.locator('[data-pixel-previous]').click();
   assert.match(await serial.innerText(),/No safe tangent-compatible path/);
   await page.locator('.sms-workspace-nav [data-tab=print]').click();
-  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  await routedJob.getByText('Stale',{exact:true}).waitFor();
+  assert(await routedJob.locator('[data-job-export]').isDisabled());
+  await routedJob.locator('[data-job-prepare]').click();
   await routedJob.getByText('Failed',{exact:true}).waitFor({timeout:120000});
   assert(await routedJob.locator('[data-job-export]').isDisabled());
   assert(await routedJob.locator('[data-job-3mf]').isDisabled());
@@ -779,8 +807,17 @@ try{
  // WT-019: use actual model-camera input at a known solid location on
  // each native fixture. Restore the auto seed on an unsupported face.
  const checkNativeDoubleClick=async (type,palette,hole)=>{
-  await page.locator('[data-view=top]').click();
-  await page.waitForTimeout(500);
+  for(const [view,direction] of [['iso',[1,.75,1]],['front',[0,.12,1]],['back',[0,.12,-1]],['bottom',[0,-1,.0001]],['top',[0,1,.0001]]]){
+   await page.locator('[data-view='+view+']').click();
+   await page.waitForFunction(direction=>{
+    const {modelSize,center,target,camera,screen}=window.__crystalForgeViewMetrics();
+    const offset=camera.map((value,i)=>value-target[i]);
+    const dot=offset.reduce((sum,value,i)=>sum+value*direction[i],0);
+    const aligned=dot/(Math.hypot(...offset)*Math.hypot(...direction))>.999;
+    return aligned&&modelSize.every(size=>size>0)&&Math.abs(screen[0])<.02&&Math.abs(screen[1])<.02&&
+     Math.hypot(...center.map((value,i)=>value-target[i]))<.1;
+   },direction);
+  }
   await palette.getByRole('button',{name:'Remove P1',exact:true}).click();
   const screen=await page.evaluate(({x,z})=>window.__sensoryStudio.fittingPointScreen(x,z,'top'),hole);
   assert(screen,type+' projects the solid face at the fitted point');

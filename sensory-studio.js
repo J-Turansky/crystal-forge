@@ -703,10 +703,17 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const normal=hit.face.normal.clone().applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld));
   return {point:hit.point,normal};
  }
+ function nativeModelBounds(meshes){
+  const model=active();
+  if(mode!=='model'||!model||model.generator.typeId==='crystals')return null;
+  const bounds=new THREE.Box3();
+  for(const mesh of meshes??fittingMeshes(model))bounds.expandByObject(mesh);
+  return bounds;
+ }
  function fittingPointScreen(x,z,face){
   const model=active(), meshes=model?fittingMeshes(model):[];
-  const bounds=new THREE.Box3();
-  for(const mesh of meshes)bounds.expandByObject(mesh);
+  const bounds=nativeModelBounds(meshes);
+  if(!bounds)return null;
   if(bounds.isEmpty())return null;
   const underside=face==='underside';
   const origin=new THREE.Vector3(x,underside?bounds.min.y-1:bounds.max.y+1,z);
@@ -1032,7 +1039,16 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const guide=document.createElement('label'),show=document.createElement('input');
   show.type='checkbox';show.dataset.nativePreview='';show.checked=showNativeGuide(model);
   show.onchange=()=>{nativeGuideChoices.set(model.id,show.checked);refreshPixelMarkers(model);};
+  const hasPaths=plan.links.some(link=>link.path.length>1);
+  show.disabled=!hasPaths;
+  if(!hasPaths)show.checked=false;
   guide.append(show,' Show routes and arrows');block.append(guide);
+  if(!hasPaths&&plan.reason&&pixelHoles(model).length){
+   const explanation=document.createElement('p');
+   explanation.dataset.nativeGuideBlocked='';
+   explanation.textContent='No wiring guide is available for these fittings. '+plan.reason;
+   block.append(explanation);
+  }
   block.insertAdjacentHTML('beforeend','<label>Physical pixel pitch<select data-native-pitch'+disabled+
    '><option value="25">25 mm</option><option value="50">50 mm</option><option value="100">100 mm</option><option value="custom">Custom</option></select></label>'+
    '<label>IN tail limit (mm)<input data-native-in-tail type="number" min="5" max="250" value="'+esc(settings.inTail)+'"'+disabled+'></label>'+
@@ -2077,5 +2093,5 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  if(shell)showHome();
  save();
  window.__sensoryStudio={project,registry,get currentModel(){return active();},get mode(){return mode;},switchModel,addModel:add,showLibrary,showPrint,send,prepare,saveImmediately,fittingPointScreen,pixelMarkerScreen:id=>{const marker=pixelMarkers(active()).find(item=>item.userData.pixelId===id);return marker?projectMarker(marker):null;},get cacheSize(){return cache.size;},get metrics(){return {previewBuilds,geometries:renderer.info.memory.geometries,activeWorkers:workers.size};}};
- return {onCrystalChange:captureCrystal,backup};
+ return {onCrystalChange:captureCrystal,backup,nativeModelBounds};
 }
