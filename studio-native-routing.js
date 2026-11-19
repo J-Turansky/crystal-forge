@@ -74,13 +74,29 @@ function samples(points){
  }
  return result;
 }
-function cutter(points,label,radius,depth){
+function cutter(points,label,radius,depth,vaulted){
  const side=sign=>points.map((p,i)=>{
   const a=unit(sub(p,points[i-1]||p)),b=unit(sub(points[i+1]||p,p));
   const d=unit(add(a,b,1)),q={x:-d.z,z:d.x};
   const scale=radius/Math.max(.9,dot(d,i===0?b:a));
   const v=add(p,q,sign*scale);return [v.x,v.z];
  });
+ if(vaulted){
+  const left=side(1),right=side(-1),vertices=[],triangles=[];
+  for(let i=0;i<points.length;i++){
+   const [lx,lz]=left[i],[rx,rz]=right[i];
+   vertices.push(lx,-.5,lz,rx,-.5,rz,rx,depth,rz,
+    points[i].x,depth+radius/.9,points[i].z,lx,depth,lz);
+   if(i===0)continue;
+   for(let j=0;j<5;j++){
+    const a=(i-1)*5+j,b=(i-1)*5+(j+1)%5;
+    triangles.push(a,b,b+5,a,b+5,a+5);
+   }
+  }
+  const end=(points.length-1)*5;
+  for(let j=1;j<4;j++)triangles.push(0,j+1,j,end,end+j,end+j+1);
+  return {kind:'mesh',mesh:{points:vertices,triangles},wireChannel:label};
+ }
  return {kind:'extrude',outline:[...side(1),...side(-1).reverse()],height:depth+.5,position:[0,-.5,0],wireChannel:label};
 }
 
@@ -95,7 +111,8 @@ export function nativeRouteEligibility(recipe,build){
   return 'Physical grooves require sockets on the flat underside backing. Disable physical routing or move the sockets to that backing.';
  if(!recipe.serialSupport)return recipe.serialReason||'Enable fitting backing to check this model for serial routing.';
  if(recipe.dualMaterial)return 'Use a single material for native serial routing.';
- const required=channelSize(build).depth+roof;
+ const channel=channelSize(build);
+ const required=channel.depth+roof+(build.serialRouting?.vaulted?channel.radius/.9:0);
  if(recipe.serialSupport.thickness<required)return 'Routing needs at least '+required.toFixed(1)+' mm of solid backing for the groove and roof.';
  const blocksBacking=part=>part.kind!=='box'||part.rotation||!Array.isArray(part.position)||
   part.position[1]+part.size[1]/2>0;
@@ -183,7 +200,7 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
   const points=link.path.slice();
   if(i===0)points.unshift(add(entry.point,entry.outward,4));
   if(i===plan.links.length-1)points.push(add(exit.point,exit.outward,4));
-  return cutter(points,link.label,radius,depth);
+  return cutter(points,link.label,radius,depth,settings.vaulted===true);
  });
  for(const link of plan.links){delete link.dense;delete link.ends;}
  return plan;

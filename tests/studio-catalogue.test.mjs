@@ -379,6 +379,13 @@ assert.throws(()=>applyBuildModules(capGenerator.recipe({shaft:8,dualMaterial:fa
  pixelBacking:true,serialRouting:serial
 },capGenerator.capabilities),/Existing cavities/);
 
+const vaultedSpecimen=makeRoutedSocketSpecimen(PIXEL_PRESETS[0],{vaulted:true});
+assert.equal(vaultedSpecimen.nativeRouting.cutters.length,3);
+for(const {mesh} of vaultedSpecimen.nativeRouting.cutters){
+ assert(mesh.points[10]>mesh.points[7],'Roof rises above the original usable channel depth');
+ assert(mesh.points[7]>0,'Rectangular usable section is preserved');
+}
+assert(prepareRecipe(THREE,wasm,vaultedSpecimen).bodies.length>0,'Vaulted routed specimen prepares with Manifold');
 const routeSpecimen=makeRoutedSocketSpecimen(PIXEL_PRESETS[0],{clearance:.15,retentionLip:.2});
 assert.equal(routeSpecimen.negative.filter(part=>part.kind==='pixel-seat').length,2);
 assert.equal(routeSpecimen.negative.filter(part=>part.wireChannel).length,3);

@@ -575,7 +575,7 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
  return r;
 }
 
-export function makeRoutedSocketSpecimen(profile,{clearance=.15,retentionLip=0}={}){
+export function makeRoutedSocketSpecimen(profile,{clearance=.15,retentionLip=0,vaulted=false}={}){
  const width=Math.max(70,4*profile.flangeDiameter+20),depth=Math.max(40,profile.flangeDiameter+12);
  const height=profile.bodyHeight+4,spacing=Math.max(30,profile.flangeDiameter+5);
  const recipe={bounds:{width,depth,height},positive:[box([width,height,depth])],negative:[],
@@ -584,7 +584,7 @@ export function makeRoutedSocketSpecimen(profile,{clearance=.15,retentionLip=0}=
   profileId:profile.id,diameter:profile.bodyDiameter,clearance,rotation:0,entryFace:'underside',checked:true,
   socketProfile:{...profile,retentionLip}}));
  return applyBuildModules(recipe,{pixelBuilderVersion:1,pixelHoles,
-  serialRouting:{version:1,enabled:true,pitch:Math.max(50,spacing),inTail:250,outTail:250}});
+  serialRouting:{version:1,enabled:true,pitch:Math.max(50,spacing),inTail:250,outTail:250,vaulted}});
 }
 
 gearGenerator.visualFields=['wheelStyle','webStyle','reliefStyle','diameter','teeth','spokes','rimWidth','webWidth','reliefHeight'];

@@ -1237,6 +1237,9 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   block.insertAdjacentHTML('beforeend','<label><input type="checkbox" data-native-route'+(settings.enabled?' checked':'')+
    (model.link||(!settings.enabled&&plan.reason)?' disabled':'')+'> Cut serial channels</label>');
   block.querySelector('[data-native-route]').onchange=e=>change({enabled:e.target.checked});
+  block.insertAdjacentHTML('beforeend','<label><input type="checkbox" data-vaulted-route'+
+   (settings.vaulted?' checked':'')+disabled+'> Vault wire-track roofs for underside-down printing</label>');
+  block.querySelector('[data-vaulted-route]').onchange=e=>change({vaulted:e.target.checked});
   const guide=document.createElement('label'),show=document.createElement('input');
   show.type='checkbox';show.dataset.nativePreview='';show.checked=showNativeGuide(model);
   show.onchange=()=>{nativeGuideChoices.set(model.id,show.checked);refreshPixelMarkers(model);};
