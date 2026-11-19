@@ -428,6 +428,14 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  const hiddenNativeRoutes=new Set();
  const selectedPixels=new Map(),pixelMessages=new Map(),pixelProfileChoices=new Map();
+ // Newly saved measured profiles are shared across all families, but never
+ // silently alter dimensions on existing fittings.
+ document.addEventListener('studio-pixel-profile-saved',event=>{
+  const model=active(),id=event.detail?.profileId;
+  if(!model||!id)return;
+  pixelProfileChoices.set(model.id,id);
+  if(mode==='model'&&stage==='build'){renderPalette();if(model.generator.typeId!=='crystals')renderEditor();}
+ });
  let placementModel=null,pixelGesture=null,pendingDuplicate=null;
  const pixelHoles=model=>stablePixels(model.build.pixelHoles||[]);
  const fittingProfiles=()=>pixelProfiles(adapter.pixelFitProfiles?.()||[]);
@@ -480,7 +488,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const holes=pixelHoles(model);
   if(!holes[index]||model.link)return false;
   const issue=pixelIssue(model,hole,holes.filter((_,i)=>i!==index));
-  if(issue){pixelStatus(model,issue);return false;}
+  if(issue){pixelStatus(model,pixelPlacementAdvice(model,issue));return false;}
   holes[index]={...hole,checked:true};
   return savePixels(model,holes,hole.id,focus);
  }
@@ -489,14 +497,20 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(!holes[index]||model.link)return;
   holes.splice(index,1);savePixels(model,holes,holes[Math.min(index,holes.length-1)]?.id);
  }
+ function pixelPlacementAdvice(model,reason){
+  const tips=' Try a smaller profile or move the fitting into a wider solid area.';
+  const backing=model.build.pixelBacking?' Inspect the backing and existing cavities.':
+   ' If no safe material exists, explicitly enable Add fitting backing (12 mm extra each side).';
+  return reason+tips+backing;
+ }
  function addAutomaticPixel(model){
   try{
    const holes=pixelHoles(model),recipe=pixelSource(model);
    if(holes.length>=16){pixelStatus(model,'Use up to 16 fittings per model.');return;}
    const hole=findPixelPosition(recipe,holes,chosenProfile(model));
    if(hole)savePixels(model,[...holes,{...hole,checked:true}],hole.id);
-   else pixelStatus(model,'No clear material for this bore. '+(checkedPixelBore(recipe,newPixel(chosenProfile(model)),holes)||'Try a smaller fitting.'));
-  }catch(error){pixelStatus(model,error.message);}
+   else pixelStatus(model,pixelPlacementAdvice(model,'No verified clear material for this pixel bore. '+(checkedPixelBore(recipe,newPixel(chosenProfile(model)),holes)||'')));
+  }catch(error){pixelStatus(model,pixelPlacementAdvice(model,error.message));}
  }
  function pixelRay(event){
   const rect=renderer.domElement.getBoundingClientRect();
@@ -936,6 +950,8 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   };
   if(build){
    if(model.generator.typeId==='crystals'){
+    addAction('Create / edit pixel profile',$('editPixelProfileBtn'));
+    addAction('Add pixel',$('placePixelBtn'));
     addAction('Fit base for gumdrop',$('fitPixelBaseBtn'));
     addAction('Print a pixel fit test',$('calibrationBtn'));
     renderCrystalPixelPalette(controls,model);
