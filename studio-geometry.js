@@ -1,4 +1,5 @@
 import {putSocket} from './fabrication-v1.js';
+import {makePixelReplicaRecipe} from './pixel-replica.js';
 /* Shared solid recipes. Preview components may overlap; only prepareRecipe
  * Boolean results may reach manufacturing exporters. Units mm; Y-up. */
 function ringSolidGeometry(THREE,rings,top){
@@ -128,17 +129,54 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
  return group;
 }
 export function disposeGroup(group){group.traverse(node=>{if(node.userData.pixelLabel||node.userData.mountLabel)node.material?.map?.dispose();if(!node.isSprite)node.geometry?.dispose();if(Array.isArray(node.material))node.material.forEach(m=>m.dispose());else node.material?.dispose();});group.removeFromParent();}
+// The very same fitting transform is used by fabrication and Build's real
+// Manifold positive/cutter overlay. The incoming local +Y axis points INTO
+// the material. Rotation is the same authored pixel wire-port orientation.
+export function placeNativeSocketSolid(THREE,wasm,hold,solid,seat,rotation=0){
+ const [x,,z]=seat.position;
+ const turned=rotation?hold(solid.rotate([0,rotation,0])):solid;
+ if(!seat.surface)return hold(turned.translate([x,0,z]));
+ const inward=new THREE.Vector3(...seat.surface.normal).negate();
+ const frame=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),inward);
+ const angles=new THREE.Euler().setFromQuaternion(frame,'ZYX').toArray().slice(0,3);
+ return hold(hold(turned.rotate(angles.map(angle=>angle*180/Math.PI))).translate([x,seat.surface.y,z]));
+}
+
+// The Build preview uses the profile-shaped positive replica and the EXACT
+// production socket cutter. It does not replace the prepared manufacturing mesh.
+export function nativeFittingPreviews(THREE,wasm,recipe){
+ const seats=(recipe.negative||[]).filter(part=>part.kind==='pixel-seat');
+ if(!seats.length)return [];
+ if(recipe.dualMaterial||recipe.partitioned)throw Error('Shaped fitting preview requires single-material stock.');
+ const owned=[],hold=solid=>(owned.push(solid),solid);
+ try{
+  // Compare against the original unsliced stock, rather than triangles of
+  // the viewport's visual solids. Other cuts/routed interference is not yet
+  // included in this preview; preparation remains authoritative.
+  const stockRecipe={...recipe,negative:[],nativeRouting:null,dualMaterial:false,partitioned:false};
+  const stockMesh=prepareRecipe(THREE,wasm,stockRecipe).bodies[0].mesh;
+  const stock=hold(new wasm.Manifold(stockMesh));
+  return seats.map(seat=>{
+   const profile=seat.profile;
+   const replica=prepareRecipe(THREE,wasm,makePixelReplicaRecipe(profile)).bodies[0].mesh;
+   const positive=placeNativeSocketSolid(THREE,wasm,hold,hold(new wasm.Manifold(replica)),seat,90-seat.pixelRotation);
+   const bore=putSocket(wasm,hold,{x:0,z:0},seat.radius,profile.bodyHeight+3,-3,profile,{
+    includeLocalWireRelief:seat.includeLocalWireRelief
+   });
+   const negative=placeNativeSocketSolid(THREE,wasm,hold,bore.solid,seat,90-seat.pixelRotation);
+   const exposed=hold(positive.subtract(stock));
+   const collision=hold(hold(positive.intersect(stock)).subtract(negative));
+   if(positive.status()!=='NoError'||negative.status()!=='NoError')throw Error('Invalid physical fitting preview.');
+   return {pixelId:seat.pixelId,
+    positive:positive.getMesh(),negative:negative.getMesh(),
+    insertionDepth:bore.usableBodyDepth,remainingRoof:bore.remainingWall,
+    exposedVolume:exposed.volume(),collisionVolume:collision.volume()};
+  });
+ }finally{owned.reverse().forEach(solid=>{try{solid.delete();}catch{}});}
+}
 export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
  const owned=[];const hold=solid=>(owned.push(solid),solid);
- const positionSeat=(solid,seat,rotation=0)=>{
-  const [x,,z]=seat.position;
-  const turned=rotation?hold(solid.rotate([0,rotation,0])):solid;
-  if(!seat.surface)return hold(turned.translate([x,0,z]));
-  const inward=new THREE.Vector3(...seat.surface.normal).negate();
-  const frame=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),inward);
-  const angles=new THREE.Euler().setFromQuaternion(frame,'ZYX').toArray().slice(0,3);
-  return hold(hold(turned.rotate(angles.map(angle=>angle*180/Math.PI))).translate([x,seat.surface.y,z]));
- };
+ const positionSeat=(solid,seat,rotation=0)=>placeNativeSocketSolid(THREE,wasm,hold,solid,seat,rotation);
  const convert=part=>{
   if(part.kind==='pixel-seat'){
    const {profile}=part;
