@@ -744,13 +744,16 @@ try{
   await page.locator('[data-view=bottom]').click();
   await page.waitForTimeout(500);
   const second=(await getHoles())[1];
-  const underside=await page.evaluate(id=>window.__sensoryStudio.pixelMarkerScreen(id),second.id);
+  assert.equal(second.x,15,'Gear P2 accepts its exact X coordinate before placement');
   await palette.getByRole('button',{name:'Remove P2',exact:true}).click();
+  const underside=await page.evaluate(({x,z})=>window.__sensoryStudio.fittingPointScreen(x,z,'underside'),second);
+  assert(underside,'Gear P2 has a solid underside at the intended position');
   await page.mouse.dblclick(underside.x,underside.y);
   await fittingActions.getByRole('button',{name:'Add pixel',exact:true}).click();
   const replaced=(await getHoles())[1];
   assert.equal(replaced.entryFace,'underside');
-  assert(Math.abs(replaced.x-15)<1);
+  assert(Math.hypot(replaced.x-second.x,replaced.z-second.z)<1,
+   'Gear placement preserves the clicked underside location: '+JSON.stringify({second,replaced}));
   await shot('wt019-gear-underside');
   await serial.locator('[data-native-route]').click();
   assert(await serial.locator('[data-native-route]').isChecked());
@@ -778,9 +781,9 @@ try{
  const checkNativeDoubleClick=async (type,palette,hole)=>{
   await page.locator('[data-view=top]').click();
   await page.waitForTimeout(500);
-  const screen=await page.evaluate(id=>window.__sensoryStudio.pixelMarkerScreen(id),hole.id);
-  assert(screen,type+' projects the fitted point');
   await palette.getByRole('button',{name:'Remove P1',exact:true}).click();
+  const screen=await page.evaluate(({x,z})=>window.__sensoryStudio.fittingPointScreen(x,z,'top'),hole);
+  assert(screen,type+' projects the solid face at the fitted point');
   await page.mouse.dblclick(screen.x,screen.y);
   await fittingActions.waitFor();
   const add=fittingActions.getByRole('button',{name:'Add pixel',exact:true});

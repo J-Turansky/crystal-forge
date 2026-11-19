@@ -630,10 +630,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   pointer.set((event.clientX-rect.left)/rect.width*2-1,1-(event.clientY-rect.top)/rect.height*2);
   partRay.setFromCamera(pointer,camera);
  }
- function projectMarker(marker){
-  const rect=viewport.getBoundingClientRect(),p=marker.position.clone().project(camera);
+ function projectPoint(point){
+  camera.updateMatrixWorld();
+  const rect=viewport.getBoundingClientRect(),p=point.clone().project(camera);
   return {x:rect.left+(p.x+1)*rect.width/2,y:rect.top+(1-p.y)*rect.height/2};
  }
+ function projectMarker(marker){return projectPoint(marker.position);}
  function markerAt(model,event){
   return pixelMarkers(model).map(marker=>{
    const p=projectMarker(marker);
@@ -641,13 +643,26 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   }).filter(hit=>hit.distance<=14).sort((a,b)=>a.distance-b.distance)[0]?.marker;
  }
  const viewport=renderer.domElement;
+ function fittingMeshes(model){
+  return cache.get(model.id)?.group?.children.filter(mesh=>mesh.visible&&mesh.isMesh&&!mesh.userData.previewOnly)||[];
+ }
  function fittingSurface(model,event){
   pixelRay(event);
-  const meshes=cache.get(model.id)?.group?.children.filter(mesh=>mesh.visible&&mesh.isMesh&&!mesh.userData.previewOnly)||[];
-  const hit=partRay.intersectObjects(meshes,false)[0];
+  const hit=partRay.intersectObjects(fittingMeshes(model),false)[0];
   if(!hit?.face)return null;
   const normal=hit.face.normal.clone().applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld));
   return {point:hit.point,normal};
+ }
+ function fittingPointScreen(x,z,face){
+  const model=active(), meshes=model?fittingMeshes(model):[];
+  const bounds=new THREE.Box3();
+  for(const mesh of meshes)bounds.expandByObject(mesh);
+  if(bounds.isEmpty())return null;
+  const underside=face==='underside';
+  const origin=new THREE.Vector3(x,underside?bounds.min.y-1:bounds.max.y+1,z);
+  const ray=new THREE.Raycaster(origin,new THREE.Vector3(0,underside?1:-1,0));
+  const hit=ray.intersectObjects(meshes,false)[0];
+  return hit?projectPoint(hit.point):null;
  }
  function fittingFaceIssue({normal}){
   return Math.abs(normal.y)<.7?'This face cannot take a vertical through-bore. Choose a top or underside surface with solid material.':'';
@@ -1929,6 +1944,6 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  for(const job of project.printJobs)if(['preparing','prepared'].includes(job.status)){job.status='stale';job.requestId=null;job.preparedRevision=null;}
  if(shell)showHome();
  save();
- window.__sensoryStudio={project,registry,get currentModel(){return active();},get mode(){return mode;},switchModel,addModel:add,showLibrary,showPrint,send,prepare,saveImmediately,pixelMarkerScreen:id=>{const marker=pixelMarkers(active()).find(item=>item.userData.pixelId===id);return marker?projectMarker(marker):null;},get cacheSize(){return cache.size;},get metrics(){return {previewBuilds,geometries:renderer.info.memory.geometries,activeWorkers:workers.size};}};
+ window.__sensoryStudio={project,registry,get currentModel(){return active();},get mode(){return mode;},switchModel,addModel:add,showLibrary,showPrint,send,prepare,saveImmediately,fittingPointScreen,pixelMarkerScreen:id=>{const marker=pixelMarkers(active()).find(item=>item.userData.pixelId===id);return marker?projectMarker(marker):null;},get cacheSize(){return cache.size;},get metrics(){return {previewBuilds,geometries:renderer.info.memory.geometries,activeWorkers:workers.size};}};
  return {onCrystalChange:captureCrystal,backup};
 }
