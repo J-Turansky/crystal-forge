@@ -78,4 +78,17 @@ try{
  assert.deepEqual(print,rounded);
  assert.deepEqual(await model(),revision);
  console.log('WT-021 Crystal dimensional evidence:',JSON.stringify({initial,revision,design,build,prepared,print,stl,mf}));
+ await page.evaluate(()=>window.__sensoryStudio.addModel('crystals',{
+  seed:42,count:5,width:94,baseHeight:35,baseWidth:18,cutSockets:true,lightingMode:'single',socketConical:true
+ },'WT021 physical fitting'));
+ await page.locator('.sms-workspace-nav [data-tab=build]').click();
+ const toggle=page.locator('.sms-palette').getByRole('checkbox',{name:'Show physical pixels and socket cutters'});
+ await toggle.check();
+ const fit=page.locator('[data-build-fit-preview-status]');
+ await fit.getByText(/insertion 22\.00 mm/).waitFor();
+ assert.match(await fit.innerText(),/centre roof [\d.]+ mm/);
+ assert.match(await fit.innerText(),/interfering with base/);
+ await toggle.uncheck();
+ assert.equal(await fit.innerText(),'');
+ console.log('WT-021 Crystal physical fitting preview toggled in Build');
 }finally{await browser.close();}

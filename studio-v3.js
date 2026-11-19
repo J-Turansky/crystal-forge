@@ -13,7 +13,7 @@ import {routingSummary,renderFeedback,installConciseHelp} from './routing-feedba
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {TransformControls} from 'three/addons/controls/TransformControls.js';
 import {generateFormation,crystalGeometry,crystalOrientation,baseGeometry,baseAccentSpecs,baseSurfaceHeight,crystalRootOffset,exportSTL} from './geometry-v3.js';
-import {loadManifold,setThreeInstance,saveSTL,save3MF,encodeSTL,makeCalibrationStrip,makePixelSeatCoupon,makeDetachableMountPlate,splitPreparedMesh,splitPreparedMeshGrid,makeSplitPinCoupon,makeDetachablePlate,makeSteppedPixelCoupon} from './fabrication-v1.js';
+import {crystalFittingPreview,loadManifold,setThreeInstance,saveSTL,save3MF,encodeSTL,makeCalibrationStrip,makePixelSeatCoupon,makeDetachableMountPlate,splitPreparedMesh,splitPreparedMeshGrid,makeSplitPinCoupon,makeDetachablePlate,makeSteppedPixelCoupon} from './fabrication-v1.js';
 import {buildProductionPack} from './production-pack.js';
 import {planSplitJoints} from './split-joints.js';
 import {planBedAwareSplit} from './bed-split.js';
@@ -487,13 +487,40 @@ function rebuildBase(){
  }
  updateAppearance();
 }
-function updateLEDs(){
- while(pixelGroup.children.length){const m=pixelGroup.children[0];pixelGroup.remove(m);m.geometry?.dispose();m.material?.dispose()}
+let fittingPreviewRequest=0;
+async function updateLEDs(){
+ const request=++fittingPreviewRequest,group=pixelGroup;
+ const report=message=>{
+  for(const output of document.querySelectorAll('#pixelFittingPreviewStatus,[data-build-fit-preview-status]'))output.textContent=message;
+ };
+ while(group.children.length){const m=group.children[0];group.remove(m);m.geometry?.dispose();m.material?.dispose()}
+ report('');
  if(!s.showPixels)return;
- for(const p of planHardware(crystals,s).sockets){
-  const m=new THREE.Mesh(new THREE.SphereGeometry(3,10,8),new THREE.MeshBasicMaterial({color:0xffdc58,depthTest:false}));
-  m.position.set(p.x,1,p.z);m.renderOrder=95;pixelGroup.add(m);
- }
+ if(!s.cutSockets||!baseMesh){report('Enable pixel socket cuts and a base to preview the fit.');return;}
+ const stock=baseMesh;
+ const sockets=planHardware(crystals,s).sockets;
+ try{
+  const wasm=await loadManifold();
+  if(request!==fittingPreviewRequest||group!==pixelGroup)return;
+  const messages=[];
+  sockets.forEach((pos,index)=>{
+   try{
+    const profile=resolveSocketProfile(s,pos);
+    const replica=prepareRecipe(THREE,wasm,makePixelReplicaRecipe(profile));
+    const roof=baseSurfaceHeight(crystals,s,pos.x,pos.z);
+    const preview=crystalFittingPreview(wasm,replica.bodies[0].mesh,stock,pos,roof,profile,s);
+    for(const [kind,geometry,color,opacity] of [
+     ['negative',preview.negative,0x46beff,.16],
+     ['positive',preview.positive,preview.collisionVolume>.01?0xff6161:0xffdc58,.42]
+    ]){
+     const mesh=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color,opacity,transparent:true,depthTest:false,depthWrite:false}));
+     mesh.name='crystal-fitting-'+kind;mesh.renderOrder=kind==='positive'?96:95;group.add(mesh);
+    }
+    messages.push('P'+(index+1)+' · insertion '+preview.insertionDepth.toFixed(2)+' mm · centre roof '+preview.remainingRoof.toFixed(2)+' mm · '+preview.exposedVolume.toFixed(2)+' mm³ outside base · '+preview.collisionVolume.toFixed(2)+' mm³ interfering with base');
+   }catch(error){messages.push('P'+(index+1)+' · '+error.message);}
+  });
+  report(messages.join(' | ')||'No accepted pixel sockets to preview.');
+ }catch(error){if(request===fittingPreviewRequest)report(error.message);}
 }
 
 function selectCrystal(id,commit=true){

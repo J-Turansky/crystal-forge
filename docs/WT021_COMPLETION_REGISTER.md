@@ -51,3 +51,9 @@ Physical-only gate (#10): owner reported a tight but successful fit and a roughl
 - tests/fabrication.test.mjs: two offset gumdrop sockets with retention, sampled curved link, IN and OUT. The independently decoded STL and 3MF pass route clearance point probes and both roof apex and radial slope measurements. A 25 mm inter-pixel cable is rejected. Existing single-pixel, thin backing and shallow socket checks remain.
 - The fixture reproduced degenerate STL facets from overlapping vaulted cuts. fabrication-v1.js rebuilds and simplifies the Manifold at 0.0001 mm tolerance, and refuses volume drift over 0.01 cubic millimetres.
 - Next: use explicit exterior-face cross sections and bend-radius checks, add blocked-exit and collision cases with state preservation, and implement FIT-02 physical preview. Keep DIM-04 and FAB-01/02 PARTIAL.
+
+### FIT-02 Crystal viewport
+
+- PARTIAL. Crystal Build can toggle translucent, profile-derived housing and the production socket cutter at accepted underside seats. It reports insertion depth, centre roof, volume outside the base and Boolean interference with the base. Collision changes the positive overlay colour.
+- The Chromium dimensional workflow now exercises the Build preview toggle on a 22 mm gumdrop with a conical socket. The earlier downloaded STL/3MF dimensional assertions still pass. The base interference check does not yet account for all routed cuts or arbitrary faces.
+- Next: reuse cutter pose and positive housing for native Gear/Tile seats, compare the visible transform to downloaded geometry, and cover invalid placement, drag and state preservation.

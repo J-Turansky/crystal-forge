@@ -187,6 +187,23 @@ export function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLo
   capRise:conical?bodyRadius:capRise,remainingWall:roofY-tipY,profileId:p.id,retentionLip:lip,
   requestedBodyDepth,usableBodyDepth:Math.max(0,conical?requestedBodyDepth:tipY),wireReliefDepth:relievedDepth};
 }
+export function crystalFittingPreview(wasm,positiveMesh,baseMesh,pos,roof,profile,settings){
+ const owned=[],hold=solid=>(owned.push(solid),solid);
+ try{
+  const cutter=putSocket(wasm,hold,pos,pos.radius,roof,-3,profile,{
+   conical:settings.socketConical===true,
+   includeLocalWireRelief:!settings.wireChannels&&settings.wireMode!=='string'
+  });
+  const pixel=hold(hold(new wasm.Manifold(positiveMesh)).translate([pos.x,0,pos.z]));
+  assertSolid(pixel,'Positive pixel preview');
+  const stock=hold(convertMesh(wasm,baseMesh));
+  const exposed=hold(pixel.subtract(stock));
+  const collision=hold(hold(pixel.intersect(stock)).subtract(cutter.solid));
+  return {positive:fromResultMesh(pixel.getMesh()),negative:fromResultMesh(cutter.solid.getMesh()),
+   insertionDepth:cutter.usableBodyDepth,remainingRoof:cutter.remainingWall,
+   exposedVolume:exposed.volume(),collisionVolume:collision.volume()};
+ }finally{cleanupAll(owned)}
+}
 function cleanupAll(list){
  for(const m of list){try{m.delete()}catch(e){}}
 }

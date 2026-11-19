@@ -1677,6 +1677,14 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     addAction('Fit base for gumdrop',$('fitPixelBaseBtn'));
     addAction('Print a pixel fit test',$('calibrationBtn'));
     renderActivePixelProfile(controls,model);
+    const origin=document.querySelector('[data-state="showPixels"]');
+    const label=document.createElement('label'),toggle=document.createElement('input'),status=document.createElement('output');
+    toggle.type='checkbox';toggle.checked=origin.checked;toggle.disabled=!!model.link;
+    toggle.onchange=()=>origin.click();
+    label.append(toggle,' Show physical pixels and socket cutters');
+    status.dataset.buildFitPreviewStatus='';status.setAttribute('aria-live','polite');
+    status.textContent=$('pixelFittingPreviewStatus')?.textContent||'';
+    controls.append(label,status);
     renderCrystalPixelPalette(controls,model);
     renderCrystalWirePalette(controls);
    }else{
