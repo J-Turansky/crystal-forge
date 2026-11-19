@@ -625,7 +625,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   save();
   if(mode==='model'&&stage==='build'){renderPalette();if(model.generator.typeId!=='crystals')renderEditor();}
  });
- let placementModel=null,mountingModel=null,pixelGesture=null,pendingDuplicate=null;
+ let placementModel=null,mountingModel=null,pixelGesture=null,pendingDuplicate=null,placeShaped=false,seatCheck=null;
  const pixelHoles=model=>stablePixels(model.build.pixelHoles||[]);
  const mountHoles=model=>stableMounts(model.build.manualMountHoles||[]);
  const fittingProfiles=()=>pixelProfiles(adapter.pixelFitProfiles?.()||[]);
@@ -870,6 +870,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  placementGhost.visible=false;
  scene.add(placementGhost);
  function endPixelPlacement(){
+  seatCheck?.terminate();seatCheck=null;placeShaped=false;
   placementModel=null;mountingModel=null;pendingDuplicate=null;placementGhost.visible=false;
   delete viewport.dataset.nativePlacement;
  }
@@ -883,28 +884,62 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const {point}=hit,placingMount=mountingModel===model.id;
   const hole=placingMount?newMount(Math.round(point.x*10)/10,Math.round(point.z*10)/10):fittingCandidate(model,point,pendingDuplicate);
   const holes=placingMount?mountHoles(model):pixelHoles(model);
-  const issue=fittingFaceIssue(hit)||(holes.length>=16?'Maximum 16 fittings per model.':
-   placingMount?mountIssue(model,{...hole,entryFace:hit.normal.y<0?'underside':'top'},holes):pixelIssue(model,hole,holes));
-  placementGhost.position.set(hole.x,point.y+(hit.normal.y<0?-.3:.3),hole.z);
+  const shaped=!placingMount&&(placeShaped||pendingDuplicate?.socketProfile);
+  const issue=(!shaped&&fittingFaceIssue(hit))||(holes.length>=16?'Maximum 16 fittings per model.':
+   shaped?null:placingMount?mountIssue(model,{...hole,entryFace:hit.normal.y<0?'underside':'top'},holes):pixelIssue(model,hole,holes));
+  placementGhost.position.copy(point).addScaledVector(hit.normal,.3);
+  placementGhost.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),hit.normal);
   placementGhost.scale.setScalar((hole.diameter+(hole.clearance||0))/2);
-  placementGhost.material.color.setHex(issue?0xff3c59:0x48e4f1);
+  placementGhost.material.color.setHex(issue?0xff3c59:shaped?0xffbe47:0x48e4f1);
   placementGhost.visible=true;
-  viewport.dataset.nativePlacement=issue?'invalid':'valid';
+  viewport.dataset.nativePlacement=issue?'invalid':shaped?'unverified':'valid';
  }
  function socketSurface(point,normal){
   if(normal.y<-.999&&Math.abs(point.y)<.01)return undefined;
   return {y:point.y,normal:normal.toArray()};
  }
- function placeFittingAt(model,{point,normal},duplicate=null){
+ function checkAndSaveSeat(model,holes,hole,onSaved){
+  if(seatCheck||model.link)return;
+  const revision=model.revision;
+  const worker=new Worker(new URL('./studio-model-worker.js',import.meta.url),{type:'module'});
+  seatCheck=worker;
+  const finish=message=>{
+   worker.terminate();
+   if(seatCheck!==worker)return;
+   seatCheck=null;
+   if(active()?.id!==model.id||model.revision!==revision||!canEditPixels(model))return;
+   if(message){pixelStatus(model,message);return;}
+   if(savePixels(model,holes,hole.id))onSaved?.();
+  };
+  worker.onmessage=({data})=>{
+   if(data.type==='complete')finish();
+   if(data.type==='error')finish(data.message);
+  };
+  worker.onerror=event=>{event.preventDefault();finish(event.message||'Socket validation could not start.');};
+  worker.onmessageerror=()=>finish('Socket validation returned an unreadable result.');
+  pixelStatus(model,'Checking socket walls, insertion opening and collisions…');
+  worker.postMessage({ticket:{model:{...model,build:{...model.build,pixelHoles:holes,pixelBuilderVersion:1}}}});
+ }
+ function placeFittingAt(model,{point,normal},duplicate=null,onSaved){
   const holes=pixelHoles(model);
   if(holes.length>=16){pixelStatus(model,'Use up to 16 fittings per model.');return false;}
   if(!duplicate&&!chosenProfile(model)){pixelStatus(model,'Import the missing profile or select another before placing.');return false;}
   const hole={...fittingCandidate(model,point,duplicate),entryFace:normal.y<0?'underside':'top'};
   hole.hitSurface=socketSurface(point,normal);
-  if(hole.socketProfile)hole.surface=hole.hitSurface;
+  if(placeShaped&&!duplicate){
+   const profile=chosenProfile(model);
+   if(!profile?.bodyHeight){pixelStatus(model,'Select a measured pixel profile for a shaped socket.');return false;}
+   hole.socketProfile={...profile,retentionLip:profile.retentionLip??0};
+  }
+  if(hole.socketProfile){
+   hole.x=point.x;hole.z=point.z;
+   hole.surface=hole.hitSurface;
+  }
   const issue=pixelIssue(model,hole,holes);
   if(issue){pixelStatus(model,pixelPlacementAdvice(model,issue));return false;}
-  return savePixels(model,[...holes,{...hole,checked:true}],hole.id);
+  const next=[...holes,{...hole,checked:true}];
+  if(hole.socketProfile){checkAndSaveSeat(model,next,hole,onSaved);return false;}
+  return savePixels(model,next,hole.id);
  }
  function placeMountAt(model,{point,normal}){
   const mounts=mountHoles(model);
@@ -994,14 +1029,15 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const hit=fittingSurface(gesture.model,event);
   const underside=current.entryFace==='underside';
   gesture.candidate=null;
-  gesture.issue=!hit?'Move onto the original solid fitting face.':fittingFaceIssue(hit);
-  if(hit&&!gesture.issue&&(hit.normal.y<0)!==underside)
+  gesture.issue=!hit?'Move onto the original solid fitting face.':current.socketProfile?'':fittingFaceIssue(hit);
+  const originalNormal=current.surface?.normal;
+  if(hit&&!gesture.issue&&(originalNormal?hit.normal.dot(new THREE.Vector3(...originalNormal))<.5:(hit.normal.y<0)!==underside))
    gesture.issue='Move onto the original fitting face. A drag cannot switch installation sides.';
   if(hit&&!gesture.issue){
    const candidate={...current,x:Math.round(hit.point.x*10)/10,z:Math.round(hit.point.z*10)/10};
    if(!mounts){
     candidate.hitSurface=socketSurface(hit.point,hit.normal);
-    if(current.socketProfile)candidate.surface=candidate.hitSurface;
+    if(current.socketProfile){candidate.x=hit.point.x;candidate.z=hit.point.z;candidate.surface=candidate.hitSurface;}
    }
    const others=holes.filter(hole=>hole.id!==id);
    gesture.issue=mounts?mountIssue(gesture.model,candidate,others):pixelIssue(gesture.model,candidate,others,gesture.recipe);
@@ -1040,23 +1076,29 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     editMount(model,index,gesture.candidate);
    }else{
     const index=pixelHoles(model).findIndex(hole=>hole.id===gesture.candidate.id);
-    editPixel(model,index,gesture.candidate);
+    if(gesture.candidate.socketProfile){
+     const holes=pixelHoles(model);
+     if(index>=0){holes[index]=gesture.candidate;checkAndSaveSeat(model,holes,gesture.candidate);}
+    }else editPixel(model,index,gesture.candidate);
    }return;
   }
   if(gesture.issue){pixelStatus(model,gesture.issue);return;}
   if(!gesture.placing||gesture.marker)return;
   const hit=fittingSurface(model,event);
   if(!hit){pixelStatus(model,'Click a solid model surface to place this fitting.');return;}
-  const faceIssue=fittingFaceIssue(hit);
+  const faceIssue=placeShaped||pendingDuplicate?.socketProfile?'':fittingFaceIssue(hit);
   if(faceIssue){pixelStatus(model,faceIssue);return;}
   if(mountingModel===model.id){
    if(placeMountAt(model,hit)){
     if(mountHoles(model).length>=16){endPixelPlacement();renderPalette();}
     else updatePlacementGhost(model,event);
    }
-  }else if(placeFittingAt(model,hit,pendingDuplicate)){
-   if(pendingDuplicate||pixelHoles(active()).length>=16){endPixelPlacement();renderPalette();}
-   else updatePlacementGhost(active(),event);
+  }else{
+   const onSaved=()=>{
+    if(pendingDuplicate||pixelHoles(model).length>=16){endPixelPlacement();renderPalette();}
+    else updatePlacementGhost(model,event);
+   };
+   if(placeFittingAt(model,hit,pendingDuplicate,onSaved))onSaved();
   }
  },true);
  viewport.addEventListener('keydown',event=>{
@@ -1339,6 +1381,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     '<button type="button" data-fit-profile="'+esc(profile.id)+'" aria-pressed="'+(chosenProfile(model)?.id===profile.id)+'"'+disabled+
     '>◉ '+esc(profile.name)+' · '+profile.bodyDiameter+' mm</button>').join('')+'</div>'+
    '<div class="sms-actions"><button type="button" data-place-pixel'+noAdd+'>Place LED fitting in 3D</button>'+
+   '<button type="button" data-place-shaped'+noAdd+'>Place shaped socket in 3D</button>'+
    '<button type="button" data-auto-pixel'+noAdd+'>Add pixel automatically</button>'+
    (placementModel===model.id?'<button type="button" data-done-pixel>Done placing pixels</button>':'')+'</div>'+
    '<div class="sms-actions" aria-label="Select pixel">'+holes.map((hole,i)=>'<button type="button" data-select-pixel="'+i+'" aria-pressed="'+(i===selected)+'">P'+(i+1)+'</button>').join('')+'</div>'+
@@ -1396,13 +1439,14 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    if(!lip.value||!lip.checkValidity()||!editPixel(model,selected,{...hole,
     socketProfile:{...hole.socketProfile,retentionLip:lip.valueAsNumber}}))lip.value=hole.socketProfile.retentionLip;
   };
-  const armPlacement=duplicate=>{
+  const armPlacement=(duplicate,shaped=false)=>{
    if(!duplicate&&!chosenProfile(model)){pixelStatus(model,'Import the missing profile or select another before placing.');return;}
-   placementModel=model.id;pendingDuplicate=duplicate;viewport.dataset.nativePlacement='outside';
+   placementModel=model.id;pendingDuplicate=duplicate;placeShaped=shaped;viewport.dataset.nativePlacement='outside';
    renderPalette();viewport.tabIndex=0;viewport.focus({preventScroll:true});
    pixelStatus(model,duplicate?'Click a solid surface to place the duplicate. Escape ends placement.':'Click or tap solid surfaces to place fittings. Use Done or Escape to end placement.');
   };
   root.querySelector('[data-place-pixel]').onclick=()=>armPlacement(null);
+  root.querySelector('[data-place-shaped]').onclick=()=>armPlacement(null,true);
   const done=root.querySelector('[data-done-pixel]');
   if(done)done.onclick=()=>{endPixelPlacement();renderPalette();};
   const duplicate=root.querySelector('[data-duplicate-pixel]');
