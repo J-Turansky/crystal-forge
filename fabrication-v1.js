@@ -342,6 +342,21 @@ function createPrintVault(wasm,hold,crystals,s,hardware,warnings){
  warnings.push('Integral base buttresses are supportless-first geometry, not a guarantee. Validate bridging and print orientation in Cura.');
  return {cutter,stats};
 }
+// Validate at the SAME float32 precision and area threshold as the STL
+// material exporter. A prepared-but-unexportable print job is never valid.
+function printableMaterialTriangles(mesh){
+ const points=mesh.vertProperties,faces=mesh.triVerts,stride=mesh.numProp;
+ if(!points||!faces||stride<3||faces.length%3)return false;
+ for(let i=0;i<faces.length;i+=3){
+  const a=faces[i]*stride,b=faces[i+1]*stride,c=faces[i+2]*stride;
+  const ux=points[b]-points[a],uy=points[b+1]-points[a+1],uz=points[b+2]-points[a+2];
+  const vx=points[c]-points[a],vy=points[c+1]-points[a+1],vz=points[c+2]-points[a+2];
+  const nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;
+  const twiceArea=Math.hypot(nx,ny,nz);
+  if(!Number.isFinite(twiceArea)||twiceArea<1e-12)return false;
+ }
+ return true;
+}
 export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=>{}}){
  if(!wasm?.Manifold || !wasm?.Mesh)throw new Error('Manifold engine has not loaded');
  // Caller explicitly supplies exportable components; preview visibility may
@@ -691,6 +706,19 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
     combined=repaired;
     warnings.push(sealedCavitiesFilled+' sealed inaccessible void shells were filled, rather than leaving unlit air pockets inside the model.');
    }
+  }
+  // All print jobs must pass the same triangle-quality gate as STL and
+  // 3MF output *before* being marked prepared. Rounded socket Booleans can
+  // leave sub-precision slivers that Manifold still regards as valid.
+  if(!printableMaterialTriangles(combined.getMesh())){
+   const before=combined.volume(),tolerance=.0001;
+   const rebuilt=hold(new wasm.Manifold(combined.getMesh()));
+   const cleaned=hold(hold(rebuilt.asOriginal()).simplify(tolerance));
+   if(cleaned.status()!=='NoError'||cleaned.isEmpty()||
+      Math.abs(cleaned.volume()-before)>.01||!printableMaterialTriangles(cleaned.getMesh()))
+    throw Error('The physical mesh contains sub-STL-precision triangles. Move a fitting or adjust its geometry; preparation was refused before export.');
+   combined=cleaned;
+   warnings.push('Sub-printable triangle slivers were removed within a 0.0001 mm tolerance; review the resulting layer geometry in Cura.');
   }
   onProgress('Auditing the final manifold geometry and printer limits…');
   const inspectionMode=s.lightingMode==='none'?'none':s.hollowCrystals?'hollow':portPlan.requested&&vault.applied?'vault':s.targetedLightPaths?'targeted':portPlan.requested?'vault':'none';
