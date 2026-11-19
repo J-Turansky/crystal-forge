@@ -1,5 +1,11 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.35.1 — Responsive automatic routing and tool finder
+
+- Run expensive Crystal pixel-string automatic routing in a deadline-limited background worker to keep the editor responsive.
+- Provide an accessible Find tools search in the left panel, including a direct pixel-fit test STL download shortcut and mounting, wiring, Cura and print links.
+- Preserve accepted project geometry on impossible or timed-out routes and add worker, browser responsiveness and tool discovery regressions.
+
 ## v0.16.0-dev.35 — Direct prepared-job print downloads
 
 - Download STL or a registered multi-part STL archive and the matching Cura profile directly from a prepared job.

@@ -120,3 +120,13 @@ dialog[aria-label="Review backup"]{
 }
 dialog[aria-label="Review backup"] select{max-width:100%}
 dialog[aria-label="Review backup"] .sms-actions{flex-wrap:wrap}
+
+/* Left-hand command finder: stays visible as the Design/Build palettes scroll. */
+.sms-tool-finder{position:sticky;top:0;z-index:6;background:var(--panel);padding:9px;border-bottom:1px solid var(--border);display:grid;gap:5px}
+.sms-tool-finder>label{font-size:12px;font-weight:750;color:var(--ink)}
+.sms-tool-finder>input[type=search]{width:100%;min-width:0;padding:8px;border:1px solid var(--border);border-radius:7px;background:var(--panel2);color:var(--ink)}
+.sms-tool-finder>p{margin:0;font-size:11px;line-height:1.4}
+.sms-tool-finder-results{display:grid;gap:6px;max-height:245px;overflow:auto}
+.sms-tool-result{display:grid;text-align:left;gap:3px;white-space:normal;font-size:12px;padding:8px;border-radius:7px}
+.sms-tool-result small{display:block;font-weight:400;line-height:1.35;color:var(--muted)}
+.sms-tool-result:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
