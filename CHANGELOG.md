@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.21 — Protect workspace saves across tabs
+
+- Preserve recovery and JSON export when a newer workspace has been saved in another tab.
+
 ## v0.16.0-dev.20 — Clearer Tile and Gear routing feedback
 
 - Identify the fitting that needs a larger bore or more clearance at the backing edge.

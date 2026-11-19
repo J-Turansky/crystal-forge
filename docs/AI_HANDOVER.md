@@ -1,5 +1,9 @@
 # AI handover — read immediately after AGENTS.md
 
+## Workspace stale-write protection
+
+WT-018 recovers the save and recovery guards from PR #66. The comparison uses local storage and is not atomic across tabs. Export in-memory work as JSON if the newer saved workspace blocks a write.
+
 ## Tile and Gear routing verification
 
 The native planner identifies the numbered fitting that fails the diameter or edge-clearance gate. Catalogue fixtures cover successful, short-pitch, obstructed and serialized routes on solid Tiles and decorative Gears. Physical cable seating remains part of #10.
