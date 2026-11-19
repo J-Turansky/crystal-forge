@@ -1,5 +1,11 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.34.2 — Keep automatic cable routing responsive
+
+- Run the Crystal pixel-string automatic repair search in a cancellable worker rather than blocking the 3D editor.
+- Limit attempts to eight seconds, preserve unchanged models when routing is impossible, and display actionable feedback.
+- Add a four-pixel impossible-route browser regression and immutable worker test.
+
 ## v0.16.0-dev.34.1 — Restore Model Maker startup on GitHub Pages
 
 - Publish the SVG importer and serve the 3D and fabrication dependencies with the app.
