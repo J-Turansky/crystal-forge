@@ -91,6 +91,8 @@ function channelSize(build){
 }
 
 export function nativeRouteEligibility(recipe,build){
+ if((build.pixelHoles||[]).some(hole=>hole.socketProfile&&hole.surface))
+  return 'Physical grooves require sockets on the flat underside backing. Disable physical routing or move the sockets to that backing.';
  if(!recipe.serialSupport)return recipe.serialReason||'Enable fitting backing to check this model for serial routing.';
  if(recipe.dualMaterial)return 'Use a single material for native serial routing.';
  const required=channelSize(build).depth+roof;

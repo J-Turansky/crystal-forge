@@ -864,11 +864,17 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   placementGhost.visible=true;
   viewport.dataset.nativePlacement=issue?'invalid':'valid';
  }
+ function socketSurface(point,normal){
+  if(normal.y<-.999&&Math.abs(point.y)<.01)return undefined;
+  return {y:point.y,normal:normal.toArray()};
+ }
  function placeFittingAt(model,{point,normal},duplicate=null){
   const holes=pixelHoles(model);
   if(holes.length>=16){pixelStatus(model,'Use up to 16 fittings per model.');return false;}
   if(!duplicate&&!chosenProfile(model)){pixelStatus(model,'Import the missing profile or select another before placing.');return false;}
   const hole={...fittingCandidate(model,point,duplicate),entryFace:normal.y<0?'underside':'top'};
+  hole.hitSurface=socketSurface(point,normal);
+  if(hole.socketProfile)hole.surface=hole.hitSurface;
   const issue=pixelIssue(model,hole,holes);
   if(issue){pixelStatus(model,pixelPlacementAdvice(model,issue));return false;}
   return savePixels(model,[...holes,{...hole,checked:true}],hole.id);
@@ -966,6 +972,10 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    gesture.issue='Move onto the original fitting face. A drag cannot switch installation sides.';
   if(hit&&!gesture.issue){
    const candidate={...current,x:Math.round(hit.point.x*10)/10,z:Math.round(hit.point.z*10)/10};
+   if(!mounts){
+    candidate.hitSurface=socketSurface(hit.point,hit.normal);
+    if(current.socketProfile)candidate.surface=candidate.hitSurface;
+   }
    const others=holes.filter(hole=>hole.id!==id);
    gesture.issue=mounts?mountIssue(gesture.model,candidate,others):pixelIssue(gesture.model,candidate,others,gesture.recipe);
    if(!gesture.issue)gesture.candidate=candidate;
@@ -1307,7 +1317,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    '<div class="sms-actions" aria-label="Select pixel">'+holes.map((hole,i)=>'<button type="button" data-select-pixel="'+i+'" aria-pressed="'+(i===selected)+'">P'+(i+1)+'</button>').join('')+'</div>'+
    '<p role="status" data-pixel-status>'+esc(pixelMessages.get(model.id)||'Click a marker to select. Hold then drag to move. Arrow keys nudge 1 mm, or 5 mm with Shift.')+'</p>'+
    (selected<0?'':pixelHoleMarkup(holes[selected],selected,esc,disabled,profiles)+
-    '<label><input type="checkbox" data-shaped-socket'+(hole.socketProfile?' checked':'')+disabled+'> Shape this underside socket from the measured profile</label>'+
+    '<label><input type="checkbox" data-shaped-socket'+(hole.socketProfile?' checked':'')+disabled+'> Shape a socket on the selected face from the measured profile</label>'+
     (hole.socketProfile?'<label>Retention lip (mm)<input type="number" data-seat-retention min="0" max=".7" step=".05" value="'+esc(hole.socketProfile.retentionLip)+'"'+disabled+'></label>':'')+
     '<div class="sms-actions"><button type="button" data-pixel-previous'+(selected===0?' disabled':disabled)+'>Move earlier</button><button type="button" data-pixel-next'+(selected===holes.length-1?' disabled':disabled)+'>Move later</button><button type="button" data-duplicate-pixel'+noAdd+'>Duplicate fitting in 3D</button></div>')+
    '<section aria-label="Test print"><h3>Test print</h3><p>'+esc(fit.profileName)+' · '+fit.nominalDiameter+' mm nominal · '+fit.diameter+' mm body · '+fit.boreDiameter+' mm bore · '+fit.clearance+' mm clearance.</p>'+
@@ -1341,12 +1351,17 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const shaped=root.querySelector('[data-shaped-socket]');
   if(shaped)shaped.onchange=()=>{
    const enabled=shaped.checked;
-   if(enabled&&(hole.entryFace!=='underside'||!fit.profile?.bodyHeight)){
-    shaped.checked=false;pixelStatus(model,'Place or select an underside fitting and choose a measured profile first.');return;
+   if(enabled&&((hole.entryFace!=='underside'&&!hole.hitSurface)||!fit.profile?.bodyHeight)){
+    shaped.checked=false;pixelStatus(model,'Place a fitting on its intended installation face and choose a measured profile first.');return;
    }
    const next={...hole};
-   if(enabled)next.socketProfile={...fit.profile,retentionLip:0};
-   else delete next.socketProfile;
+   if(enabled){
+    next.socketProfile={...fit.profile,retentionLip:0};
+    next.surface=hole.hitSurface;
+   }else{
+    delete next.socketProfile;
+    delete next.surface;
+   }
    if(!editPixel(model,selected,next))shaped.checked=!!hole.socketProfile;
   };
   const lip=root.querySelector('[data-seat-retention]');

@@ -404,3 +404,25 @@ assert.equal(pathRay.intersectObject(specimenMesh).length,0,'The printed route i
 const undersideRoof=new THREE.Raycaster(new THREE.Vector3(0,-1,0),new THREE.Vector3(0,1,0));
 assert(Math.abs(undersideRoof.intersectObject(specimenMesh)[0].point.y-2)<.01,'The groove is recessed 2 mm and has a roof');
 specimenGeometry.dispose();specimenMaterial.dispose();
+
+const sourceSeat=routeSpecimen.negative.find(part=>part.kind==='pixel-seat');
+const faceBlock={...routeSpecimen,nativeRouting:null,positive:[{kind:'box',size:[70,30,40],position:[0,15,0]}]};
+const topSeat={...sourceSeat,position:[0,0,0],surface:{y:30,normal:[0,1,0]}};
+const sideSeat={...sourceSeat,position:[35,0,0],surface:{y:15,normal:[1,0,0]}};
+const solidBlock=prepareRecipe(THREE,wasm,{...faceBlock,negative:[]}).bodies[0];
+for(const seat of [topSeat,sideSeat]){
+ const prepared=prepareRecipe(THREE,wasm,{...faceBlock,negative:[seat]});
+ assert.equal(prepared.bodies.length,1);
+ assert(solidBlock.volume-prepared.bodies[0].volume>1000);
+ const mesh=prepared.bodies[0].mesh,p=mesh.vertProperties,n=mesh.numProp;
+ const [x,,z]=seat.position,{y,normal}=seat.surface;
+ const points=Array.from({length:p.length/n},(_,i)=>new THREE.Vector3(...p.subarray(i*n,i*n+3)));
+ assert(points.some(point=>{
+  const delta=point.clone().sub(new THREE.Vector3(x,y,z));
+  const depth=-delta.dot(new THREE.Vector3(...normal));
+  return depth>20&&depth<23&&delta.length()<24;
+ }),'The dome is cut inward from the installation face');
+ assert(exportMaterialBodies(prepared).threeMF.length>100);
+}
+assert.throws(()=>prepareRecipe(THREE,wasm,{...faceBlock,negative:[{...topSeat,surface:{y:10,normal:[0,1,0]}}]}),
+ /obstructed insertion opening/);
