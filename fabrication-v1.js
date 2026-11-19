@@ -693,7 +693,7 @@ export function encodeSTL(geometry){
 }
 // A real stepped pixel-body and flange fitting coupon. Each of five pockets
 // uses the EXACT socket cutter from the full build, not a plain round hole.
-export function makePixelSeatCoupon(wasm,s,{openWireExits=true,single=false}={}){
+export function makePixelSeatCoupon(wasm,s,{openWireExits=true,single=false,trackWidthMm}={}){
  const profile=resolvePixelProfile(s),keep=[],hold=m=>{keep.push(m);return m};
  const spec=single?{fits:[profile.clearance],captions:[],diameters:[profile.boreDiameter]}:calibrationSpec(s,'stepped');
  const labels=spec.captions,pitch=Math.max(32,profile.maxDiameter+20),
@@ -709,8 +709,8 @@ export function makePixelSeatCoupon(wasm,s,{openWireExits=true,single=false}={})
    // On a FULL profile sample, wiring must reach both external side walls.
    // Extend the underside cut a full mm beyond each edge. The same
    // measured F/G relief still determines the groove's width and depth.
-   if(openWireExits&&adjusted.wireWidth>.1&&adjusted.wireDepth>.1){
-    const laneWidth=Math.max(.8,adjusted.wireWidth+adjusted.clearance);
+   if(openWireExits&&(trackWidthMm!=null||adjusted.wireWidth>.1)&&adjusted.wireDepth>.1){
+    const laneWidth=trackWidthMm??Math.max(.8,adjusted.wireWidth+adjusted.clearance);
     const laneDepth=Math.min(adjusted.wireDepth,Math.max(.2,roof-2.8));
     wireExits.push(hold(wasm.Manifold.cube([laneWidth,laneDepth+.6,width+2])
       .translate([centreX-laneWidth/2,-.5,-1])));

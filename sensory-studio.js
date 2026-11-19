@@ -1179,17 +1179,27 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const length=document.querySelector('[data-state="pixelStringSpacing"]');
   const channels=document.querySelector('[data-state="wireChannels"]');
   const arrows=document.querySelector('[data-state="wireDirectionArrows"]');
-  if(!length||!channels||!arrows)return;
+  const width=document.querySelector('[data-state="wireWidth"]');
+  if(!length||!channels||!arrows||!width)return;
   const field=document.createElement('fieldset');
   field.innerHTML='<legend>Wire routing and cable lengths</legend>'+
    '<label>Available pixel-to-pixel cable length<select data-build-wire-pitch>'+
    '<option value="25">25 mm</option><option value="50">50 mm</option><option value="100">100 mm</option><option value="custom">Custom</option></select></label>'+
    '<label data-build-wire-custom-row>Custom length (mm)<input data-build-wire-custom type="number" min="5" max="1000" step="1"></label>'+
+   '<label>Wire-track width (mm)<input data-build-wire-width type="number" min="1.5" max="9" step=".25" required></label>'+
    '<label><input data-build-wire-channels type="checkbox"> Cut underside wiring channels</label>'+
    '<label><input data-build-wire-arrows type="checkbox"> Show direction arrows</label>'+
    '<div class="sms-actions"><button type="button" data-build-wire-snap>Snap pixels to cable length</button>'+
    '<button type="button" data-build-wire-reverse>Reverse pixel order</button></div>'+
    '<p>Ordered P1 → Pn; opposite 180° IN/OUT. The real curved cable length is checked and overlength routes show red. Thin or blocked paths are refused by Prepare.</p>';
+  const trackWidth=field.querySelector('[data-build-wire-width]');
+  trackWidth.value=width.value;
+  trackWidth.onchange=()=>{
+   if(!trackWidth.checkValidity()){trackWidth.reportValidity();trackWidth.value=width.value;return;}
+   width.value=trackWidth.value;
+   width.dispatchEvent(new Event('input',{bubbles:true}));
+   trackWidth.value=width.value;
+  };
   const pitch=field.querySelector('[data-build-wire-pitch]');
   const custom=field.querySelector('[data-build-wire-custom]');
   const chosen=Number(length.value);

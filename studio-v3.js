@@ -1675,7 +1675,8 @@ if(studioBootstrap&&!new URLSearchParams(location.search).has('legacy'))studioBr
   const pixel=hardwareUI.getSelectedPixel();
   if(!pixel)throw Error('Select a Crystal pixel first.');
   const profile=resolveSocketProfile(s,pixel);
-  const coupon=makePixelSeatCoupon(await loadManifold(),{...s,pixelProfileId:profile.id,pixelDiameter:profile.bodyDiameter});
+  const coupon=makePixelSeatCoupon(await loadManifold(),{...s,pixelProfileId:profile.id,pixelDiameter:profile.bodyDiameter},
+   {trackWidthMm:Math.max(1.5,Math.min(9,Number(s.wireWidth)||3))});
   try{
    const save=format==='3mf'?save3MF:saveSTL;
    save(coupon.geometry,'pixel-fit-crystal-p'+(pixel.index+1)+'.'+format);
