@@ -170,3 +170,52 @@ for(const id of ['knob','selector']){
  console.log('WT-006 bore: fabricable calibrated radius, strict void/mount/web rejection and dual material exports.');
 }
 
+
+const checked=(id,x,z=0,rotation=0)=>({id,x,z,rotation,checked:true,diameter:5,clearance:.3,profileId:'seed'});
+const serial={version:1,enabled:true,pitch:50,tail:200};
+const tileRoute=tileGenerator.recipe({pattern:'terraces',width:84,depth:76,thickness:5});
+const gearRoute=gearGenerator.recipe({mode:'Decorative',wheelStyle:'Rounded lobes',webStyle:'Solid',bore:0,diameter:100,teeth:12,thickness:8});
+for(const [recipe,family] of [[tileRoute,tileGenerator],[gearRoute,gearGenerator]]){
+ for(const count of [1,2,3]){
+  const pixelHoles=Array.from({length:count},(_,i)=>checked('led-'+i,.37+(i-(count-1)/2)*25,1.23));
+  const build={pixelHoles,pixelBuilderVersion:1};
+  const bored=prepareRecipe(THREE,wasm,applyBuildModules(recipe,build,family.capabilities));
+  const routedRecipe=applyBuildModules(recipe,{...build,serialRouting:{...serial,pitch:25}},family.capabilities);
+  assert.equal(routedRecipe.nativeRouting.links.length,count+1);
+  assert.match(routedRecipe.nativeRouting.links[0].label,/EDGE IN/);
+  assert.match(routedRecipe.nativeRouting.links.at(-1).label,/EDGE OUT/);
+  const routed=prepareRecipe(THREE,wasm,routedRecipe);
+  assert(bored.bodies[0].volume-routed.bodies[0].volume>100);
+  const mesh=routed.bodies[0].mesh;
+  const vertices=mesh.vertProperties||mesh.points,stride=mesh.numProp||3;
+  const ceilingVertices=[];
+  for(let i=0;i<vertices.length;i+=stride)if(Math.abs(vertices[i+1]-1.8)<1e-4)ceilingVertices.push(vertices[i]);
+  assert(Math.min(...ceilingVertices)<-30&&Math.max(...ceilingVertices)>30,'Channel ceiling reaches both external sides.');
+  console.log('WT-012 routed export:',family.typeId,count);
+  const output=exportMaterialBodies(routed,{name:family.typeId+'-routed'});
+  assert.equal(output.stls.length,1);assert(output.threeMF.length>100);
+ }
+}
+const curveBuild={pixelHoles:[checked('left',-15),checked('right',15,2)],pixelBuilderVersion:1,serialRouting:serial};
+const curvePlan=applyBuildModules(tileRoute,curveBuild).nativeRouting;
+assert(curvePlan.links[1].path.length>2);
+const shortTail=applyBuildModules(tileRoute,{...curveBuild,serialRouting:{...serial,inTail:5,outTail:100}}, {},{preview:true}).nativeRouting;
+assert.match(shortTail.links[0].reason,/Cable budget/);assert.equal(shortTail.links.at(-1).reason,'');
+assert(curvePlan.links[1].measure>Math.hypot(30,2));
+assert.throws(()=>applyBuildModules(tileRoute,{...curveBuild,serialRouting:{...serial,pitch:25}}),/Cable budget exceeded/);
+assert.throws(()=>applyBuildModules(tileRoute,{...curveBuild,pixelHoles:[...curveBuild.pixelHoles].reverse()}),/tangent-compatible/);
+assert.throws(()=>applyBuildModules(tileGenerator.recipe({thickness:2}),curveBuild),/3.8 mm/);
+assert.throws(()=>applyBuildModules(gearGenerator.recipe(turbine),{serialRouting:serial}),/solid decorative/);
+assert.throws(()=>applyBuildModules(pebbleGenerator.recipe(river.parameters),{serialRouting:serial}),/Only solid/);
+assert.throws(()=>applyBuildModules(gearRoute,{...curveBuild,mounting:true}),/mounting cuts/);
+const curved=prepareRecipe(THREE,wasm,applyBuildModules(tileRoute,curveBuild));
+assert.equal(curved.report.nativeRouting.channels.length,3);
+assert(exportMaterialBodies(curved).threeMF.length>100);
+for(const [family,ids,baseline] of [[tileGenerator,['terraces','quilt'],'grass'],[gearGenerator,['forked-sun','forked-rotor'],'turbine'],[pebbleGenerator,['beacon-tall','beacon-low'],'lantern']]){
+ const volumes=[baseline,...ids].map(id=>{
+  const preset=family.presets.find(item=>item.id===id);
+  return Math.round(prepareRecipe(THREE,wasm,family.recipe(preset.parameters)).bodies[0].volume);
+ });
+ assert.equal(new Set(volumes).size,3);
+}
+console.log('WT-012 catalogue and native serial channel fabrication passed.');

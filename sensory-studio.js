@@ -239,8 +239,8 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(!c?.group||c.fingerprint!==fingerprint){
    if(c?.group&&c.group.parent)c.view={camera:camera.position.toArray(),target:orbit.target.toArray()};
    if(c?.group)disposeGroup(c.group);
-   const recipe=applyBuildModules(generator.recipe(model.parameters),model.build,generator.capabilities);
-   const group=previewRecipe(THREE,recipe,[model.materials.primary?.colour||0x88bbff,model.materials.secondary?.colour||0xffcf70]);previewBuilds++;c={kind:'generic',group,fingerprint,view:c?.view};cache.set(model.id,c);
+   const recipe=applyBuildModules(generator.recipe(model.parameters),model.build,generator.capabilities,{preview:true});
+   const group=previewRecipe(THREE,recipe,[model.materials.primary?.colour||0x88bbff,model.materials.secondary?.colour||0xffcf70]);previewBuilds++;c={kind:'generic',group,fingerprint,view:c?.view,routing:recipe.nativeRouting};cache.set(model.id,c);
    model.thumbnail=thumbnail(group);
   }
   scene.add(c.group);
@@ -281,7 +281,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  function recipeThumbnail(generator,parameters,build={},colours){
   let group;
   try{
-   group=previewRecipe(THREE,applyBuildModules(generator.recipe(parameters),build,generator.capabilities),colours);
+   group=previewRecipe(THREE,applyBuildModules(generator.recipe(parameters),build,generator.capabilities,{preview:true}),colours);
    return thumbnail(group);
   }catch{return null;}
   finally{if(group)disposeGroup(group);}
@@ -365,6 +365,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(remaining.size)output.push(details('Fine adjustments','Adjust the seed or other generator settings.',[...remaining].map(field=>control(field,model.parameters)).join('')));
   return (family?control(family,model.parameters):'')+output.join('');
  }
+ const hiddenNativeRoutes=new Set();
  const selectedPixels=new Map(),pixelMessages=new Map(),pixelProfileChoices=new Map();
  let placementModel=null,pixelGesture=null,pendingDuplicate=null;
  const pixelHoles=model=>stablePixels(model.build.pixelHoles||[]);
@@ -375,6 +376,8 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  function refreshPixelMarkers(model){
   if(model.generator.typeId==='crystals')return;
+  for(const guide of cache.get(model.id)?.group?.children||[])if(guide.userData.nativeRoute)
+   guide.visible=stage==='build'&&!hiddenNativeRoutes.has(model.id);
   for(const marker of pixelMarkers(model)){
    marker.visible=stage==='build';
    marker.material.color.setHex(marker.userData.pixelId===selectedPixels.get(model.id)?0x48e4f1:0xffbe47);
@@ -389,7 +392,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  function pixelSource(model){
   const family=registry.get(model.generator.typeId);
-  return applyBuildModules(family.recipe(model.parameters),{...model.build,pixelHoles:[]},family.capabilities);
+  return applyBuildModules(family.recipe(model.parameters),{...model.build,pixelHoles:[],serialRouting:null},family.capabilities,{preview:true});
  }
  function pixelIssue(model,hole,others,recipe){
   try{return checkedPixelBore(recipe||pixelSource(model),hole,others);}catch(error){return error.message;}
@@ -590,12 +593,60 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   renderPalette();
   if(key)shell?.palette.querySelector('[data-crystal-pixel-key="'+key+'"]')?.focus({preventScroll:true});
  });
+ function appendNativeRouting(root,model){
+  const plan=cache.get(model.id)?.routing;
+  if(!plan)return;
+  const block=document.createElement('fieldset');
+  block.innerHTML='<legend>Serial LED string</legend>';
+  root.prepend(block);
+  const settings={version:1,enabled:false,pitch:50,inTail:200,outTail:200,...model.build.serialRouting};
+  const disabled=model.link?' disabled':'';
+  const change=fields=>{
+   if(commit({build:{...model.build,serialRouting:{...settings,...fields}}}))redrawPixelEditor();
+  };
+  const note=document.createElement('p');
+  note.setAttribute('role','status');
+  note.textContent=plan.reason?(!settings.enabled?'Bore-only — '+plan.reason:plan.reason):settings.enabled?'Channels ready for preparation.':'Opt in to cut 3.2 mm wide, 1.8 mm deep underside channels.';
+  block.append(note);
+  block.insertAdjacentHTML('beforeend','<label><input type="checkbox" data-native-route'+(settings.enabled?' checked':'')+
+   (model.link||(!settings.enabled&&plan.reason)?' disabled':'')+'> Cut serial channels</label>');
+  block.querySelector('[data-native-route]').onchange=e=>change({enabled:e.target.checked});
+  if(!settings.enabled)return;
+  block.insertAdjacentHTML('beforeend','<label>Physical pixel pitch<select data-native-pitch'+disabled+
+   '><option value="25">25 mm</option><option value="50">50 mm</option><option value="100">100 mm</option><option value="custom">Custom</option></select></label>'+
+   '<label>IN tail limit (mm)<input data-native-in-tail type="number" min="5" max="250" value="'+esc(settings.inTail)+'"'+disabled+'></label>'+
+   '<label>OUT tail limit (mm)<input data-native-out-tail type="number" min="5" max="250" value="'+esc(settings.outTail)+'"'+disabled+'></label>'+
+   '<label><input data-native-preview type="checkbox"'+(hiddenNativeRoutes.has(model.id)?'':' checked')+'> Show routes and arrows</label>');
+  const pitch=block.querySelector('[data-native-pitch]');
+  pitch.value=settings.customPitch||![25,50,100].includes(settings.pitch)?'custom':settings.pitch;
+  pitch.onchange=()=>change(pitch.value==='custom'?{customPitch:true}:{pitch:Number(pitch.value),customPitch:false});
+  const bindNumber=(input,key)=>input.onchange=()=>{
+   if(!input.value||!input.checkValidity()){input.reportValidity();input.value=settings[key];return;}
+   change({[key]:input.valueAsNumber});
+  };
+  bindNumber(block.querySelector('[data-native-in-tail]'),'inTail');
+  bindNumber(block.querySelector('[data-native-out-tail]'),'outTail');
+  if(pitch.value==='custom'){
+   pitch.parentElement.insertAdjacentHTML('afterend','<label>Custom pitch (mm)<input data-native-custom type="number" min="5" max="250" value="'+esc(settings.pitch)+'"'+disabled+'></label>');
+   bindNumber(block.querySelector('[data-native-custom]'),'pitch');
+  }
+  block.querySelector('[data-native-preview]').onchange=e=>{
+   if(e.target.checked)hiddenNativeRoutes.delete(model.id);else hiddenNativeRoutes.add(model.id);
+   refreshPixelMarkers(model);
+  };
+  for(const link of plan.links){
+   const line=document.createElement('p');
+   line.textContent=link.label+(Number.isFinite(link.measure)?' · '+link.measure.toFixed(1)+' / '+link.budget+' mm':'')+(link.reason?' · '+link.reason:'');
+   if(link.reason)line.className='sms-error';
+   block.append(line);
+  }
+ }
  function renderPixelPalette(root,model){
   const holes=pixelHoles(model),profiles=fittingProfiles(),selected=holes.findIndex(hole=>hole.id===selectedPixels.get(model.id));
   const disabled=model.link?' disabled':'',noAdd=holes.length>=16?' disabled':disabled;
   const hole=holes[selected]||newPixel(chosenProfile(model));
   const fit=resolvePixelFitting(hole,adapter.pixelFitProfiles());
-  root.innerHTML='<p>Bores supported on verified solid regions. Routed cable tracks are available in Crystal Build.</p>'+
+  root.innerHTML='<p>Bores are available on verified solid regions.</p>'+
    '<div class="sms-actions" aria-label="Hardware library">'+profiles.map(profile=>
     '<button type="button" data-fit-profile="'+esc(profile.id)+'" aria-pressed="'+(chosenProfile(model)?.id===profile.id)+'"'+disabled+
     '>◉ '+esc(profile.name)+' · '+profile.bodyDiameter+' mm</button>').join('')+'</div>'+
@@ -661,6 +712,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    }catch(error){pixelStatus(model,error.message);}
   };
   bindPixelEditor(root,model,holes,profiles);
+  appendNativeRouting(root,model);
  }
  async function downloadPixelCoupon(model,hole,options,button){
   button.disabled=true;
@@ -857,7 +909,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     ...(['Goat','Sheep','Boat'].includes(parameters.character)?['silhouettePose']:[]),'outlineRoundness','reliefFinish',
     ...(parameters.reliefFinish!=='Plain'?['reliefRise']:[])]:[])];
    const keys=({gears:gearKeys,'control-caps':controlKeys,characters:characterKeys}[family.typeId]?.()||family.visualFields)||{
-    'tactile-tiles':['pattern','width','height','relief'],
+    'tactile-tiles':['pattern','width','depth','relief','density','orientation'],
     waves:['flowStyle','amplitude','frequency','width'],
     'control-caps':['diameter','height','gripDepth'],
     characters:['character','width','depth'],
@@ -956,7 +1008,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const model=active();if(model.link){$('smsModelError').textContent='Make an independent variant before editing.';return;}
   const old=copy(model);try{
    const generator=registry.get(model.generator.typeId),candidate={...model,...changes};
-   if(candidate.generator.typeId!=='crystals')applyBuildModules(generator.recipe(candidate.parameters),candidate.build,generator.capabilities);
+   if(candidate.generator.typeId!=='crystals')applyBuildModules(generator.recipe(candidate.parameters),candidate.build,generator.capabilities,{preview:true});
    if(history){let h=histories.get(model.id);if(!h){h={items:[{parameters:old.parameters,build:old.build}],index:0};histories.set(model.id,h);}h.items.splice(h.index+1);h.items.push({parameters:copy(candidate.parameters),build:copy(candidate.build)});h.index=h.items.length-1;}
    editModel(project,model.id,changes);showGeneric(model);renderTabs();save();if($('smsModelError'))$('smsModelError').textContent='Updated. Prepare again before exporting.';
    return true;
@@ -1276,7 +1328,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     schemaVersion:1,modelId:model.id,modelName:model.name,generatorType:model.generator.typeId,
     modelRevision:model.revision,jobId:job.id,preparedRevision:job.preparedRevision,
     printer:settings.printer,nozzleMm:settings.curaNozzle,material:settings.curaMaterial,quality:settings.curaQuality,
-    curaProfile,files:[...entries.map(([name])=>name),'READ-ME.txt',manifestName]
+    curaProfile,...(result.report.nativeRouting?{routing:result.report.nativeRouting}:{}),files:[...entries.map(([name])=>name),'READ-ME.txt',manifestName]
    };
    const instructions=[
     'Model: '+model.name,'Revision: '+model.revision,'Job ID: '+job.id,

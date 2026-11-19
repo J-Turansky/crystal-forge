@@ -2,7 +2,7 @@
  * Coordinates are millimetres, Y-up. Conversion to slicer Z-up belongs to export.
  * Returned triangles are preview/source geometry until Manifold preparation.
  */
-export const tilePatterns = ['grass', 'wool', 'river', 'mineral', 'rain', 'dots', 'basket', 'pebbles', 'scales'];
+export const tilePatterns = ['grass', 'wool', 'river', 'mineral', 'rain', 'dots', 'basket', 'pebbles', 'scales', 'terraces', 'quilt'];
 export const tileOutlines = ['square', 'rounded', 'circle', 'hexagon'];
 const defaults = {width: 80, depth: 80, thickness: 4, cornerRadius: 8,
  outline: 'rounded', pattern: 'grass', relief: 3, density: 5,
@@ -69,6 +69,15 @@ function reliefAt(p, x, z, fraction) {
  if (p.pattern === 'scales') {
   const arc=Math.cos(u+jitter)*.85;
   h=Math.pow(.5+.5*Math.cos(v+arc),3)*(.8+.2*Math.cos(u));
+ }
+ if(p.pattern==='terraces'){
+  const contour=Math.hypot(u*.9+Math.sin(v*.8)*.7,v*.62)+Math.sin(v*.6+phase)*.35;
+  const band=Math.max(0,contour)/2.3,step=Math.floor(band);
+  h=.18+.74*(.5+.5*Math.cos((step+smooth((band-step-.56)/.44))*.91));
+ }
+ if(p.pattern==='quilt'){
+  const xCell=.5+.5*Math.cos(u),zCell=.5+.5*Math.cos(v);
+  h=Math.pow(xCell*zCell,.58)*(.82+.18*Math.cos((u+v)*.5+phase));
  }
  // Raised border transition is continuous and never vanishes to a zero-height
  // secondary shell. It is a full connected contrasting top, not floating islands.
@@ -154,7 +163,7 @@ export const tactileTileGenerator = Object.freeze({
   key,type:'number',min,max,default:defaults[key],
   unit:['width','depth','thickness','cornerRadius','relief','border'].includes(key)?'mm':key==='orientation'?'degrees':''
  }))]),
- presets:Object.freeze(tilePatterns.map(pattern=>Object.freeze({id:pattern,name:pattern,parameters:{...defaults,pattern}}))),
+ presets:Object.freeze(tilePatterns.map(pattern=>Object.freeze({id:pattern,name:pattern==='terraces'?'Contour terrace plate':pattern==='quilt'?'Padded quilt cells':pattern,parameters:{...defaults,pattern,...(pattern==='terraces'?{density:4,relief:5,thickness:5}:pattern==='quilt'?{density:7,relief:5,thickness:5}:{})}}))),
  validateParameters:validateTileParameters, generatePreview:generateTile,
  generateManufacturingGeometry:prepareTile,
  estimateBounds:input=>{const {valid,errors,parameters:p}=validateTileParameters(input);

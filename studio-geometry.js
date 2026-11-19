@@ -89,6 +89,18 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
    tag.userData.previewOnly=true;tag.userData.pixelLabel=hole.pixelId;group.add(tag);
   }
  }
+ for(const link of recipe.nativeRouting?.links||[]){
+  if(link.path.length<2)continue;
+  const points=[],point=p=>new THREE.Vector3(p.x,.15,p.z);
+  for(let i=1;i<link.path.length;i++)points.push(point(link.path[i-1]),point(link.path[i]));
+  const k=Math.floor((link.path.length-1)/2),a=point(link.path[k]),b=point(link.path[k+1]);
+  const d=b.clone().sub(a).normalize(),tip=a.clone().lerp(b,.63),back=tip.clone().addScaledVector(d,-2.5);
+  const across=new THREE.Vector3(-d.z,0,d.x);
+  points.push(tip,back.clone().addScaledVector(across,1.2),tip,back.clone().addScaledVector(across,-1.2));
+  const guide=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(points),
+   new THREE.LineBasicMaterial({color:link.reason?0xff3155:0x00d5c8,depthTest:false}));
+  guide.renderOrder=6;guide.visible=false;guide.userData.nativeRoute=true;guide.userData.previewOnly=true;group.add(guide);
+ }
  return group;
 }
 export function disposeGroup(group){group.traverse(node=>{if(node.userData.pixelLabel)node.material?.map?.dispose();if(!node.isSprite)node.geometry?.dispose();if(Array.isArray(node.material))node.material.forEach(m=>m.dispose());else node.material?.dispose();});group.removeFromParent();}
@@ -121,11 +133,48 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
  try{
   onProgress('Joining physical bodies');let total=union(recipe.positive);
   if(recipe.secondary?.length&&!recipe.partitioned)total=hold(total.add(union(recipe.secondary)));
-  for(const part of recipe.negative||[]){
+  if(recipe.nativeRouting?.ready){
+   onProgress('Cutting serial LED channels');
+   // Collapse Boolean slivers below the precision of a printable channel.
+   // STL still checks every exported triangle after this bounded simplification.
+   const tolerance=.0001,cuts=[];
+   total=hold(total.setTolerance(tolerance));
+   for(const part of recipe.negative){
+    const cut=hold(convert(part).setTolerance(tolerance));
+    if(hold(total.intersect(cut)).volume()<.1)
+     throw Error((part.pixelHole||part.wireChannel||'Cut')+' does not cut the model.');
+    cuts.push(cut);
+   }
+   const originalVolume=total.volume();
+   const routed=hold(total.subtract(hold(wasm.Manifold.union(cuts))));
+   total=hold(hold(routed.asOriginal()).simplify(tolerance));
+   const validTriangles=mesh=>{
+    const p=mesh.vertProperties,t=mesh.triVerts,stride=mesh.numProp;
+    for(let i=0;i<t.length;i+=3){
+     const a=t[i]*stride,b=t[i+1]*stride,c=t[i+2]*stride;
+     const u=[p[b]-p[a],p[b+1]-p[a+1],p[b+2]-p[a+2]];
+     const v=[p[c]-p[a],p[c+1]-p[a+1],p[c+2]-p[a+2]];
+     const twiceArea=Math.hypot(u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]);
+     if(!Number.isFinite(twiceArea)||twiceArea<1e-12)return false;
+    }
+    return true;
+   };
+   const mesh=total.getMesh();
+   if(!validTriangles(mesh)){
+    // Round-trip through the exact float precision used by STL/3MF as a solid.
+    // Keep the repair only if it preserves volume and gives valid triangles.
+    const rebuilt=hold(new wasm.Manifold(mesh));
+    const repaired=hold(hold(rebuilt.asOriginal()).simplify(tolerance));
+    if(repaired.status()!=='NoError'||repaired.isEmpty()||Math.abs(repaired.volume()-total.volume())>.01||!validTriangles(repaired.getMesh()))
+     throw Error('The routed mesh cannot be exported at STL precision. Move a fitting slightly or change rotation and prepare again.');
+    total=repaired;
+   }
+   if(originalVolume-total.volume()<.1)throw Error('Serial channels did not remove material.');
+  }else for(const part of recipe.negative||[]){
    const before=total;
    total=hold(total.subtract(convert(part)));
-   if(part.pixelHole&&before.volume()-total.volume()<.1)
-    throw Error(part.pixelHole+' does not cut the model. Move it onto solid material in Build.');
+   if((part.pixelHole||part.wireChannel)&&before.volume()-total.volume()<.1)
+    throw Error((part.pixelHole||part.wireChannel)+' does not cut the model. Move it onto solid material in Build.');
   }
   if(total.status()!=='NoError'||total.isEmpty()||total.volume()<=0)throw Error('Manufacturing produced no valid material.');
   let regions=[{role:'primary',solid:total}];
@@ -148,7 +197,7 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
    return {role,volume:solid.volume(),mesh:solid.getMesh()};
   });
   if(regions.length===2){const overlap=hold(regions[0].solid.intersect(regions[1].solid));if(overlap.volume()>1e-4)throw Error('Material regions overlap.');}
-  return {report:{ready:true,engine:'Manifold',coordinateFrame:'Y-up',warnings:recipe.warnings||[]},bodies};
+  return {report:{ready:true,engine:'Manifold',coordinateFrame:'Y-up',warnings:recipe.warnings||[],...(recipe.nativeRouting?.ready?{nativeRouting:{mode:'serial',channels:recipe.nativeRouting.links.map(({label,measure,budget})=>({label,lengthMm:measure,limitMm:budget}))}}:{})},bodies};
  }finally{owned.reverse().forEach(solid=>solid.delete());}
 }
 export function circle(radius,segments=64,cx=0,cz=0){return Array.from({length:segments},(_,i)=>[cx+radius*Math.cos(i/segments*Math.PI*2),cz+radius*Math.sin(i/segments*Math.PI*2)]);}

@@ -1,3 +1,7 @@
+## WT-012 · Creative catalogue and native serial routing
+
+The draft adds four geometric mechanisms across Tiles, Gears and Pods. Serial cuts support certified solid Tiles and decorative Gears. Pod routing, physical fit and optical validation remain separate. WT-011 modular splitting stays on hold.
+
 ## WT-006 interactive Build
 
 Verified native through bores and contextual fitting edits extend the existing Crystal Build workflow. Generic cable tracks and optical validation require shape-specific clearance and physical testing. Later SVG integration follows independent WT-003 review.
