@@ -1100,6 +1100,7 @@ $('savePixelProfileBtn').onclick=()=>{
  try{localStorage.setItem(pixelLibraryKey,JSON.stringify(s.pixelProfiles))}
  catch(e){console.warn('Pixel library not writable',e)}
  closePixelEditor();syncForm();rebuild();snapshot();
+ document.dispatchEvent(new CustomEvent('studio-pixel-profile-saved',{detail:{profileId:p.id}}));
  setStatus('Custom pixel profile saved: '+p.name+'. Prepare print mesh again.');
 };
 $('deletePixelProfileBtn').onclick=()=>{
