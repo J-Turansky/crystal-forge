@@ -838,11 +838,11 @@ try{
   for(const [view,direction] of [['iso',[1,.75,1]],['front',[0,.12,1]],['back',[0,.12,-1]],['bottom',[0,-1,.0001]],['top',[0,1,.0001]]]){
    await page.locator('[data-view='+view+']').click();
    await page.waitForFunction(direction=>{
-    const {modelSize,center,target,camera,screen}=window.__crystalForgeViewMetrics();
+    const {settled,modelSize,center,target,camera,screen}=window.__crystalForgeViewMetrics();
     const offset=camera.map((value,i)=>value-target[i]);
     const dot=offset.reduce((sum,value,i)=>sum+value*direction[i],0);
     const aligned=dot/(Math.hypot(...offset)*Math.hypot(...direction))>.999;
-    return aligned&&modelSize.every(size=>size>0)&&Math.abs(screen[0])<.02&&Math.abs(screen[1])<.02&&
+    return settled&&aligned&&modelSize.every(size=>size>0)&&Math.abs(screen[0])<.02&&Math.abs(screen[1])<.02&&
      Math.hypot(...center.map((value,i)=>value-target[i]))<.1;
    },direction);
   }
@@ -1025,17 +1025,29 @@ try{
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
  assert(await page.locator('.sms-palette').getByRole('button',{name:'M1',exact:true}).isVisible());
  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.backingTabs),savedTabs);
+ const dimensions=page.locator('#smsModelDimensions');
+ await dimensions.filter({hasText:'Design preview'}).waitFor();
  await page.getByRole('button',{name:'Render actual model',exact:true}).click();
  const tabInspection=page.locator('#smsLightInspector');
  await tabInspection.getByText('Prepared manufacturing mesh').waitFor({timeout:120000});
  assert.equal(await tabInspection.getByLabel('Cut section').isChecked(),false);
+ await dimensions.filter({hasText:'Prepared'}).waitFor();
+ const displayedDimensions=(await dimensions.textContent()).match(/\d+\.\d+/g).map(Number);
+ assert.equal(displayedDimensions.length,3);
  await tabInspection.getByRole('button',{name:'Close inspection'}).click();
  await page.locator('.sms-workspace-nav [data-tab=print]').click();
  const tabJob=page.locator('#smsJobs article');
  await tabJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
  const tabSTL=await useDownload(tabJob.locator('[data-job-stl]'));
  assert.match(tabSTL.name,/\.stl$/);
- assert(tabSTL.bytes.readUInt32LE(80)>0);
+ const facetCount=tabSTL.bytes.readUInt32LE(80);
+ assert(facetCount>0);
+ const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
+ for(let facet=0;facet<facetCount;facet++)for(let vertex=0;vertex<3;vertex++)for(let axis=0;axis<3;axis++){
+  const value=tabSTL.bytes.readFloatLE(84+facet*50+12+vertex*12+axis*4);
+  min[axis]=Math.min(min[axis],value);max[axis]=Math.max(max[axis],value);
+ }
+ assert.deepEqual(displayedDimensions,max.map((value,i)=>Number((value-min[i]).toFixed(1))));
  assert(zipEntries((await useDownload(tabJob.locator('[data-job-3mf]'))).bytes).has('3D/3dmodel.model'));
 
 

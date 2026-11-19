@@ -76,3 +76,19 @@ Compatible backing can use editable IN/OUT perimeter percentages or automatic ex
 ## WT-021 prepared mesh inspection
 
 Build can open the actual prepared manufacturing mesh for each family through the existing shared inspector. A whole-mesh view and cut section use the same prepared result as Print Centre. The Tile browser path renders, returns to Print Centre and exports both formats. Complete seven-family acceptance and physical prints remain separate under #79 and #10.
+
+## WT-021 selected-face and dimensions review
+
+This draft extends the six recipe builders' measured socket cutter to an oriented installation frame. The Manifold fixture covers a top socket, a side socket and refusal at an obstructed opening. It uses a controlled stock block; the fixture does not demonstrate compatible stock on every family or side-face access in the editor. The existing physical wire cutter still requires flat underside backing. Crystal retains its existing underside cutter.
+
+| Family | Selected-face shaped stock | Physical route | Combined browser and export acceptance |
+| --- | --- | --- | --- |
+| Crystal Clusters | L, existing underside | L, existing Crystal routing and fabrication regressions | L, combined custom profile and off-underside acceptance outstanding |
+| Tactile Tiles | L, shared oriented cutter | L, verified underside stock | L, preview, tab and STL workflow exercised; combined off-underside workflow outstanding |
+| Gears | L, shared oriented cutter; webs and cavities may block | L, solid underside stock only | L, placement and routed fabrication exercised separately |
+| Waves | L, shared oriented cutter | L, compatible underside stock | L, placement and routed fabrication exercised separately |
+| Control Caps | L, shared oriented cutter; avoid shaft cavities | L, requires compatible stationary backing | L, placement and routed fabrication exercised separately |
+| Characters | L, shared oriented cutter | L, requires compatible stationary backing | L, placement and routed fabrication exercised separately |
+| Pebbles / Light Pods | L, shared oriented cutter; illuminated cavities may block | L, compatible solid backing only | L, placement and routed fabrication exercised separately |
+
+Design and prepared dimensions are shown in the exported X × Y × Z orientation. The Chromium Tile case independently reads binary STL vertices and checks the prepared dimensions. Geometry validation and installed Cura resource checks do not verify physical fit, bridge strength or Cura UI import. Track those physical activities in #10 and the remaining software under #79.

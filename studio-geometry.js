@@ -76,6 +76,8 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
   ring.userData.pixelId=hole.pixelId;
   const angle=hole.pixelRotation*Math.PI/180;
   const direction=new THREE.Vector3(Math.cos(angle),0,Math.sin(angle));
+  if(hole.surface)direction.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(
+   new THREE.Vector3(0,1,0),new THREE.Vector3(...hole.surface.normal).negate()));
   for(const sign of [-1,1]){
    const port=new THREE.ArrowHelper(direction.clone().multiplyScalar(sign),ring.position.clone(),hole.radius+2,sign<0?0x37bbeb:0xffe17c,1.2,.8);
    port.renderOrder=5;port.userData.previewOnly=true;port.userData.pixelPort=hole.pixelId;group.add(port);
@@ -128,12 +130,21 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
 export function disposeGroup(group){group.traverse(node=>{if(node.userData.pixelLabel||node.userData.mountLabel)node.material?.map?.dispose();if(!node.isSprite)node.geometry?.dispose();if(Array.isArray(node.material))node.material.forEach(m=>m.dispose());else node.material?.dispose();});group.removeFromParent();}
 export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
  const owned=[];const hold=solid=>(owned.push(solid),solid);
+ const positionSeat=(solid,seat,rotation=0)=>{
+  const [x,,z]=seat.position;
+  const turned=rotation?hold(solid.rotate([0,rotation,0])):solid;
+  if(!seat.surface)return hold(turned.translate([x,0,z]));
+  const inward=new THREE.Vector3(...seat.surface.normal).negate();
+  const frame=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),inward);
+  const angles=new THREE.Euler().setFromQuaternion(frame,'ZYX').toArray().slice(0,3);
+  return hold(hold(turned.rotate(angles.map(angle=>angle*180/Math.PI))).translate([x,seat.surface.y,z]));
+ };
  const convert=part=>{
   if(part.kind==='pixel-seat'){
-   const {profile}=part,[x,,z]=part.position;
+   const {profile}=part;
    const bore=putSocket(wasm,hold,{x:0,z:0},part.radius,profile.bodyHeight+3,-3,profile,
     {includeLocalWireRelief:part.includeLocalWireRelief});
-   return hold(hold(bore.solid.rotate([0,90-part.pixelRotation,0])).translate([x,0,z]));
+   return positionSeat(bore.solid,part,90-part.pixelRotation);
   }
   if(part.kind==='extrude'){
    // Fabricate from the planar contours rather than welding the display triangulation.
@@ -163,12 +174,19 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
   if(recipe.secondary?.length&&!recipe.partitioned)total=hold(total.add(union(recipe.secondary)));
   const seats=(recipe.negative||[]).filter(part=>part.kind==='pixel-seat');
   for(const seat of seats){
-   const [x,,z]=seat.position,{profile}=seat,stockHeight=profile.bodyHeight+2.8;
+   const {profile}=seat,stockHeight=profile.bodyHeight+2.8;
    const stockRadius=Math.max(profile.maxDiameter/2+1,seat.includeLocalWireRelief?profile.boreDiameter*.675+4.8:0);
    const stock=hold(wasm.Manifold.cylinder(stockHeight,stockRadius,stockRadius,32));
-   const envelope=hold(hold(stock.rotate([-90,0,0])).translate([x,0,z]));
+   const envelope=positionSeat(hold(stock.rotate([-90,0,0])),seat);
+   if(seat.surface){
+    const radius=profile.boreDiameter/2;
+    const approach=hold(wasm.Manifold.cylinder(2.7,radius,radius,32));
+    const opening=positionSeat(hold(hold(approach.rotate([-90,0,0])).translate([0,-3,0])),seat);
+    if(hold(total.intersect(opening)).volume()>.05)
+     throw Error(seat.pixelHole+' has an obstructed insertion opening. Choose an exposed face.');
+   }
    if(envelope.volume()-hold(total.intersect(envelope)).volume()>.05)
-    throw Error(seat.pixelHole+' needs continuous underside stock, including 2.8 mm above the socket. Increase thickness or move the fitting.');
+    throw Error(seat.pixelHole+' needs '+(seat.surface?'continuous stock on its installation face':'continuous underside stock')+', including a 2.8 mm roof beyond the socket. Increase thickness or move the fitting.');
    for(const other of recipe.negative||[]){
     if(other===seat||other.wireChannel)continue;
     if(hold(envelope.intersect(convert(other))).volume()>.05)

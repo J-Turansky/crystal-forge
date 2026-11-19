@@ -1,5 +1,11 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.35.9 — Inspect shaped sockets on the selected installation face
+
+- On compatible single-material stock, native shaped sockets use the selected face and refuse obstructed openings or inadequate material.
+- Show design-preview and prepared X, Y and Z dimensions in millimetres using the STL and 3MF orientation.
+- Use Cura quality metadata for the installed Ultimaker 3 Extended AA 0.8 mm and supported Ultimaker 2+ PLA profiles.
+
 ## v0.16.0-dev.35.8 — Inspect the prepared manufacturing mesh from Build
 
 - Render the actual prepared mesh from Build and toggle a cut section without exporting.

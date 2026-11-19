@@ -53,6 +53,11 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  const bar=document.createElement('nav');bar.className='studio-modelbar';bar.setAttribute('aria-label','Project and model workspaces');
  bar.innerHTML='<input id="smsProjectTitle" class="sms-project-input project-title" aria-label="Project name"><button id="smsLibrary">Library</button><div id="smsTabs" class="studio-modeltabs" role="tablist" aria-label="Open models"></div><button id="smsNew" aria-label="Add a model">＋ New model</button><button id="smsPrint">Print Centre</button><button id="smsReload" title="Save your project and load the latest published Studio">↻ Reload Studio</button><span id="smsSaveState" role="status"></span>';
  document.querySelector('.topbar').before(bar);
+ const modelDimensions=document.createElement('output');
+ modelDimensions.id='smsModelDimensions';
+ modelDimensions.setAttribute('aria-label','Model dimensions in export orientation');
+ modelDimensions.hidden=true;
+ bar.append(modelDimensions);
  const panel=document.createElement('div');panel.id='smsEditor';panel.className='sms-controls';panel.hidden=true;document.querySelector('.left').prepend(panel);
  const overlay=document.createElement('div');overlay.className='sms-overlay';overlay.hidden=true;overlay.id='smsOverlay';document.querySelector('.viewarea').style.position='relative';document.querySelector('.viewarea').append(overlay);
  const shell=unified?setupShell():null;
@@ -149,7 +154,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   search.oninput=searchSettings;
   const styleNav=document.querySelector('.workspace-tabs'),top=document.querySelector('.topbar');
   styleNav.prepend(home,$('smsLibrary'));styleNav.setAttribute('aria-label','Workspaces');
-  top.after(styleNav);styleNav.classList.add('sms-workspace-nav');
+  top.after(styleNav);styleNav.classList.add('sms-workspace-nav');styleNav.append(modelDimensions);
   top.querySelector('.topcluster').append($('smsProjectTitle'),$('smsSaveState'));
   const projectName=$('smsProjectTitle');
   const describeTitle=()=>{projectName.title=projectName.value;};
@@ -506,6 +511,26 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   }
   const placeholder=document.createElement('span');placeholder.className='sms-picture-empty';placeholder.textContent='Preview unavailable';return placeholder;
  }
+ function updateModelDimensions(model,printResult){
+  modelDimensions.hidden=true;
+  if(!model)return;
+  let dimensions;
+  if(printResult)dimensions=preparedSize(printResult);
+  else if(model.generator.typeId==='crystals'){
+   const {width,depth,height}=adapter.bounds();
+   dimensions=[width,depth,height];
+  }else{
+   const meshes=fittingMeshes(model),bounds=new THREE.Box3();
+   for(const mesh of meshes)bounds.expandByObject(mesh);
+   if(bounds.isEmpty())return;
+   const size=bounds.getSize(new THREE.Vector3());
+   dimensions=[size.x,size.z,size.y];
+  }
+  if(!dimensions.every(n=>Number.isFinite(n)&&n>0))return;
+  modelDimensions.textContent=(printResult?'Prepared':'Design preview')+' X × Y × Z: '+
+   dimensions.map(value=>value.toFixed(1)).join(' × ')+' mm';
+  modelDimensions.hidden=false;
+ }
  function renderTabs(){
   if((placementModel||mountingModel)&&(!canEditPixels(active())||(placementModel&&placementModel!==active()?.id)||(mountingModel&&mountingModel!==active()?.id)))endPixelPlacement();
   for(const job of project.printJobs)if(job.status==='stale')discardPrintResult(job.id);
@@ -514,7 +539,9 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    const model=active(),job=project.printJobs.find(item=>item.modelId===currentId);
    const type=model?.generator.typeId;
    const supported=mode==='model'&&!!model;
-   inspection.update(supported?currentId:null,supported&&job?currentPrintResult(job):undefined,supported?job?.status:undefined,type);
+   const printResult=supported&&job?currentPrintResult(job):undefined;
+   inspection.update(supported?currentId:null,printResult,supported?job?.status:undefined,type);
+   updateModelDimensions(supported?model:null,printResult);
   }
   if(shell){const history=histories.get(currentId),crystal=active()?.generator.typeId==='crystals';const blocked=mode!=='model'||!!active()?.link;$('smsGlobalUndo').disabled=blocked||!(crystal?adapter.canUndo(-1):history?.index>0);$('smsGlobalRedo').disabled=blocked||!(crystal?adapter.canUndo(1):history?.index<history?.items.length-1);document.body.dataset.studioView=mode;shell.home.toggleAttribute('aria-current',mode==='home');$('smsLibrary').toggleAttribute('aria-current',mode==='library');if(mode!=='model'&&document.body.classList.contains('sms-focused'))shell.focus.click();}
   const type=mode==='model'?active()?.generator.typeId:null;
@@ -864,11 +891,17 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   placementGhost.visible=true;
   viewport.dataset.nativePlacement=issue?'invalid':'valid';
  }
+ function socketSurface(point,normal){
+  if(normal.y<-.999&&Math.abs(point.y)<.01)return undefined;
+  return {y:point.y,normal:normal.toArray()};
+ }
  function placeFittingAt(model,{point,normal},duplicate=null){
   const holes=pixelHoles(model);
   if(holes.length>=16){pixelStatus(model,'Use up to 16 fittings per model.');return false;}
   if(!duplicate&&!chosenProfile(model)){pixelStatus(model,'Import the missing profile or select another before placing.');return false;}
   const hole={...fittingCandidate(model,point,duplicate),entryFace:normal.y<0?'underside':'top'};
+  hole.hitSurface=socketSurface(point,normal);
+  if(hole.socketProfile)hole.surface=hole.hitSurface;
   const issue=pixelIssue(model,hole,holes);
   if(issue){pixelStatus(model,pixelPlacementAdvice(model,issue));return false;}
   return savePixels(model,[...holes,{...hole,checked:true}],hole.id);
@@ -966,6 +999,10 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    gesture.issue='Move onto the original fitting face. A drag cannot switch installation sides.';
   if(hit&&!gesture.issue){
    const candidate={...current,x:Math.round(hit.point.x*10)/10,z:Math.round(hit.point.z*10)/10};
+   if(!mounts){
+    candidate.hitSurface=socketSurface(hit.point,hit.normal);
+    if(current.socketProfile)candidate.surface=candidate.hitSurface;
+   }
    const others=holes.filter(hole=>hole.id!==id);
    gesture.issue=mounts?mountIssue(gesture.model,candidate,others):pixelIssue(gesture.model,candidate,others,gesture.recipe);
    if(!gesture.issue)gesture.candidate=candidate;
@@ -1295,7 +1332,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const hole=holes[selected]||newPixel(chosenProfile(model));
   const fit=resolvePixelFitting(hole,adapter.pixelFitProfiles());
   root.innerHTML='<h3>Pixel fittings</h3><div class="sms-actions"><button type="button" data-pixel-profile-editor>Create / edit pixel profile</button></div>'+
-   '<p>Choose a saved measured profile before placing. A profile selection with P1/P2 selected updates <strong>only that fitting</strong>; otherwise it chooses the next fitting. Plain bores open on both faces. Select an underside fitting to enable a measured blind socket. Cable cuts open on the underside. Print a coupon to check fit.</p>'+
+   '<p>Choose a saved measured profile before placing. A profile selection with P1/P2 selected updates <strong>only that fitting</strong>; otherwise it chooses the next fitting. Plain bores open on both faces. Select a fitting to enable a measured blind socket on its installation face. Cable cuts open on the underside. Print a coupon to check fit.</p>'+
    '<label><input type="checkbox" data-pixel-backing'+(model.build.pixelBacking?' checked':'')+disabled+'> Add fitting backing (12 mm of additional material around each edge)</label>'+
    '<p>Fitting bores need continuous solid material. Thin walls, cavities and narrow rims can block placement.</p>'+
    '<div class="sms-actions" aria-label="Hardware library">'+profiles.map(profile=>
@@ -1307,7 +1344,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    '<div class="sms-actions" aria-label="Select pixel">'+holes.map((hole,i)=>'<button type="button" data-select-pixel="'+i+'" aria-pressed="'+(i===selected)+'">P'+(i+1)+'</button>').join('')+'</div>'+
    '<p role="status" data-pixel-status>'+esc(pixelMessages.get(model.id)||'Click a marker to select. Hold then drag to move. Arrow keys nudge 1 mm, or 5 mm with Shift.')+'</p>'+
    (selected<0?'':pixelHoleMarkup(holes[selected],selected,esc,disabled,profiles)+
-    '<label><input type="checkbox" data-shaped-socket'+(hole.socketProfile?' checked':'')+disabled+'> Shape this underside socket from the measured profile</label>'+
+    '<label><input type="checkbox" data-shaped-socket'+(hole.socketProfile?' checked':'')+disabled+'> Shape a socket on the selected face from the measured profile</label>'+
     (hole.socketProfile?'<label>Retention lip (mm)<input type="number" data-seat-retention min="0" max=".7" step=".05" value="'+esc(hole.socketProfile.retentionLip)+'"'+disabled+'></label>':'')+
     '<div class="sms-actions"><button type="button" data-pixel-previous'+(selected===0?' disabled':disabled)+'>Move earlier</button><button type="button" data-pixel-next'+(selected===holes.length-1?' disabled':disabled)+'>Move later</button><button type="button" data-duplicate-pixel'+noAdd+'>Duplicate fitting in 3D</button></div>')+
    '<section aria-label="Test print"><h3>Test print</h3><p>'+esc(fit.profileName)+' · '+fit.nominalDiameter+' mm nominal · '+fit.diameter+' mm body · '+fit.boreDiameter+' mm bore · '+fit.clearance+' mm clearance.</p>'+
@@ -1341,12 +1378,17 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const shaped=root.querySelector('[data-shaped-socket]');
   if(shaped)shaped.onchange=()=>{
    const enabled=shaped.checked;
-   if(enabled&&(hole.entryFace!=='underside'||!fit.profile?.bodyHeight)){
-    shaped.checked=false;pixelStatus(model,'Place or select an underside fitting and choose a measured profile first.');return;
+   if(enabled&&((hole.entryFace!=='underside'&&!hole.hitSurface)||!fit.profile?.bodyHeight)){
+    shaped.checked=false;pixelStatus(model,'Place a fitting on its intended installation face and choose a measured profile first.');return;
    }
    const next={...hole};
-   if(enabled)next.socketProfile={...fit.profile,retentionLip:0};
-   else delete next.socketProfile;
+   if(enabled){
+    next.socketProfile={...fit.profile,retentionLip:0};
+    next.surface=hole.hitSurface;
+   }else{
+    delete next.socketProfile;
+    delete next.surface;
+   }
    if(!editPixel(model,selected,next))shaped.checked=!!hole.socketProfile;
   };
   const lip=root.querySelector('[data-seat-retention]');
