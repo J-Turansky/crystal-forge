@@ -39,3 +39,9 @@ Physical-only gate (#10): owner reported a tight but successful fit and a roughl
 - Current branch tree contains the Chromium asymmetric dimensional regression and conical Crystal fabrication. Local browser run and targeted conical regression passed. Exact-head full CI must be read from PR #102.
 - Next implementation: extend the 6 mm exported Crystal route regression to sample bends, socket junctions and the IN/OUT openings with stock rejection. Add full-model conical socket export sections and prove positive clearance in print orientation before enabling other builders.
 - Original Cura discrepancy remains unconfirmed without the original project, export and slicer evidence.
+
+### Crystal exported route and socket evidence
+
+- tests/fabrication.test.mjs now independently decodes a complete Crystal's STL and 3MF. The single-pixel IN/OUT fixture samples the usable channel at intervals of at most 1 mm, across a 5.8 mm span and to 1.95 mm depth. Both formats pass. A shallow backing is refused. Exact bend/edge cross sections and multi-pixel junction coverage remain open.
+- Both exports match the conical apex and a 2 mm rise over a 2 mm radial run in print-Z coordinates. A shallow full model refuses the conical socket. Previous cutter containment and coupon tests supply separate fit evidence. Other orientations and builders are still outstanding.
+- Next: establish an asymmetric multi-pixel serial fixture with an actual turn, then measure its exterior apertures and junctions across the full usable section.

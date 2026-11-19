@@ -139,6 +139,34 @@ function assembly(s){
   }
   return {meshes,crystals};
 }
+function crystalExportTriangles(measured){
+ const bytes=encodeSTL(measured.geometry);
+ const stl=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+ const vertices=[];
+ for(let i=0;i<stl.getUint32(80,true);i++){
+  for(let coordinate=0;coordinate<9;coordinate++)
+   vertices.push(stl.getFloat32(96+i*50+coordinate*4,true));
+ }
+ const {threeMF}=exportMaterialBodies({
+  report:{ready:true,engine:'Manifold',coordinateFrame:'Y-up'},
+  bodies:[{role:'primary',volume:measured.report.volumeMm3,mesh:measured.report.mesh}]
+ });
+ const zip=Buffer.from(threeMF);
+ let xml;
+ for(let i=0;zip.readUInt32LE(i)===0x04034b50;){
+  const nameLength=zip.readUInt16LE(i+26),start=i+30+nameLength+zip.readUInt16LE(i+28),size=zip.readUInt32LE(i+18);
+  if(zip.toString('utf8',i+30,i+30+nameLength)==='3D/3dmodel.model'){
+   assert.equal(zip.readUInt16LE(i+8),0);
+   xml=zip.toString('utf8',start,start+size);break;
+  }
+  i=start+size;
+ }
+ assert.match(xml,/<model unit="millimeter"/);
+ assert.match(xml,/<item objectid="2" transform="1 0 0 0 1 0 0 0 1 0 0 0"/);
+ const points=[...xml.matchAll(/<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"/g)].map(m=>m.slice(1).map(Number));
+ const indexes=[...xml.matchAll(/<triangle v1="(\d+)" v2="(\d+)" v3="(\d+)"/g)].flatMap(m=>m.slice(1).map(Number));
+ return [['STL',vertices],['3MF',indexes.flatMap(index=>points[index])]];
+}
 function validate(label,s){
   const {meshes,crystals}=assembly(s);
   const result=prepareFabrication({wasm,meshes,crystals,settings:s});
@@ -340,32 +368,7 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
  // Read the exported triangles and measure the void between the two sockets.
  const measuredCfg={...cfg,wireWidth:6,wireVaulted:true};
  const measured=prepareFabrication({wasm,...assembly(measuredCfg),settings:measuredCfg});
- const bytes=encodeSTL(measured.geometry);
- const stl=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
- const vertices=[];
- for(let i=0;i<stl.getUint32(80,true);i++){
-  for(let coordinate=0;coordinate<9;coordinate++)
-   vertices.push(stl.getFloat32(96+i*50+coordinate*4,true));
- }
- const {threeMF}=exportMaterialBodies({
-  report:{ready:true,engine:'Manifold',coordinateFrame:'Y-up'},
-  bodies:[{role:'primary',volume:measured.report.volumeMm3,mesh:measured.report.mesh}]
- });
- const zip=Buffer.from(threeMF);
- let xml;
- for(let i=0;zip.readUInt32LE(i)===0x04034b50;){
-  const nameLength=zip.readUInt16LE(i+26),start=i+30+nameLength+zip.readUInt16LE(i+28),size=zip.readUInt32LE(i+18);
-  if(zip.toString('utf8',i+30,i+30+nameLength)==='3D/3dmodel.model'){
-   assert.equal(zip.readUInt16LE(i+8),0);
-   xml=zip.toString('utf8',start,start+size);break;
-  }
-  i=start+size;
- }
- assert.match(xml,/<model unit="millimeter"/);
- assert.match(xml,/<item objectid="2" transform="1 0 0 0 1 0 0 0 1 0 0 0"/);
- const points=[...xml.matchAll(/<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"/g)].map(m=>m.slice(1).map(Number));
- const indexes=[...xml.matchAll(/<triangle v1="(\d+)" v2="(\d+)" v3="(\d+)"/g)].flatMap(m=>m.slice(1).map(Number));
- for(const [format,positions] of [['STL',vertices],['3MF',indexes.flatMap(index=>points[index])]]){
+ for(const [format,positions] of crystalExportTriangles(measured)){
   const geometry=new THREE.BufferGeometry();
   geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
@@ -432,6 +435,41 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
   'Valid serial string must not cut orphan reliefs underneath the connected path');
  assert.equal(serialMesh.wireChannelsCut,serialPlan.wirePlan.routes.length,
   'Manifold removes every approved IN/OUT groove in the string plan');
+ const routedVault={...serialOne,baseHeight:35,wireWidth:6,wireDepth:2,wireVaulted:true,socketConical:true};
+ const routed=prepareFabrication({wasm,...assembly(routedVault),settings:routedVault});
+ const routes=routed.report.hardware.wirePlan.routes;
+ const socket=routed.report.socketCeilings[0];
+ assert(socket&&routes.length>1);
+ for(const [format,positions] of crystalExportTriangles(routed)){
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(geometry,material);
+  const ceiling=(x,z)=>new THREE.Raycaster(new THREE.Vector3(x,-z,-1),new THREE.Vector3(0,0,1)).intersectObject(mesh)[0]?.point.z;
+  const apex=ceiling(socket.x,socket.z);
+  assert(Math.abs(apex-socket.tipY)<.001,format+' full-model conical apex');
+  assert(Math.abs(apex-ceiling(socket.x+2,socket.z)-2)<.001,format+' conical roof falls 2 mm over 2 mm');
+  for(const {a,b} of routes){
+   const span=Math.hypot(b.x-a.x,b.z-a.z);
+   for(let i=0;i<=Math.ceil(span);i++){
+    const t=i/Math.ceil(span);
+    for(const offset of [-2.9,0,2.9]){
+     const z=a.z+(b.z-a.z)*t+(b.x-a.x)*offset/span;
+     const x=a.x+(b.x-a.x)*t-(b.z-a.z)*offset/span;
+     assert((ceiling(x,z)??Infinity)>1.95,format+' continuous 5.8 × 1.95 mm sampled wire clearance');
+    }
+   }
+  }
+  geometry.dispose();material.dispose();
+ }
+ routed.geometry.dispose();
+ const thin={...routedVault,baseHeight:5};
+ assert.throws(()=>prepareFabrication({wasm,...assembly(thin),settings:thin}),/Pixel string route invalid/);
+ const shallowSocket={...routedVault,baseHeight:25,wireChannels:false};
+ assert.throws(()=>prepareFabrication({wasm,...assembly(shallowSocket),settings:shallowSocket}),
+  /Conical pixel socket needs .*stock/);
+
+ console.log('WT-021 full Crystal STL/3MF: IN/OUT clearance samples, conical apex/slope and thin stock rejection');
  const uncutSerial=validate('PR9 single-pixel wiring OFF',{...serialOne,wireChannels:false});
  assert(serialMesh.volumeMm3<uncutSerial.volumeMm3-1,
   'Opposed cable channels remove real material from Manifold geometry');
