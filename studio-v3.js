@@ -1,3 +1,6 @@
+import {makePixelReplicaRecipe} from './pixel-replica.js';
+import {prepareRecipe} from './studio-geometry.js';
+import {exportMaterialBodies} from './studio-material-export.js';
 import {lightPassageExportBlock} from './light-passage-inspection.js';
 import * as THREE from 'three';
 import {installExactValueEditors} from './exact-value-editors.js';
@@ -1083,27 +1086,96 @@ $('editPixelProfileBtn').onclick=()=>{
  const p=resolvePixelProfile(s);
  for(const [k,id] of Object.entries(pixelFields))$(id).value=p[k];
  updatePixelProfileDiagram();
+ $('pixelSocketClearance').value=p.measuredFit
+  ?(p.measuredFit.printedBoreDiameter-p.measuredFit.bodyDiameter).toFixed(2):s.pixelFit;
+ $('pixelSocketStatus').textContent='';
  $('pixelProfileOverlay').hidden=false;$('pixelName').focus();
 };
+for(const format of ['stl','3mf']){
+ const button=$('pixelReplica'+format.toUpperCase());
+ button.onclick=async()=>{
+  const status=$('pixelReplicaStatus');
+  const values=Object.fromEntries(Object.entries(pixelFields).map(([key,id])=>
+   [key,key==='kind'||key==='name'?$(id).value:$(id).valueAsNumber]));
+  button.disabled=true;
+  status.textContent='Preparing the 1:1 positive pixel body…';
+  try{
+   const recipe=makePixelReplicaRecipe(values);
+   const result=prepareRecipe(THREE,await loadManifold(),recipe);
+   const stem='pixel-replica-'+(values.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,60)||'custom')+'-1to1';
+   const files=exportMaterialBodies(result,{name:stem});
+   download(new Blob([format==='stl'?files.stls[0].bytes:files.threeMF],
+    {type:format==='stl'?'model/stl':'model/3mf'}),stem+'.'+format);
+   status.textContent='Downloaded a 1:1 replica using the current A–G measurements.';
+  }catch(error){status.textContent=error.message;}
+  finally{button.disabled=false;}
+ };
+}
 $('closePixelProfileBtn').onclick=closePixelEditor;
 $('pixelProfileOverlay').addEventListener('pointerdown',e=>{
  if(e.target===$('pixelProfileOverlay'))closePixelEditor()
 });
-$('savePixelProfileBtn').onclick=()=>{
+function socketFitFromEditor(){
+ const input=$('pixelSocketClearance');
+ if(!input.checkValidity()||!Number.isFinite(input.valueAsNumber))throw Error('Enter a clearance between −0.50 and +0.80 mm.');
+ return input.valueAsNumber;
+}
+for(const format of ['stl','3mf']){
+ const button=$('pixelSocket'+format.toUpperCase());
+ button.onclick=async()=>{
+  const status=$('pixelSocketStatus');
+  button.disabled=true;
+  try{
+   for(const [key,id] of Object.entries(pixelFields)){
+    if(key!=='name'&&key!=='kind'&&(!$(id).value||!$(id).checkValidity()))
+     throw Error('Enter valid A–G profile dimensions before printing a test socket.');
+   }
+   const profile=normalisePixelProfile({...Object.fromEntries(Object.entries(pixelFields).map(([key,id])=>
+    [key,key==='kind'||key==='name'?$(id).value:$(id).valueAsNumber])),id:'custom-test-socket'});
+   const fit=socketFitFromEditor(),single=!$('pixelSocketPlate').checked;
+   const settings={...s,pixelProfileId:profile.id,pixelProfiles:[profile],pixelDiameter:profile.bodyDiameter,pixelFit:fit};
+   status.textContent='Preparing the negative test socket…';
+   const coupon=makePixelSeatCoupon(await loadManifold(),settings,{single,openWireExits:!single});
+   try{
+    const save=format==='3mf'?save3MF:saveSTL;
+    save(coupon.geometry,(single?'pixel-test-socket':'pixel-socket-tolerance-plate')+'.'+format);
+    status.textContent='Downloaded underside socket bore '+coupon.diameters.map(n=>n.toFixed(2)).join(', ')+' mm.';
+   }finally{coupon.geometry.dispose();}
+  }catch(error){status.textContent=error.message;}
+  finally{button.disabled=false;}
+ };
+}
+$('resetPixelSocketClearance').onclick=()=>{$('pixelSocketClearance').value=defaults.pixelFit;$('pixelSocketClearance').focus();};
+function savePixelProfileFromEditor(applySocketFit=false){
  const data={};
  for(const [k,id] of Object.entries(pixelFields))
   data[k]=['name','kind'].includes(k)?$(id).value:Number($(id).value);
  if(!String(data.name||'').trim()){alert('Enter a profile name.');return}
  data.id=s.pixelProfileId.startsWith('custom-')?s.pixelProfileId:'custom-'+Date.now().toString(36);
+ if(applySocketFit){
+  let fit;
+  try{fit=socketFitFromEditor();}catch(error){$('pixelSocketStatus').textContent=error.message;return;}
+  const nominal=normalisePixelProfile(data).bodyDiameter;
+  data.measuredFit={bodyDiameter:nominal,printedBoreDiameter:Math.round((nominal+fit)*100)/100};
+ }else data.measuredFit=readPixelFitProfiles().find(profile=>profile.id===data.id)?.measuredFit;
  const p=normalisePixelProfile(data);
+ let applyLinked=()=>{};
+ if(applySocketFit){
+  try{applyLinked=studioBridge?.planPixelProfileClearance(p)??applyLinked;}
+  catch(error){$('pixelSocketStatus').textContent=error.message;return;}
+  s.pixelFit=socketFitFromEditor();s.fitCalibration=null;
+ }
  s.pixelProfiles=[...(s.pixelProfiles||[]).filter(x=>x.id!==p.id),p].slice(-30);
  s.pixelProfileId=p.id;s.pixelDiameter=p.bodyDiameter;
  try{localStorage.setItem(pixelLibraryKey,JSON.stringify(s.pixelProfiles))}
  catch(e){console.warn('Pixel library not writable',e)}
  closePixelEditor();syncForm();rebuild();snapshot();
+ applyLinked();
  document.dispatchEvent(new CustomEvent('studio-pixel-profile-saved',{detail:{profileId:p.id}}));
  setStatus('Custom pixel profile saved: '+p.name+'. Prepare print mesh again.');
-};
+}
+$('savePixelProfileBtn').onclick=()=>savePixelProfileFromEditor();
+$('applyPixelSocketFit').onclick=()=>savePixelProfileFromEditor(true);
 $('deletePixelProfileBtn').onclick=()=>{
  const id=s.pixelProfileId;
  if(!id.startsWith('custom-')){alert('Built-in presets cannot be deleted.');return}

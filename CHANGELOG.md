@@ -1,5 +1,10 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.35.3 — Print pixel test sockets and replicas
+
+- Print a single negative test socket or five-socket tolerance plate using the Crystal underside cutter, and save the tested clearance.
+- Download a positive measured pixel body as STL or 3MF from the A–G profile editor, independently of socket-fit coupons.
+
 ## v0.16.0-dev.35.2 — External fixing tabs with Tile backing compatibility
 
 - Add editable positive external screw tabs on compatible stationary backing across the six native model families.

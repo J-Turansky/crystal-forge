@@ -8,7 +8,7 @@ const defaultProfile=PIXEL_PRESETS.find(profile=>profile.id==='seed');
 export const pixelId=(hole,index)=>hole.id||'legacy-pixel-'+(index+1);
 export const stablePixels=holes=>holes.map((hole,index)=>({...hole,id:pixelId(hole,index),rotation:hole.rotation??0}));
 export function newPixel(profile=defaultProfile,x=0,z=0){
- return {id:globalThis.crypto?.randomUUID?.()??'pixel-'+Date.now()+'-'+Math.random().toString(36).slice(2),profileId:profile.id,x,z,diameter:profile.bodyDiameter,clearance:profile.measuredFit?Math.round((profile.measuredFit.printedBoreDiameter-profile.measuredFit.bodyDiameter)*100)/100:.3,rotation:0};
+ return {id:globalThis.crypto?.randomUUID?.()??'pixel-'+Date.now()+'-'+Math.random().toString(36).slice(2),profileId:profile.id,followProfileClearance:profile.id.startsWith('custom-'),x,z,diameter:profile.bodyDiameter,clearance:profile.measuredFit?Math.round((profile.measuredFit.printedBoreDiameter-profile.measuredFit.bodyDiameter)*100)/100:.3,rotation:0};
 }
 export const checkedPixelBore=(recipe,hole,others)=>pixelBoreIssue(recipe,hole,others);
 const radius=hole=>(hole.diameter+hole.clearance)/2;
@@ -78,7 +78,7 @@ export function bindPixelBuilder(panel,{holes=[],profiles=pixelProfiles(),onAdd,
   if(!input.checkValidity()){input.reportValidity();input.value=hole[field]??0;return;}
   const value=field==='profileId'?input.value:Number(input.value);
   const changed=field==='profileId'?applyPixelFittingProfile(hole,value,profiles.filter(profile=>profile.id!=='custom')):{...hole,[field]:value};
-  if(field==='diameter'||field==='clearance')delete changed.fitCalibration;
+  if(field==='diameter'||field==='clearance'){delete changed.fitCalibration;changed.followProfileClearance=false;}
   if(!onEdit(index,changed))input.value=hole[field]??0;
  });
 }
