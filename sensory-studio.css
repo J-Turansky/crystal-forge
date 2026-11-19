@@ -62,6 +62,7 @@ body.sms-unified .layout{display:grid;flex:1;min-height:0;height:auto;position:r
 .sms-unified #smsProjectTitle{display:block;max-width:140px;width:clamp(92px,10vw,140px);padding:3px 6px;text-overflow:ellipsis}
 .sms-unified #smsProjectTitle:focus{text-overflow:clip}
 .sms-unified #smsSaveState{color:var(--muted);font-size:11px}
+#smsModelDimensions{margin-inline-start:auto;padding:4px 8px;color:var(--muted);font-size:11px;white-space:nowrap}
 .sms-workspace-nav{flex:0 0 auto;padding:3px 10px;border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--panel);align-items:center}
 .sms-workspace-nav button{padding:3px 10px}
 .sms-tools,.sms-settings{display:grid;grid-template-rows:auto minmax(0,1fr);min-width:0;min-height:0;background:var(--panel)}

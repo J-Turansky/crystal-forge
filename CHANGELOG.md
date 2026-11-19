@@ -3,6 +3,7 @@
 ## v0.16.0-dev.35.9 — Inspect shaped sockets on the selected installation face
 
 - On compatible single-material stock, native shaped sockets use the selected face and refuse obstructed openings or inadequate material.
+- Show design-preview and prepared X, Y and Z dimensions in millimetres using the STL and 3MF orientation.
 
 ## v0.16.0-dev.35.8 — Inspect the prepared manufacturing mesh from Build
 
