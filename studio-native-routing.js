@@ -75,8 +75,13 @@ export function planNativePixelString(recipe,build){
  }
  const pixels=holes.map(p=>({...p,radius:(p.diameter+p.clearance)/2,wireAngle:p.rotation??0}));
  const outline=recipe.serialSupport.outline.map(([x,z])=>({x,z}));
- if(pixels.some(p=>p.radius<2.1||boundary(p,outline)<p.radius+1.9)){
-  plan.reason='Fittings need a bore diameter of at least 4.2 mm and clear material around the ports.';return plan;
+ const undersized=pixels.findIndex(p=>p.radius<2.1);
+ if(undersized>=0){
+  plan.reason='P'+(undersized+1)+' needs a bore diameter of at least 4.2 mm for serial routing.';return plan;
+ }
+ const nearEdge=pixels.findIndex(p=>boundary(p,outline)<p.radius+1.9);
+ if(nearEdge>=0){
+  plan.reason='P'+(nearEdge+1)+' is too close to the backing edge. Move the fitting inward to clear its cable ports.';return plan;
  }
  const addLink=(label,path,ends,budget,edge=null,centreAllowance=0)=>{
   if(!path){plan.links.push({label,path:[],reason:'No safe tangent-compatible path.'});return;}

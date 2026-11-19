@@ -1,5 +1,9 @@
 # AI handover — read immediately after AGENTS.md
 
+## Tile and Gear routing verification
+
+The native planner identifies the numbered fitting that fails the diameter or edge-clearance gate. Catalogue fixtures cover successful, short-pitch, obstructed and serialized routes on solid Tiles and decorative Gears. Physical cable seating remains part of #10.
+
 ## Production review candidate
 
 Print Centre and production packs use the same bounding dimensions of the prepared mesh in its exported, Z-up frame. See [production review](PRODUCTION_REVIEW.md) for test scope, walkthrough and physical checks.
