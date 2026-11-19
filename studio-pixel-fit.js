@@ -30,6 +30,10 @@ export function applyPixelFittingProfile(hole,profileId,customProfiles=[]){
  const next={...hole,profileId,followProfileClearance:profileId.startsWith('custom-')};
  delete next.fitCalibration;
  if(profile.bodyDiameter)next.diameter=profile.bodyDiameter;
+ if(next.socketProfile){
+  if(profile.bodyHeight)next.socketProfile={...profile,retentionLip:next.socketProfile.retentionLip};
+  else delete next.socketProfile;
+ }
  if(profile.measuredFit)next.clearance=round(profile.measuredFit.printedBoreDiameter-profile.measuredFit.bodyDiameter);
  return next;
 }

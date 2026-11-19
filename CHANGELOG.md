@@ -4,6 +4,14 @@
 
 - Select the active profile in Build, keep the selection on reload and move custom profiles between computers with a library file.
 
+## v0.16.0-dev.35.6 — Configurable cable openings
+
+- Pin or adjust physical IN and OUT openings on compatible native backing while preserving bend and cable-length checks.
+
+## v0.16.0-dev.35.5 — Shaped underside sockets and routed print specimen
+
+- Prepare measured underside sockets on suitable stock and export a two-socket test piece with recessed IN, connecting and OUT channels.
+
 ## v0.16.0-dev.35.4 — Face-aware fitting movement and profile clearance
 
 - Keep native fitting drags on their installation face and isolate saved Crystal socket allowances by profile.

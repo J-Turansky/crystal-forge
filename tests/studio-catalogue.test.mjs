@@ -1,3 +1,5 @@
+import {makeRoutedSocketSpecimen} from '../studio-catalogue.js';
+import {PIXEL_PRESETS} from '../pixel-profiles.js';
 import {pixelBoreIssue} from '../studio-pixel-bore-validation.js';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -226,6 +228,17 @@ for(const recipe of [tileRoute,gearRoute]){
 }
 const curveBuild={pixelHoles:[checked('left',-15),checked('right',15,2)],pixelBuilderVersion:1,serialRouting:serial};
 const curvePlan=applyBuildModules(tileRoute,curveBuild).nativeRouting;
+const flatStock={bounds:{width:70,depth:40,height:10},
+ positive:[{kind:'box',size:[70,10,40],position:[0,5,0]}],negative:[],
+ serialSupport:{outline:[[-35,-20],[35,-20],[35,20],[-35,20]],thickness:10}};
+const flatBuild={...curveBuild,pixelHoles:[checked('left',-15),checked('right',15)],serialRouting:serial};
+const automatic=applyBuildModules(flatStock,flatBuild).nativeRouting;
+const pinnedBuild={...flatBuild,serialRouting:{...serial,inEdgePercent:automatic.edgePositions.in-2,outEdgePercent:automatic.edgePositions.out+2}};
+const pinned=applyBuildModules(flatStock,pinnedBuild);
+assert.equal(pinned.nativeRouting.cutters.length,3,'Pinned openings retain both exterior cutters');
+assert(pinned.nativeRouting.links[0].path.length>2,'Offset IN is a smooth curved path');
+assert(prepareRecipe(THREE,wasm,pinned).bodies[0].volume>0);
+assert.throws(()=>applyBuildModules(flatStock,{...pinnedBuild,serialRouting:{...serial,inEdgePercent:100}}),/Chosen IN edge/);
 const guideBuild={...curveBuild,serialRouting:{...serial,enabled:false}};
 const guideRecipe=applyBuildModules(tileRoute,guideBuild,{},{preview:true});
 const boreOnly=applyBuildModules(tileRoute,guideBuild);
@@ -365,3 +378,29 @@ assert.throws(()=>applyBuildModules(pebbleGenerator.recipe({illuminated:true,dua
 assert.throws(()=>applyBuildModules(capGenerator.recipe({shaft:8,dualMaterial:false}),{
  pixelBacking:true,serialRouting:serial
 },capGenerator.capabilities),/Existing cavities/);
+
+const routeSpecimen=makeRoutedSocketSpecimen(PIXEL_PRESETS[0],{clearance:.15,retentionLip:.2});
+assert.equal(routeSpecimen.negative.filter(part=>part.kind==='pixel-seat').length,2);
+assert.equal(routeSpecimen.negative.filter(part=>part.wireChannel).length,3);
+const routedSocketMesh=prepareRecipe(THREE,wasm,routeSpecimen);
+assert.equal(routedSocketMesh.bodies.length,1);
+assert(routedSocketMesh.bodies[0].volume<70*40*26-1000);
+const routedSocketFiles=exportMaterialBodies(routedSocketMesh);
+assert(routedSocketFiles.stls[0].bytes.length>84&&routedSocketFiles.threeMF.length>100);
+const thinSocket={...routeSpecimen,positive:[{kind:'box',size:[70,10,40],position:[0,5,0]}]};
+assert.throws(()=>prepareRecipe(THREE,wasm,thinSocket),/continuous underside stock/);
+
+const specimenSolid=routedSocketMesh.bodies[0].mesh;
+const specimenGeometry=new THREE.BufferGeometry();
+const specimenPositions=[];
+for(let i=0;i<specimenSolid.vertProperties.length;i+=specimenSolid.numProp)
+ specimenPositions.push(...specimenSolid.vertProperties.subarray(i,i+3));
+specimenGeometry.setAttribute('position',new THREE.Float32BufferAttribute(specimenPositions,3));
+specimenGeometry.setIndex(Array.from(specimenSolid.triVerts));
+const specimenMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+const specimenMesh=new THREE.Mesh(specimenGeometry,specimenMaterial);
+const pathRay=new THREE.Raycaster(new THREE.Vector3(-36,.8,0),new THREE.Vector3(1,0,0),0,72);
+assert.equal(pathRay.intersectObject(specimenMesh).length,0,'The printed route is open across IN, both seats and OUT');
+const undersideRoof=new THREE.Raycaster(new THREE.Vector3(0,-1,0),new THREE.Vector3(0,1,0));
+assert(Math.abs(undersideRoof.intersectObject(specimenMesh)[0].point.y-2)<.01,'The groove is recessed 2 mm and has a roof');
+specimenGeometry.dispose();specimenMaterial.dispose();

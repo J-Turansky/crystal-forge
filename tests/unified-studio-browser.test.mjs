@@ -730,6 +730,10 @@ try{
   await serial.locator('[data-native-preview]').check();
   await serial.locator('[data-native-in-tail]').fill('120');await serial.locator('[data-native-in-tail]').press('Tab');
   await serial.locator('[data-native-out-tail]').fill('110');await serial.locator('[data-native-out-tail]').press('Tab');
+  await serial.locator('[data-native-pin=in]').click();
+  assert.notEqual(await serial.locator('[data-native-edge=in]').inputValue(),'');
+  await serial.locator('[data-native-pin=out]').click();
+  assert.notEqual(await serial.locator('[data-native-edge=out]').inputValue(),'');
   assert.match(await serial.innerText(),/Channels ready/);
   await serial.scrollIntoViewIfNeeded();
   await shot('wt012-tile-routing');
@@ -744,6 +748,8 @@ try{
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
   assert.equal(await serial.locator('[data-native-custom]').inputValue(),'40');
   assert.equal(await serial.locator('[data-native-out-tail]').inputValue(),'110');
+  assert.notEqual(await serial.locator('[data-native-edge=in]').inputValue(),'');
+  assert.notEqual(await serial.locator('[data-native-edge=out]').inputValue(),'');
   await page.locator('#smsNew').click();
   await page.getByRole('button',{name:/Browse Cogs & Gears starting points/}).click();
   const fork=page.locator('#smsPicker [data-preset=forked-sun]');
@@ -899,6 +905,10 @@ try{
  }
  assert(Math.abs(signedVolume)>1000&&Math.abs(signedVolume)<32*32*15,'The exported block retains stock and loses cavity volume');
  assert(zipEntries((await useDownload(page.locator('#pixelSocket3MF'))).bytes).has('3D/3dmodel.model'));
+ const routedSpecimen=await useDownload(page.locator('#routeSpecimenSTL'));
+ assert.equal(routedSpecimen.name,'two-pixel-route-test.stl');
+ assert.equal(routedSpecimen.bytes.length,84+50*routedSpecimen.bytes.readUInt32LE(80));
+ assert(zipEntries((await useDownload(page.locator('#routeSpecimen3MF'))).bytes).has('3D/3dmodel.model'));
  await page.locator('#applyPixelSocketFit').click();
  await wavePalette.getByRole('button',{name:/Reusable 4.5 mm seed/}).waitFor();
  await wavePalette.getByRole('button',{name:'Add pixel automatically',exact:true}).click();

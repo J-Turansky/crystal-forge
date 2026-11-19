@@ -32,6 +32,40 @@ function exitAlong(port,direction,outline){
  if(!first||first.incidence<.6)return null;
  return add(port,direction,first.t);
 }
+function perimeterEnds(outline){
+ const ccw=outline.reduce((sum,a,i)=>sum+cross(a,outline[(i+1)%outline.length]),0)>0;
+ const segments=[];
+ let perimeter=0;
+ for(let i=0;i<outline.length;i++){
+  const a=outline[i],d=sub(outline[(i+1)%outline.length],a),span=length(d);
+  if(span<1e-6)continue;
+  const tangent=unit(d),outward=ccw?{x:tangent.z,z:-tangent.x}:{x:-tangent.z,z:tangent.x};
+  segments.push({a,d,span,offset:perimeter,outward});
+  perimeter+=span;
+ }
+ return {
+  pin(percent){
+   if(!Number.isFinite(percent)||percent<0||percent>=100)return null;
+   const at=percent*perimeter/100;
+   const segment=segments.find(edge=>at<edge.offset+edge.span);
+   if(!segment)return null;
+   const along=at-segment.offset;
+   const point=add(segment.a,segment.d,along/segment.span);
+   if(segments.some((edge,i)=>gap(point,edge.a)<radius+1&&
+    dot(unit(edge.d),unit(segments[(i+segments.length-1)%segments.length].d))<.9))return null;
+   return {point,outward:segment.outward};
+  },
+  percent(point){
+   let best=null;
+   for(const edge of segments){
+    const along=Math.max(0,Math.min(edge.span,dot(sub(point,edge.a),unit(edge.d))));
+    const miss=gap(point,add(edge.a,edge.d,along/edge.span));
+    if(!best||miss<best.miss)best={miss,percent:(edge.offset+along)*100/perimeter};
+   }
+   return best?.percent%100;
+  }
+ };
+}
 function samples(points){
  const result=[points[0]];
  for(let i=1;i<points.length;i++){
@@ -40,7 +74,7 @@ function samples(points){
  }
  return result;
 }
-function cutter(points,label){
+function cutter(points,label,radius,depth){
  const side=sign=>points.map((p,i)=>{
   const a=unit(sub(p,points[i-1]||p)),b=unit(sub(points[i+1]||p,p));
   const d=unit(add(a,b,1)),q={x:-d.z,z:d.x};
@@ -50,10 +84,17 @@ function cutter(points,label){
  return {kind:'extrude',outline:[...side(1),...side(-1).reverse()],height:depth+.5,position:[0,-.5,0],wireChannel:label};
 }
 
+function channelSize(build){
+ const shaped=(build.pixelHoles||[]).filter(hole=>hole.socketProfile);
+ return {radius:Math.max(radius,...shaped.map(hole=>(hole.socketProfile.wireWidth+hole.clearance)/2)),
+  depth:Math.max(depth,...shaped.map(hole=>hole.socketProfile.wireDepth))};
+}
+
 export function nativeRouteEligibility(recipe,build){
  if(!recipe.serialSupport)return recipe.serialReason||'Enable fitting backing to check this model for serial routing.';
  if(recipe.dualMaterial)return 'Use a single material for native serial routing.';
- if(recipe.serialSupport.thickness<depth+roof)return 'Routing needs at least 3.8 mm of solid backing for the groove and roof.';
+ const required=channelSize(build).depth+roof;
+ if(recipe.serialSupport.thickness<required)return 'Routing needs at least '+required.toFixed(1)+' mm of solid backing for the groove and roof.';
  const blocksBacking=part=>part.kind!=='box'||part.rotation||!Array.isArray(part.position)||
   part.position[1]+part.size[1]/2>0;
  const obstructed=recipe.serialSupport.explicitBacking?recipe.negative.some(blocksBacking):recipe.negative.length>0;
@@ -63,6 +104,7 @@ export function nativeRouteEligibility(recipe,build){
 }
 
 export function planNativePixelString(recipe,build,{guide=false}={}){
+ const {radius,depth}=channelSize(build);
  const enabled=build.serialRouting?.enabled===true;
  const settings=enabled?build.serialRouting:{version:1,pitch:50,...build.serialRouting};
  const plan={enabled,ready:false,links:[],cutters:[],reason:nativeRouteEligibility(recipe,build)};
@@ -83,7 +125,7 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
  if(undersized>=0){
   plan.reason='P'+(undersized+1)+' needs a bore diameter of at least 4.2 mm for serial routing.';return plan;
  }
- const nearEdge=pixels.findIndex(p=>boundary(p,outline)<p.radius+1.9);
+ const nearEdge=pixels.findIndex(p=>boundary(p,outline)<p.radius+radius+.3);
  if(nearEdge>=0){
   plan.reason='P'+(nearEdge+1)+' is too close to the backing edge. Move the fitting inward to clear its cable ports.';return plan;
  }
@@ -105,10 +147,24 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
  };
  const start=pixels[0],end=pixels.at(-1),inPort=pixelStringPort(start,'input'),outPort=pixelStringPort(end,'output');
  const inAxis=pixelStringAxis(start),outAxis=pixelStringAxis(end);
- const outside=(edge,axis)=>edge&&[.5,1,1.5,2,2.5,3,3.5,4].every(step=>boundary(add(edge,axis,step),outline)<0)?edge:null;
- const outward={x:-inAxis.x,z:-inAxis.z};
- const entry=outside(exitAlong(inPort,outward,outline),outward),exit=outside(exitAlong(outPort,outAxis,outline),outAxis);
- addLink('EDGE IN → P1',entry?[entry,inPort]:null,[start.id],inTail,entry);
+ const outside=(edge,axis)=>edge&&[.5,1,1.5,2,2.5,3,3.5,4].every(step=>boundary(add(edge,axis,step),outline)<0);
+ const perimeter=perimeterEnds(outline);
+ const tail=(port,axis,percent)=>{
+  if(percent==null){
+   const point=exitAlong(port,axis,outline);
+   return outside(point,axis)?{point,outward:axis,path:[port,point]}:null;
+  }
+  const chosen=perimeter.pin(percent);
+  if(!chosen||!outside(chosen.point,chosen.outward))return null;
+  const path=sampleCableCurve(port,chosen.point,axis,chosen.outward);
+  return path?{...chosen,path}:null;
+ };
+ const entry=tail(inPort,{x:-inAxis.x,z:-inAxis.z},settings.inEdgePercent);
+ const exit=tail(outPort,outAxis,settings.outEdgePercent);
+ plan.edgePositions={in:entry?perimeter.percent(entry.point):null,out:exit?perimeter.percent(exit.point):null};
+ addLink('EDGE IN → P1',entry?.path.slice().reverse(),[start.id],inTail,entry?.point);
+ if(!entry&&settings.inEdgePercent!=null)plan.links.at(-1).reason='Chosen IN edge is too close to a corner or has no safe bend. Move the endpoint or use automatic.';
+
  for(let i=0;i<pixels.length-1;i++){
   const a=pixels[i],b=pixels[i+1],p=pixelStringPort(a,'output'),q=pixelStringPort(b,'input');
   const forward=unit(sub(q,p)),from=pixelStringAxis(a),to=pixelStringAxis(b);
@@ -116,15 +172,16 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
   // Include the in-bore distance at each end for physical centre-to-centre pitch.
   addLink('P'+(i+1)+' → P'+(i+2),curve,[a.id,b.id],pitch,null,gap(a,p)+gap(b,q));
  }
- addLink('P'+pixels.length+' → EDGE OUT',exit?[outPort,exit]:null,[end.id],outTail,exit);
- if(entry&&exit&&gap(entry,exit)<6)plan.links.at(-1).reason='Use distinct perimeter exits at least 6 mm apart.';
+ addLink('P'+pixels.length+' → EDGE OUT',exit?.path,[end.id],outTail,exit?.point);
+ if(!exit&&settings.outEdgePercent!=null)plan.links.at(-1).reason='Chosen OUT edge is too close to a corner or has no safe bend. Move the endpoint or use automatic.';
+ if(entry&&exit&&gap(entry.point,exit.point)<6)plan.links.at(-1).reason='Use distinct perimeter exits at least 6 mm apart.';
  plan.reason=plan.links.filter(link=>link.reason).map(link=>link.label+': '+link.reason).join(' ');
  plan.ready=!plan.reason;
  if(plan.ready&&plan.enabled)plan.cutters=plan.links.map((link,i)=>{
   const points=link.path.slice();
-  if(i===0)points.unshift(add(entry,inAxis,-4));
-  if(i===plan.links.length-1)points.push(add(exit,outAxis,4));
-  return cutter(points,link.label);
+  if(i===0)points.unshift(add(entry.point,entry.outward,4));
+  if(i===plan.links.length-1)points.push(add(exit.point,exit.outward,4));
+  return cutter(points,link.label,radius,depth);
  });
  for(const link of plan.links){delete link.dense;delete link.ends;}
  return plan;
