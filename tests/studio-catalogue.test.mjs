@@ -310,6 +310,26 @@ console.log('WT-020 native family mounting through-holes: actual Manifold volume
 
 console.log('WT-017 native family actual bores and export passed; Crystal checked by original hardware fixtures.');
 
+// WT-021: real external fixing tabs on an explicitly enabled stationary backing.
+for(const [family,parameters] of fittingCases){
+ const source=family.recipe(parameters),build={pixelBacking:true};
+ const backing=applyBuildModules(source,build,family.capabilities);
+ const backingTabs=[{u:.125},{u:.625}];
+ const recipe=applyBuildModules(source,{...build,backingTabs},family.capabilities);
+ assert.equal(recipe.positive.length,backing.positive.length+2);
+ assert.equal(recipe.negative.filter(cut=>cut.tabHole).length,2);
+ assert(recipe.bounds.width>backing.bounds.width||recipe.bounds.depth>backing.bounds.depth);
+ const before=prepareRecipe(THREE,wasm,backing);
+ const after=prepareRecipe(THREE,wasm,recipe);
+ assert.equal(after.bodies.length,1);
+ assert(after.bodies[0].volume>before.bodies[0].volume+1);
+ const files=exportMaterialBodies(after);
+ assert(files.stls.length===1&&files.threeMF.length>100);
+ assert.throws(()=>applyBuildModules(source,{...build,backingTabs:[{u:.125},{u:.125}]},family.capabilities),/overlapping/);
+ assert.throws(()=>applyBuildModules(source,{backingTabs},family.capabilities),/stationary fitting backing/);
+}
+console.log('WT-021 attached backing tabs: six native families, volume, union, fixing cuts and STL/3MF.');
+
 const extendedRouting=[
  [waveGenerator,{flowStyle:'Parallel',dualMaterial:false},false],
  [capGenerator,{controlStyle:'Pushbutton',shaft:0,dualMaterial:false},true],

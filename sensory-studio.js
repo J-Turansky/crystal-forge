@@ -1079,7 +1079,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const mounts=mountHoles(model),selected=mounts.findIndex(hole=>hole.id===selectedMounts.get(model.id));
   const locked=!!model.link,disabled=locked?' disabled':'';
   const block=document.createElement('fieldset');block.setAttribute('aria-label','Mounting holes');
-  block.innerHTML='<legend>Mounting holes</legend>'+
+  block.innerHTML='<legend>Mounting &amp; attachments</legend>'+
    '<p>Place actual vertical 2–8 mm through-holes on a verified solid top or underside surface. M1…Mn are editable; printed mounting loads and screw fit are not certified. The legacy two-hole mounting preset remains separate.</p>'+
    '<div class="sms-actions"><button type="button" data-place-mount'+(locked||mounts.length>=16?' disabled':'')+'>Place mounting hole in 3D</button>'+
    (mountingModel===model.id?'<button type="button" data-done-mount>Done placing mounts</button>':'')+'</div>'+
@@ -1104,6 +1104,45 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   });
   const remove=block.querySelector('[data-remove-mount]');
   if(remove)remove.onclick=()=>removeMount(model,selected);
+  const tabList=model.build.backingTabs||[],tabDiameter=model.build.backingTabDiameter??3.4;
+  const tabs=document.createElement('fieldset');
+  tabs.innerHTML='<legend>External backing tabs</legend>'+
+   '<p>Add screw tabs to a stationary design using the fitting backing. Adjust each position along the perimeter.</p>'+
+   '<label>Tab hole diameter (mm)<input type="number" data-tab-diameter min="2" max="8" step=".1" value="'+esc(tabDiameter)+'"'+disabled+'></label>'+
+   '<button type="button" data-add-backing-tab'+(locked||tabList.length>=24?' disabled':'')+'>Add external tab</button>'+
+   tabList.map((tab,i)=>'<div class="sms-actions"><label>T'+(i+1)+' perimeter (%)<input type="number" data-backing-tab="'+i+'" min="0" max="99.9" step=".1" value="'+esc((tab.u*100).toFixed(1))+'"'+disabled+'></label>'+
+     '<button type="button" data-remove-backing-tab="'+i+'"'+disabled+'>Remove T'+(i+1)+'</button></div>').join('');
+  block.append(tabs);
+  const saveTabs=(backingTabs,backingTabDiameter)=>{
+   if(commit({build:{...model.build,backingTabs,backingTabDiameter}})){redrawPixelEditor();return true;}
+   pixelStatus(model,$('smsModelError')?.textContent||'Could not attach the external tab.');
+   return false;
+  };
+  const diameterInput=tabs.querySelector('[data-tab-diameter]');
+  diameterInput.onchange=()=>{
+   if(!diameterInput.value||!diameterInput.checkValidity()||!saveTabs(tabList,diameterInput.valueAsNumber))
+    diameterInput.value=tabDiameter;
+  };
+  tabs.querySelector('[data-add-backing-tab]').onclick=()=>{
+   if(!model.build.pixelBacking){pixelStatus(model,'Enable Add fitting backing on a stationary single-material design before adding external tabs.');return;}
+   const positions=[.125,.625,.375,.875,...Array.from({length:32},(_,i)=>(i+.5)/32)];
+   const family=registry.get(model.generator.typeId),source=family.recipe(model.parameters);
+   let reason='There is no clear attachment location along this backing edge.';
+   for(const u of positions){
+    const next=[...tabList,{u}];
+    try{applyBuildModules(source,{...model.build,backingTabs:next},family.capabilities,{preview:true});}
+    catch(error){reason=error.message;continue;}
+    saveTabs(next,tabDiameter);return;
+   }
+   pixelStatus(model,reason);
+  };
+  tabs.querySelectorAll('[data-backing-tab]').forEach(input=>input.onchange=()=>{
+   const i=Number(input.dataset.backingTab);
+   if(input.value&&input.checkValidity()&&saveTabs(tabList.map((tab,index)=>index===i?{...tab,u:input.valueAsNumber/100}:tab),tabDiameter))return;
+   input.value=(tabList[i].u*100).toFixed(1);
+  });
+  tabs.querySelectorAll('[data-remove-backing-tab]').forEach(button=>button.onclick=()=>
+   saveTabs(tabList.filter((_,i)=>i!==Number(button.dataset.removeBackingTab)),tabDiameter));
  }
  function renderPixelPalette(root,model){
   const holes=pixelHoles(model),profiles=fittingProfiles(),selected=holes.findIndex(hole=>hole.id===selectedPixels.get(model.id));

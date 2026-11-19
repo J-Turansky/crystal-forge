@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.35.2 — External fixing tabs on stationary backing
+
+- Add editable external backing tabs with physical screw holes to the six recipe-based builders.
+
 ## v0.16.0-dev.35 — Direct prepared-job print downloads
 
 - Download STL or a registered multi-part STL archive and the matching Cura profile directly from a prepared job.
