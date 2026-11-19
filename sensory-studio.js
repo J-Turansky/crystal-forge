@@ -550,7 +550,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(!gesture.origin&&performance.now()-gesture.time<180){cancelPixelGesture();return;}
   if(!gesture.origin){
    gesture.origin=gesture.marker.position.clone();
-   try{gesture.recipe=pixelSource(gesture.model);}catch(error){pixelStatus(gesture.model,error.message);cancelPixelGesture();return;}
+   try{gesture.recipe=pixelSource(gesture.model);}catch(error){pixelStatus(gesture.model,pixelPlacementAdvice(gesture.model,error.message));cancelPixelGesture();return;}
   }
   pixelRay(event);
   const hit=partRay.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),-gesture.origin.y),new THREE.Vector3());
@@ -592,13 +592,13 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   pixelRay(event);
   const group=cache.get(model.id)?.group;
   const hit=partRay.intersectObjects(group?.children.filter(mesh=>mesh.isMesh&&!mesh.userData.previewOnly)||[],false)[0];
-  if(!hit){pixelStatus(model,'Click a solid model surface to place the fitting.');return;}
+  if(!hit){pixelStatus(model,pixelPlacementAdvice(model,'Click a solid model surface to place this fitting.'));return;}
   const holes=pixelHoles(model);
   if(holes.length>=16){pixelStatus(model,'Use up to 16 fittings per model.');return;}
   const fresh=newPixel(chosenProfile(model),Math.round(hit.point.x*10)/10,Math.round(hit.point.z*10)/10);
   const hole=pendingDuplicate?{...pendingDuplicate,id:fresh.id,x:fresh.x,z:fresh.z}:fresh;
   const issue=pixelIssue(model,hole,holes);
-  if(issue){pixelStatus(model,issue);return;}
+  if(issue){pixelStatus(model,pixelPlacementAdvice(model,issue));return;}
   placementModel=null;pendingDuplicate=null;
   savePixels(model,[...holes,{...hole,checked:true}],hole.id);
  },true);
