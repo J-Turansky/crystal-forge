@@ -28,6 +28,7 @@ try{
  await page.waitForFunction(()=>window.__sensoryStudio);
  await fs.mkdir('qa',{recursive:true});
  const shot=name=>page.screenshot({path:'qa/unified-'+name+'.png'});
+ {
  const inspectionPage=await browser.newPage({viewport:{width:1440,height:1000}});
  inspectionPage.on('pageerror',error=>errors.push(error.message));
  await inspectionPage.goto(url);
@@ -86,6 +87,7 @@ try{
  assert.deepEqual(errors,[]);
  console.log('WT-013 prepared sections, strict rejection, Pod and view-only controls verified.');
  await inspectionPage.close();
+ }
  assert(await page.locator('body.theme-light').count(),'First visit uses light mode.');
  await page.locator('#smsHomeSearch').fill('no-such-project');
  assert.match(await page.locator('#smsHomeModels').innerText(),/No matching/);
