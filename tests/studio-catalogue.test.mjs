@@ -196,6 +196,17 @@ for(const [recipe,family] of [[tileRoute,tileGenerator],[gearRoute,gearGenerator
   assert.equal(output.stls.length,1);assert(output.threeMF.length>100);
  }
 }
+for(const recipe of [tileRoute,gearRoute]){
+ const build={pixelHoles:[checked('left',-15),checked('right',15)],pixelBuilderVersion:1,serialRouting:serial};
+ const planned=applyBuildModules(recipe,build).nativeRouting;
+ assert.equal(planned.ready,true);
+ assert.equal(planned.links[1].label,'P1 → P2');
+ assert.deepEqual(applyBuildModules(recipe,JSON.parse(JSON.stringify(build))).nativeRouting,planned);
+ const short={...build,serialRouting:{...serial,pitch:25}};
+ assert.match(applyBuildModules(recipe,short,{}, {preview:true}).nativeRouting.links[1].reason,/Cable budget/);
+ assert.throws(()=>applyBuildModules(recipe,short),/P1 → P2: Cable budget exceeded/);
+ assert.throws(()=>applyBuildModules(recipe,{...build,mounting:true},{supportsMounting:true}),/mounting cuts/);
+}
 const curveBuild={pixelHoles:[checked('left',-15),checked('right',15,2)],pixelBuilderVersion:1,serialRouting:serial};
 const curvePlan=applyBuildModules(tileRoute,curveBuild).nativeRouting;
 assert(curvePlan.links[1].path.length>2);

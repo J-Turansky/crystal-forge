@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.20 — Clearer Tile and Gear routing feedback
+
+- Identify the fitting that needs a larger bore or more clearance at the backing edge.
+
 ## v0.16.0-dev.19 — Prepared print dimensions
 
 - Show the prepared X, Y and Z dimensions in Print Centre and exported production packs.
