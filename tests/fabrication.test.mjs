@@ -384,6 +384,16 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
  }
  const ready=validate('PR7 targeted light passages',wide);
  assert(ready.targetedLightCount>0,'Manifold actually subtracts a physical optical passage');
+ const inspection=ready.lightPassageInspection;
+ assert.equal(inspection.mode,'targeted');
+ assert.equal(inspection.physicalOpticalVerification,false);
+ assert.equal(inspection.rows.length,Object.values(inspection.counts).reduce((sum,count)=>sum+count,0));
+ for(const id of ready.targetedLightAcceptedIds){
+  const row=inspection.rows.find(item=>item.id===id);
+  assert(row?.manufactured&&row.points?.length>=3);
+  assert.match(row.source,/^LED socket P\d+$/);
+  assert(['clear','blocked','unknown'].includes(row.status));
+ }
  assert.equal(ready.disconnected,1,'Targeted bore preserves the connected solid');
  assert.equal(ready.internalCavities,0,'No hidden sealed cavities introduced by optical passages');
  const restricted=planTargetedLightPaths(construction.crystals,{...wide,lightReach:15},

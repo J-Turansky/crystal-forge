@@ -1,5 +1,9 @@
 ## WT-012 · Creative catalogue and native serial routing
 
+## Prepared light-path inspection
+
+WT-013 adds final-solid sampling for targeted and direct Crystal routes, a movable prepared section view and optional export enforcement. Shared hollowing cannot yet be certified by individual route. Light Pods offer prepared section inspection only. Installed Cura and physical tests remain manual.
+
 The draft adds four geometric mechanisms across Tiles, Gears and Pods. Serial cuts support certified solid Tiles and decorative Gears. Pod routing, physical fit and optical validation remain separate. WT-011 modular splitting stays on hold.
 
 ## WT-006 interactive Build

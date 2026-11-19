@@ -1,3 +1,5 @@
+import {createLightInspector} from './studio-light-inspector.js';
+import {lightPassageExportBlock,lightPassageReportEntries} from './light-passage-inspection.js';
 import {renderPixelProfileDiagram} from './pixel-profile-diagram.js';
 import {applyPixelFittingProfile,resolvePixelFitting,withMeasuredPixelFit,saveablePixelFit} from './studio-pixel-fit.js';
 import {pixelBuilderMarkup,pixelHoleMarkup,bindPixelBuilder,pixelProfiles,stablePixels,findPixelPosition,checkedPixelBore,newPixel} from './studio-pixel-builder.js';
@@ -34,6 +36,18 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  const panel=document.createElement('div');panel.id='smsEditor';panel.className='sms-controls';panel.hidden=true;document.querySelector('.left').prepend(panel);
  const overlay=document.createElement('div');overlay.className='sms-overlay';overlay.hidden=true;overlay.id='smsOverlay';document.querySelector('.viewarea').style.position='relative';document.querySelector('.viewarea').append(overlay);
  const shell=unified?setupShell():null;
+ const inspection=shell?createLightInspector({THREE,scene,camera,
+  prepare:modelId=>prepare(enqueue(modelId).id),
+  cancel:modelId=>{const job=project.printJobs.find(item=>item.modelId===modelId);if(job?.status==='preparing'){cancelPreparation(project,job.id);delete job.progress;discardPrintResult(job.id);save();renderJobs();renderTabs();}}}):null;
+ if(inspection){
+  $('smsPrecisionContent').prepend(inspection.root);
+  const cutaway=$('sectionCutBtn');
+  cutaway?.addEventListener('click',event=>{
+   if(inspection.root.hidden||!inspection.hasPrepared())return;
+   event.stopImmediatePropagation();
+   inspection.root.open=!inspection.root.open;
+  },true);
+ }
  function setupShell(){
   document.body.classList.add('sms-unified');
   const layout=document.querySelector('.layout'),left=layout.querySelector('.left'),right=layout.querySelector('.right'),viewer=layout.querySelector('.viewarea');
@@ -326,6 +340,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  function renderTabs(){
   for(const job of project.printJobs)if(job.status==='stale')discardPrintResult(job.id);
+  if(inspection){
+   const model=active(),job=project.printJobs.find(item=>item.modelId===currentId);
+   const type=model?.generator.typeId;
+   const supported=mode==='model'&&(type==='crystals'||(type==='light-pods'&&model.parameters.illuminated));
+   inspection.update(supported?currentId:null,supported&&job?currentPrintResult(job):undefined,supported?job?.status:undefined);
+  }
   if(shell){const history=histories.get(currentId),crystal=active()?.generator.typeId==='crystals';const blocked=mode!=='model'||!!active()?.link;$('smsGlobalUndo').disabled=blocked||!(crystal?adapter.canUndo(-1):history?.index>0);$('smsGlobalRedo').disabled=blocked||!(crystal?adapter.canUndo(1):history?.index<history?.items.length-1);document.body.dataset.studioView=mode;shell.home.toggleAttribute('aria-current',mode==='home');$('smsLibrary').toggleAttribute('aria-current',mode==='library');if(mode!=='model'&&document.body.classList.contains('sms-focused'))shell.focus.click();}
   const type=mode==='model'?active()?.generator.typeId:null;
   document.body.dataset.modelTheme=type||'workspace';
@@ -1191,6 +1211,9 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    if(job.status==='stale')return 'The previous preparation is stale. Prepare the current revision.';
    return 'Prepare this job to enable downloads.';
   }
+  const model=findModel(project,job.modelId);
+  const block=model?.generator.typeId==='crystals'&&lightPassageExportBlock(model.parameters.requireAccessiblePassages,result.report.lightPassageInspection);
+  if(block)return block;
   if(result.bodies.length>1&&settings.printer!=='Ultimaker 3 Extended')
    return 'Choose Ultimaker 3 Extended for two materials, or switch the model to one material and prepare again.';
   return '';
@@ -1346,6 +1369,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    const stem=printDownloadStem(model,job);
    if(only3MF){adapter.download(new Blob([exported.threeMF],{type:'model/3mf'}),stem+'.3mf');return;}
    const entries=exported.stls.map(s=>[s.name,s.bytes]);entries.push([exported.filename,exported.threeMF],['editable-model.json',JSON.stringify(model,null,2)],['material-roles.json',JSON.stringify(exported.assignments,null,2)],['print-report.json',JSON.stringify(result.report,null,2)]);
+   entries.push(...lightPassageReportEntries(result.report.lightPassageInspection));
    let curaProfile='included';
    try{
     const profile=createCuraProfile(curaOptions(settings));

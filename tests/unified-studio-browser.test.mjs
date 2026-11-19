@@ -587,4 +587,39 @@ try{
  await fs.mkdir('qa',{recursive:true});
  await page.screenshot({path:'qa/unified-wt006-failure.png'});
  throw error;
+ const inspectionPage=await browser.newPage({viewport:{width:1440,height:1000}});
+ inspectionPage.on('pageerror',error=>errors.push(error.message));
+ await inspectionPage.goto(url);
+ await inspectionPage.waitForFunction(()=>window.__sensoryStudio);
+ await inspectionPage.evaluate(()=>window.__sensoryStudio.addModel('crystals',{
+  count:5,cutSockets:true,baseVault:false,hollowCrystals:false,targetedLightPaths:true,wireChannels:false,lightingMode:'single'
+ },'Inspection fixture'));
+ const inspector=inspectionPage.locator('#smsPrecisionContent > details').first();
+ await inspector.locator('summary').click();
+ await inspector.getByText('Preview only').waitFor();
+ await inspector.getByRole('button',{name:'Prepare inspection'}).click();
+ await inspector.getByText('Prepared manufacturing mesh').waitFor({timeout:120000});
+ await inspectionPage.screenshot({path:'qa/wt013-crystal-x.png'});
+ await inspector.getByLabel('Section axis').selectOption('Z');
+ const section=inspector.getByRole('slider');
+ const before=await section.inputValue();
+ await section.press('ArrowRight');
+ assert.notEqual(await section.inputValue(),before);
+ await inspectionPage.screenshot({path:'qa/wt013-crystal-z.png'});
+ const crystalResult=inspector.getByRole('button',{name:/^Inspect /}).first();
+ await crystalResult.click();
+ assert.equal(await crystalResult.getAttribute('aria-pressed'),'true');
+ await inspectionPage.screenshot({path:'qa/wt013-crystal-selected.png'});
+ await inspector.getByLabel('Show light paths').uncheck();
+ await inspector.getByRole('button',{name:'Reset section'}).click();
+ assert.equal(await inspector.getByLabel('Section axis').inputValue(),'X');
+ await inspector.getByRole('button',{name:'Close inspection'}).click();
+ assert.equal(await inspector.evaluate(node=>node.open),false);
+ await inspectionPage.evaluate(()=>window.__sensoryStudio.addModel('light-pods',{illuminated:true},'Light Pod inspection'));
+ await inspector.locator('summary').click();
+ await inspector.getByRole('button',{name:'Prepare inspection'}).click();
+ await inspector.getByText('Prepared Light Pod').waitFor({timeout:120000});
+ await inspector.getByLabel('Section axis').selectOption('Z');
+ await inspectionPage.screenshot({path:'qa/wt013-pod-section.png'});
+ assert.deepEqual(errors,[]);
 }finally{await browser.close();}

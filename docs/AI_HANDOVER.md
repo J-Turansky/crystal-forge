@@ -1,5 +1,11 @@
 # AI handover — read immediately after AGENTS.md
 
+## WT-013 — Prepared light-path inspection
+
+- Crystal fabrication samples the final solid in the worker. The audit probes 0.2 mm radius segments from the underside along each known bore, counts obstruction above 0.001 mm³, limits each segment to 300 mm and limits inspection to 160 probes. Shared hollowing is reported as unknown where a source-to-spike route cannot be traced.
+- The Precision inspector reuses current Print Centre geometry and camera. Strict validation defaults off and gates current Crystal exports. Both package paths carry JSON and text reports when available.
+- Approved specification `d5d00a9cf25464270fa2fd97023932a834c51c01`. See the WT-013 draft for exact-head CI. Installed Cura inspection, LED fit, optical transmission and structural verification remain manual.
+
 ## WT-014 · Pixel Model Maker workspace
 
 The unified shell uses a compact direct-action header, left Design/Build controls, centre renderer, right precision controls and a horizontal model rail. It moves the same live editor nodes. The generic editor joins the right precision panel in unified mode so exact settings and search stay together. Classic layout retains its original editor placement.
