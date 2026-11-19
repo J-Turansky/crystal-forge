@@ -173,7 +173,37 @@ export function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLo
   cutters.push(cylinder(p.maxDiameter/2,-.5,Math.min(depth,p.flangeHeight+.5)));
  if(conical)cutters.push(hold(wasm.Manifold.cylinder(bodyRadius,bodyRadius,0,32)
   .rotate([-90,0,0]).translate([pos.x,shaftEnd,pos.z])));
- else cutters.push(hold(wasm.Manifold.sphere(bodyRadius,32).scale([1,capRise/bodyRadius,1]).translate([pos.x,shaftEnd,pos.z])));
+ else{
+  // Facet the negative roof to the same 20 dome rings and 48 radial sectors
+  // as the measured 1:1 positive. The older coarse stretched sphere omitted
+  // printable tip volume despite a correctly calibrated nominal bore.
+  // A 0.35 mm axial overlap keeps the union with the straight bore robust.
+  const radial=48,rings=[[shaftEnd-.35,bodyRadius]];
+  for(let i=0;i<20;i++){
+   const angle=i*Math.PI/40;
+   rings.push([shaftEnd+capRise*Math.sin(angle),bodyRadius*Math.cos(angle)]);
+  }
+  const vertices=[],triangles=[];
+  for(const [y,r] of rings)for(let side=0;side<radial;side++){
+   const angle=2*Math.PI*side/radial;
+   vertices.push(pos.x+r*Math.cos(angle),y,pos.z+r*Math.sin(angle));
+  }
+  const bottom=vertices.length/3,apex=bottom+1,last=(rings.length-1)*radial;
+  vertices.push(pos.x,rings[0][0],pos.z,pos.x,shaftEnd+capRise,pos.z);
+  for(let side=0;side<radial;side++){
+   const next=(side+1)%radial;
+   triangles.push(bottom,side,next,apex,last+next,last+side);
+   for(let ring=0;ring<rings.length-1;ring++){
+    const a=ring*radial+side,b=ring*radial+next,c=a+radial,d=b+radial;
+    triangles.push(a,c,b,b,c,d);
+   }
+  }
+  const mesh=new wasm.Mesh({numProp:3,vertProperties:new Float32Array(vertices),triVerts:new Uint32Array(triangles)});
+  mesh.merge();
+  const cap=hold(new wasm.Manifold(mesh));
+  if(cap.status()!=='NoError'||cap.isEmpty())throw Error('The rounded socket roof is not a valid Manifold.');
+  cutters.push(cap);
+ }
  if(includeLocalWireRelief&&p.wireWidth>.1&&p.wireDepth>.1){
   // Two shallow underside cable reliefs; not full wiring channels.
   // Wire relief F is a measured physical width; socket fit clearance must not resize it.
