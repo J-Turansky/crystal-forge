@@ -176,7 +176,8 @@ export function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLo
  else cutters.push(hold(wasm.Manifold.sphere(bodyRadius,32).scale([1,capRise/bodyRadius,1]).translate([pos.x,shaftEnd,pos.z])));
  if(includeLocalWireRelief&&p.wireWidth>.1&&p.wireDepth>.1){
   // Two shallow underside cable reliefs; not full wiring channels.
-  const w=Math.max(.8,p.wireWidth+p.clearance),h=Math.max(.2,Math.min(p.wireDepth,Math.max(.2,roofY-2.8))),len=bodyRadius+4;
+  // Wire relief F is a measured physical width; socket fit clearance must not resize it.
+  const w=Math.max(.8,p.wireWidth),h=Math.max(.2,Math.min(p.wireDepth,Math.max(.2,roofY-2.8))),len=bodyRadius+4;
   relievedDepth=h;
   for(const sign of [-1,1]){
    cutters.push(hold(wasm.Manifold.cube([w,h+.5,len])
@@ -764,7 +765,8 @@ export function makePixelSeatCoupon(wasm,s,{openWireExits=true,single=false,trac
    // Extend the underside cut a full mm beyond each edge. The same
    // measured F/G relief still determines the groove's width and depth.
    if(openWireExits&&(trackWidthMm!=null||adjusted.wireWidth>.1)&&adjusted.wireDepth>.1){
-    const laneWidth=trackWidthMm??Math.max(.8,adjusted.wireWidth+adjusted.clearance);
+    // An optional independent track-width calibration overrides the measured relief.
+    const laneWidth=trackWidthMm??Math.max(.8,adjusted.wireWidth);
     const laneDepth=Math.min(adjusted.wireDepth,Math.max(.2,roof-2.8));
     wireExits.push(hold(wasm.Manifold.cube([laneWidth,laneDepth+.6,width+2])
       .translate([centreX-laneWidth/2,-.5,-1])));
@@ -995,7 +997,7 @@ export function makeSteppedPixelCoupon(wasm,settings,{openWireExits=true}={}){
    const bore=putSocket(wasm,hold,at,profile.maxDiameter/2,thick,-3,profile);
    cuts.push(bore.solid);
    if(openWireExits&&profile.wireWidth>.1&&profile.wireDepth>.1){
-    const laneWidth=Math.max(.8,profile.wireWidth+profile.clearance);
+    const laneWidth=Math.max(.8,profile.wireWidth);
     const laneDepth=Math.min(profile.wireDepth,Math.max(.2,thick-2.8));
     wireExits.push(hold(wasm.Manifold.cube([laneWidth,laneDepth+.6,width+2])
      .translate([centreX-laneWidth/2,-.5,-1])));
