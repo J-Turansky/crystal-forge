@@ -7,7 +7,7 @@ import Module from 'manifold-3d';
 import {waveGenerator,tileGenerator,gearGenerator,capGenerator,characterGenerator,pebbleGenerator,generators,applyBuildModules} from '../studio-catalogue.js';
 import {findPixelPosition,newPixel} from '../studio-pixel-builder.js';
 import {planNativePixelString} from '../studio-native-routing.js';
-import {previewRecipe,disposeGroup,prepareRecipe} from '../studio-geometry.js';
+import {previewRecipe,disposeGroup,prepareRecipe,nativeFittingPreviews} from '../studio-geometry.js';
 import {exportMaterialBodies,preparedDimensionsMm} from '../studio-material-export.js';
 const wasm=await Module();wasm.setup();
 // Independently read both exports of an asymmetric, translated solid.
@@ -203,6 +203,47 @@ for(const id of ['knob','selector']){
 }
 
 
+// FIT-02: Gear top and Tile underside share the production Manifold cutter,
+// its physical positive profile and the same placement transform as Print.
+{
+ const gumdrop=PIXEL_PRESETS.find(item=>item.id==='gumdrop');
+ const configs=[
+  {type:'Gear top',family:gearGenerator,params:{diameter:80,bore:0,thickness:25,
+   wheelStyle:'Cam',dualMaterial:false},
+   profile:{...gumdrop,retentionLip:0},face:{y:25,normal:[0,1,0]}},
+  {type:'Tile underside',family:tileGenerator,params:{pattern:'terraces',width:90,
+   depth:90,thickness:20,relief:2,dualMaterial:false},
+   // A smaller REAL profile fits this thinner tile. A 22 mm gumdrop
+   // must be rejected without additional material and is not pretended to fit.
+   profile:{...gumdrop,bodyHeight:14,capHeight:2,flangeHeight:2,retentionLip:0},face:null}
+ ];
+ for(const fixture of configs){
+  const source=fixture.family.recipe(fixture.params);
+  assert.equal(source.negative?.length||0,0,fixture.type+' test needs isolated stock');
+  const hole={id:'physical-preview',x:0,z:0,diameter:fixture.profile.bodyDiameter,clearance:.15,
+   checked:true,rotation:17,entryFace:fixture.face?'top':'underside',profileId:'gumdrop',
+   socketProfile:fixture.profile,...(fixture.face?{surface:fixture.face}:{})};
+  const recipe=applyBuildModules(source,{pixelBuilderVersion:1,pixelHoles:[hole]},fixture.family.capabilities);
+  const previews=nativeFittingPreviews(THREE,wasm,recipe);
+  assert.equal(previews.length,1,fixture.type+' displays one real profile fitting');
+  const preview=previews[0];
+  assert.equal(preview.pixelId,'physical-preview');
+  assert.equal(preview.insertionDepth,fixture.profile.bodyHeight);
+  assert(preview.positive.triVerts.length>0&&preview.negative.triVerts.length>0);
+  assert([preview.exposedVolume,preview.collisionVolume,preview.remainingRoof].every(Number.isFinite));
+  const stock=prepareRecipe(THREE,wasm,{...recipe,negative:[],nativeRouting:null});
+  const finished=prepareRecipe(THREE,wasm,recipe);
+  const blankSolid=new wasm.Manifold(stock.bodies[0].mesh);
+  const negativeSolid=new wasm.Manifold(preview.negative);
+  const expected=blankSolid.subtract(negativeSolid);
+  try{
+   const expectedVolume=expected.volume(),manufacturedVolume=finished.bodies[0].volume;
+   assert(Math.abs(expectedVolume-manufacturedVolume)<.02,
+    fixture.type+' preview negative must be same Boolean cutter and pose as manufactured model');
+  }finally{expected.delete();negativeSolid.delete();blankSolid.delete();}
+ }
+ console.log('FIT-02 native Gear top/Tile underside positive and negative overlays match manufactured cutter');
+}
 const checked=(id,x,z=0,rotation=0)=>({id,x,z,rotation,checked:true,diameter:5,clearance:.3,profileId:'seed'});
 const serial={version:1,enabled:true,pitch:50,tail:200};
 
