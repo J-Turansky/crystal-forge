@@ -40,7 +40,7 @@ function samples(points){
  }
  return result;
 }
-function cutter(points,label){
+function cutter(points,label,radius,depth){
  const side=sign=>points.map((p,i)=>{
   const a=unit(sub(p,points[i-1]||p)),b=unit(sub(points[i+1]||p,p));
   const d=unit(add(a,b,1)),q={x:-d.z,z:d.x};
@@ -50,10 +50,17 @@ function cutter(points,label){
  return {kind:'extrude',outline:[...side(1),...side(-1).reverse()],height:depth+.5,position:[0,-.5,0],wireChannel:label};
 }
 
+function channelSize(build){
+ const shaped=(build.pixelHoles||[]).filter(hole=>hole.socketProfile);
+ return {radius:Math.max(radius,...shaped.map(hole=>(hole.socketProfile.wireWidth+hole.clearance)/2)),
+  depth:Math.max(depth,...shaped.map(hole=>hole.socketProfile.wireDepth))};
+}
+
 export function nativeRouteEligibility(recipe,build){
  if(!recipe.serialSupport)return recipe.serialReason||'Enable fitting backing to check this model for serial routing.';
  if(recipe.dualMaterial)return 'Use a single material for native serial routing.';
- if(recipe.serialSupport.thickness<depth+roof)return 'Routing needs at least 3.8 mm of solid backing for the groove and roof.';
+ const required=channelSize(build).depth+roof;
+ if(recipe.serialSupport.thickness<required)return 'Routing needs at least '+required.toFixed(1)+' mm of solid backing for the groove and roof.';
  const blocksBacking=part=>part.kind!=='box'||part.rotation||!Array.isArray(part.position)||
   part.position[1]+part.size[1]/2>0;
  const obstructed=recipe.serialSupport.explicitBacking?recipe.negative.some(blocksBacking):recipe.negative.length>0;
@@ -63,6 +70,7 @@ export function nativeRouteEligibility(recipe,build){
 }
 
 export function planNativePixelString(recipe,build,{guide=false}={}){
+ const {radius,depth}=channelSize(build);
  const enabled=build.serialRouting?.enabled===true;
  const settings=enabled?build.serialRouting:{version:1,pitch:50,...build.serialRouting};
  const plan={enabled,ready:false,links:[],cutters:[],reason:nativeRouteEligibility(recipe,build)};
@@ -83,7 +91,7 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
  if(undersized>=0){
   plan.reason='P'+(undersized+1)+' needs a bore diameter of at least 4.2 mm for serial routing.';return plan;
  }
- const nearEdge=pixels.findIndex(p=>boundary(p,outline)<p.radius+1.9);
+ const nearEdge=pixels.findIndex(p=>boundary(p,outline)<p.radius+radius+.3);
  if(nearEdge>=0){
   plan.reason='P'+(nearEdge+1)+' is too close to the backing edge. Move the fitting inward to clear its cable ports.';return plan;
  }
@@ -124,7 +132,7 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
   const points=link.path.slice();
   if(i===0)points.unshift(add(entry,inAxis,-4));
   if(i===plan.links.length-1)points.push(add(exit,outAxis,4));
-  return cutter(points,link.label);
+  return cutter(points,link.label,radius,depth);
  });
  for(const link of plan.links){delete link.dense;delete link.ends;}
  return plan;
