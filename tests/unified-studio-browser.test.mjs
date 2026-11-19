@@ -177,7 +177,7 @@ try{
  await page.getByRole('searchbox',{name:'Search settings'}).clear();
  await shot('wt014-desktop');
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
- await page.locator('.sms-palette').getByRole('button',{name:'Add pixel',exact:true}).click();
+ await page.locator('.sms-palette').getByRole('button',{name:'Add pixel automatically',exact:true}).click();
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles.length),1);
  await page.locator('#smsGlobalUndo').click();
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length||0),0);
