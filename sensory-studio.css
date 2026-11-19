@@ -107,3 +107,16 @@ body.sms-unified .layout{display:grid;flex:1;min-height:0;height:auto;position:r
 #smsJobs fieldset{min-width:0;border:1px solid var(--border);border-radius:8px;padding:8px;display:grid;gap:6px}
 #smsJobs fieldset label{display:grid;gap:3px;font-size:13px}
 #smsJobs fieldset :is(input,select){width:100%;min-width:0;color:var(--ink);background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:5px}
+
+/* WT-016: keep the existing native backup-review dialog operable on phones. */
+dialog[aria-label="Review backup"]{
+  box-sizing:border-box;
+  width:min(560px,calc(100vw - 24px));
+  max-width:calc(100vw - 24px);
+  max-height:calc(100dvh - 24px);
+  overflow:auto;
+  overflow-wrap:anywhere;
+  padding:clamp(12px,3vw,20px);
+}
+dialog[aria-label="Review backup"] select{max-width:100%}
+dialog[aria-label="Review backup"] .sms-actions{flex-wrap:wrap}
