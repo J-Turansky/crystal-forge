@@ -14,7 +14,7 @@
 
 ## v0.16.0-dev.21 — Protect workspace saves across tabs
 
-- Preserve recovery and JSON export when a newer workspace has been saved in another tab.
+- Warn when another tab has saved a newer workspace.
 
 ## v0.16.0-dev.20 — Clearer Tile and Gear routing feedback
 
