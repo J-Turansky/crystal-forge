@@ -1,3 +1,7 @@
+## WT-017 · Seven-family Build pixel fitting
+
+Add pixel and the measured-profile editor are now part of the unified Build workspace across all seven families. The opt-in solid-material fitting backing supports checked native seating where direct bores cannot pass; unsafe placements continue to show a rejection rather than silently modify geometry. Physical printing, flange fit, retention and non-Tile/Gear serial cable channels remain follow-up work. [Issue #63](https://github.com/connorturansky-svg/crystal-forge/issues/63).
+
 ## WT-012 · Creative catalogue and native serial routing
 
 ## Prepared light-path inspection
