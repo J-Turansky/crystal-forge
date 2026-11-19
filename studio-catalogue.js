@@ -4,6 +4,7 @@ import {planNativePixelString} from './studio-native-routing.js';
 import {layeredCharacter} from './studio-character-relief.js';
 import {createPodShell} from './wt002-pod-shell.js';
 import {addPixelHoleCuts,checkedPixelBore} from './studio-pixel-builder.js';
+import {addManualMountCuts} from './studio-mount-builder.js';
 import {generateTile,tactileTileGenerator} from './tactile-tile-generator.js';
 import {createGeneratorRegistry} from './studio-generator-registry.js';
 import {circle,heightField} from './studio-geometry.js';
@@ -515,6 +516,8 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
   r.bounds={...b,width:b.width+spread*2,depth:b.depth+spread*2,height:Math.max(b.height,thickness)};
   r.warnings.push('Expanded fitting backing was explicitly enabled. Inspect underside openings, material joins and support requirements in Cura and on a printed sample.');
  }
+ // Manufacture validated manual mounts before pixel/route checks so cutters cannot overlap.
+ addManualMountCuts(r,build);
  if(build.pixelBuilderVersion===1){
   const holes=build.pixelHoles||[];
   for(const [index,hole] of holes.entries())if(hole.checked){
