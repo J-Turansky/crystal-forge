@@ -1025,8 +1025,12 @@ try{
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
  assert(await page.locator('.sms-palette').getByRole('button',{name:'M1',exact:true}).isVisible());
  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.backingTabs),savedTabs);
+ await page.getByRole('button',{name:'Render actual model',exact:true}).click();
+ const tabInspection=page.locator('#smsLightInspector');
+ await tabInspection.getByText('Prepared manufacturing mesh').waitFor({timeout:120000});
+ assert.equal(await tabInspection.getByLabel('Cut section').isChecked(),false);
+ await tabInspection.getByRole('button',{name:'Close inspection'}).click();
  await page.locator('.sms-workspace-nav [data-tab=print]').click();
- await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
  const tabJob=page.locator('#smsJobs article');
  await tabJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
  const tabSTL=await useDownload(tabJob.locator('[data-job-stl]'));

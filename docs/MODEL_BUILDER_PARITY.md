@@ -72,3 +72,7 @@ Build shows an active profile selector, profile editing or duplication, and stan
 ## WT-021 configurable native cable openings
 
 Compatible backing can use editable IN/OUT perimeter percentages or automatic exits. Both use the same recessed cutter with an extension outside the stock. Pins may be rejected when no safe bend or corner clearance is available. Tests cover a curved pinned route, invalid placement, genuine fabrication and persisted browser controls. Seven independent manufacturing journeys remain open under #79.
+
+## WT-021 prepared mesh inspection
+
+Build can open the actual prepared manufacturing mesh for each family through the existing shared inspector. A whole-mesh view and cut section use the same prepared result as Print Centre. The Tile browser path renders, returns to Print Centre and exports both formats. Complete seven-family acceptance and physical prints remain separate under #79 and #10.
