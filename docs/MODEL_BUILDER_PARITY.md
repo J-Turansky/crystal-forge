@@ -50,3 +50,7 @@ Print Centre exposes STL, 3MF, Cura profile and the production pack on each prep
 ## WT-021 external backing tabs
 
 The six recipe-based builders share one backing-tab editor under Mounting & attachments. It uses Crystal’s perimeter planner to union external stock and subtract a screw bore. The six-family fabrication fixture checks real union, volume, expanded bounds and STL/3MF. Crystal retains its existing hardware editor. This is limited (L): independent browser journeys, moving/fixed assemblies, drag interaction, other fixing types and public release evidence are pending.
+
+### Tile backing compatibility repair
+
+Tactile Tiles now have an explicitly allowed single-material fitting backing, separate from the legacy integrated-base feature, while dual-material/partitioned recipes remain rejected. All seven-builder parity cells are still limited until actual browser interactions, saved positions, correct Manifold positive tab unions, screw cuts, STL/3MF and live-site checks pass.

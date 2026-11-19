@@ -1,8 +1,16 @@
 # Crystal Forge — Changelog
 
-## v0.16.0-dev.35.2 — External fixing tabs on stationary backing
+## v0.16.0-dev.35.2 — External fixing tabs with Tile backing compatibility
 
-- Add editable external backing tabs with physical screw holes to the six recipe-based builders.
+- Add editable positive external screw tabs on compatible stationary backing across the six native model families.
+- Allow a separately enabled fitting backing on single-material Tiles without enabling the unsupported integrated-base feature.
+- Continue rejecting unsafe dual-material backing; test physical tab union, screw cuts and exported STL/3MF.
+
+## v0.16.0-dev.35.1 — Responsive automatic routing and tool finder
+
+- Run expensive Crystal pixel-string automatic routing in a deadline-limited background worker to keep the editor responsive.
+- Provide an accessible Find tools search in the left panel, including a direct pixel-fit test STL download shortcut and mounting, wiring, Cura and print links.
+- Preserve accepted project geometry on impossible or timed-out routes and add worker, browser responsiveness and tool discovery regressions.
 
 ## v0.16.0-dev.35 — Direct prepared-job print downloads
 

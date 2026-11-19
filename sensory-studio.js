@@ -15,6 +15,7 @@ import {makeCatalogue,applyBuildModules,generators} from './studio-catalogue.js'
 import {previewRecipe,disposeGroup} from './studio-geometry.js';
 import {exportMaterialBodies} from './studio-material-export.js';
 import {installExactValueEditors} from './exact-value-editors.js';
+import {createToolFinder} from './studio-tool-finder.js';
 import {createCuraProfile,zipProfileEntries,curaFallbackText,calculateCuraSettings} from './cura-profiles.js';
 import {StudioVault} from './studio-vault.js';
 import {crystalStartingPoints,crystalStartingPointPreview} from './studio-crystal-presets.js';
@@ -92,6 +93,52 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const tools=side('Design and Build','smsTools',palette,left);
   const precision=side('Precision settings','smsPrecision',search,panel,right);
   tools.region.className='sms-tools';precision.region.className='sms-settings';
+  // Left-hand search indexes ACTIONS, not only parameter labels.
+  // Preserve existing physically validated coupon exporter, saved profile and
+  // per-model print preparation instead of maintaining duplicate download logic.
+  const focusAfterNavigation=selectors=>{
+   requestAnimationFrame(()=>{
+    for(const selector of selectors){
+     const element=[...document.querySelectorAll(selector)].find(node=>node.getClientRects().length);
+     if(!element)continue;
+     for(let node=element.parentElement;node;node=node.parentElement)
+      if(node.tagName==='DETAILS')node.open=true;
+     element.scrollIntoView({block:'center',behavior:'smooth'});
+     if(element.matches('button,input,select,[tabindex]'))element.focus({preventScroll:true});
+     return;
+    }
+   });
+  };
+  const toBuild=()=>document.querySelector('.workspace-tabs [data-tab="build"]')?.click();
+  const chooseTool=action=>{
+   const model=active();
+   if(!model){showHome();return;}
+   if(action==='coupon'){
+    if(model.generator.typeId==='crystals'){
+     const button=$('calibrationBtn');
+     if(button)button.click();
+    }else{
+     const fitting=pixelHoles(model).find(hole=>hole.id===selectedPixels.get(model.id))||newPixel(chosenProfile(model));
+     downloadPixelCoupon(model,fitting,{},null);
+    }
+    return;
+   }
+   if(action==='cura'||action==='export'||action==='manufacturing'){
+    showPrint();
+    focusAfterNavigation(action==='cura'?['#smsCura']:
+     action==='manufacturing'?['#smsJobs [data-job-prepare]','#smsPrepareAll']:
+      ['#smsJobs [data-job-export]','#smsPrintCurrent']);
+    return;
+   }
+   toBuild();
+   focusAfterNavigation(action==='pixels'?
+    ['.sms-palette [data-pixel-profile-editor]','.sms-palette [data-fit-profile]','.sms-palette [data-fit-print]','#placePixelBtn']:
+    action==='mounts'?
+    ['.sms-palette [data-place-mount]','.sms-palette [data-select-mount]','#mountType','#mountPlacement','[data-state="mount"]']:
+    ['#wireRouteStatus','.sms-palette [data-native-route]','#wireSpacingPreset']);
+  };
+  const finder=createToolFinder(chooseTool);
+  tools.body.prepend(finder);
   const searchSettings=()=>{
    const query=search.value.trim().toLowerCase();
    for(const item of precision.body.querySelectorAll('.sms-panel-details,.collapsible-section')){
@@ -1104,6 +1151,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   });
   const remove=block.querySelector('[data-remove-mount]');
   if(remove)remove.onclick=()=>removeMount(model,selected);
+ }
   const tabList=model.build.backingTabs||[],tabDiameter=model.build.backingTabDiameter??3.4;
   const tabs=document.createElement('fieldset');
   tabs.innerHTML='<legend>External backing tabs</legend>'+
@@ -1233,12 +1281,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   renderMountPalette(root,model);
  }
  async function downloadPixelCoupon(model,hole,options,button){
-  button.disabled=true;
+  if(button)button.disabled=true;
   try{
    const sizes=await adapter.pixelFitCoupon(hole,options);
    if(active()?.id===model.id)pixelStatus(model,'Fit test downloaded. Bore diameters: '+sizes.map(size=>size.toFixed(2)).join(', ')+' mm.');
   }catch(error){if(active()?.id===model.id)pixelStatus(model,error.message);}
-  finally{button.disabled=false;}
+  finally{if(button)button.disabled=false;}
  }
  function bindPixelEditor(root,model,holes,profiles){
   bindPixelBuilder(root,{holes,profiles,onAdd:()=>addAutomaticPixel(model),onRemove:index=>removePixel(model,index),

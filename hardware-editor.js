@@ -5,7 +5,7 @@ import {snapHardwarePoint,snapHardwareCoordinate} from './design-workflows.js';
 import {nearestEdgePosition} from './edge-tabs.js';
 import {ensureHardwareIds,movePixelInString,hardwareName} from './hardware-identity.js';
 import {snapPixelsToWireLength} from './pixel-spacing-snap.js';
-import {setPixelEdgeMode,pixelEdgeMode,solvePixelMove,repairPixelRouting} from './pixel-motion.js';
+import {setPixelEdgeMode,pixelEdgeMode,solvePixelMove} from './pixel-motion.js';
 import {routingSummary,renderFeedback} from './routing-feedback.js';
 
 export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,getBaseMesh,getSettings,getCrystals,getManufacturingVisible=()=>false,onEdit,onStatus,onSelectionChange=()=>{},canEdit=()=>true}){
@@ -483,13 +483,56 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
    onEdit();
   });
  }
- async function tryRepair(){
-  const state=getSettings(),before=JSON.stringify(state);onStatus('Checking socket rotations and safe edge openings…');
-  await new Promise(resolve=>requestAnimationFrame(resolve));
-  const result=repairPixelRouting(getCrystals(),state);
-  if(JSON.stringify(getSettings())!==before){onStatus('The model changed during routing. Try again on the current layout.');return;}
-  if(result.valid){applyWireDraft(result.settings);onEdit();onStatus('Routing fixed. Pixel positions, fixings and measured cable lengths were kept. Prepare the print mesh again.');}
-  else{renderFeedback($('wireRouteStatus'),{severity:'error',title:'The route needs a manual adjustment.',body:result.reason,details:getPlan().wirePlan?.messages||[]});onStatus('Routing needs a manual adjustment. Review the red box in Build.');}
+ let autoRepairWorker=null,autoRepairSerial=0;
+ async function tryRepair(event){
+  if(autoRepairWorker){onStatus('Automatic routing is already checking this model.');return;}
+  if(!window.Worker){onStatus('Automatic routing needs Web Workers; this browser cannot run the search safely.');return;}
+  const settings=copy(getSettings()),crystals=copy(getCrystals());
+  const before=JSON.stringify(settings),crystalBefore=JSON.stringify(crystals);
+  const button=event?.currentTarget;
+  if(button){button.disabled=true;button.setAttribute('aria-busy','true');}
+  onStatus('Checking routes in the background… The editor remains usable.');
+  const serial=++autoRepairSerial;
+  let worker=null,deadline=null;
+  try{
+   const result=await new Promise((resolve,reject)=>{
+    worker=new Worker(new URL('./pixel-route-repair-worker.js',import.meta.url),{type:'module'});
+    autoRepairWorker=worker;
+    // Terminate expensive searches instead of freezing the browser event loop.
+    deadline=setTimeout(()=>reject(Error('Routing exceeded 8 seconds. No changes were made. Move a pixel closer to a clear edge, or choose a measured longer cable.')),8000);
+    worker.onmessage=({data})=>{
+     if(data?.serial!==serial)return;
+     if(data.error)reject(Error(data.reason||'Automatic routing failed.'));
+     else resolve(data);
+    };
+    worker.onerror=error=>reject(Error('Routing worker failed to load: '+(error.message||'unknown error')));
+    worker.onmessageerror=()=>reject(Error('Routing returned an unreadable result.'));
+    worker.postMessage({serial,crystals,settings});
+   });
+   if(JSON.stringify(getSettings())!==before||JSON.stringify(getCrystals())!==crystalBefore){
+    onStatus('Model changed during automatic routing. No stale pixel positions were applied.');
+    return;
+   }
+   if(result.valid&&result.settings){
+    applyWireDraft(result.settings);onEdit();
+    onStatus('Routing fixed. Pixel positions, fixings and measured cable lengths were kept. Prepare the print mesh again.');
+   }else{
+    renderFeedback($('wireRouteStatus'),{severity:'error',title:'The route needs a manual adjustment.',
+     body:result.reason||'No safe route was found.',details:getPlan().wirePlan?.messages||[]});
+    onStatus('No automatic route fits. The original model is unchanged. Review the red box in Build.');
+   }
+  }catch(error){
+   onStatus('Automatic routing stopped safely. '+error.message);
+   const status=$('wireRouteStatus');
+   if(status)renderFeedback(status,{severity:'error',title:'Automatic routing stopped without changing your model.',
+    body:error.message,details:['The search is limited to 8 seconds to keep the editor responsive.',
+     'Try moving a pixel closer to the perimeter, changing its rotation or choosing a measured longer wire.']});
+  }finally{
+   if(deadline!==null)clearTimeout(deadline);
+   worker?.terminate();
+   if(autoRepairWorker===worker)autoRepairWorker=null;
+   if(button?.isConnected){button.disabled=false;button.removeAttribute('aria-busy');}
+  }
  }
  function placementValid(kind,pos,replaceIndex=null,s=getSettings()){
   if(kind==='tab'){

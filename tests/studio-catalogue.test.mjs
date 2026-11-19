@@ -328,6 +328,15 @@ for(const [family,parameters] of fittingCases){
  assert.throws(()=>applyBuildModules(source,{...build,backingTabs:[{u:.125},{u:.125}]},family.capabilities),/overlapping/);
  assert.throws(()=>applyBuildModules(source,{backingTabs},family.capabilities),/stationary fitting backing/);
 }
+// Single-material Tiles have separate fitting-backing capability from legacy base.
+assert.equal(tileGenerator.capabilities.supportsBase,false);
+assert.equal(tileGenerator.capabilities.supportsStationaryFittingBacking,true);
+assert.throws(()=>applyBuildModules(tileGenerator.recipe({pattern:'grass',dualMaterial:true}),
+ {pixelBacking:true,backingTabs:[{u:.125}]},tileGenerator.capabilities),
+ /stationary single-material|dual-material/);
+assert.throws(()=>applyBuildModules(tileGenerator.recipe({pattern:'grass',dualMaterial:false}),
+ {backingTabs:[{u:.125}]},tileGenerator.capabilities),
+ /stationary fitting backing/);
 console.log('WT-021 attached backing tabs: six native families, volume, union, fixing cuts and STL/3MF.');
 
 const extendedRouting=[

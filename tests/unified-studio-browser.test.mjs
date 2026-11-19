@@ -175,6 +175,20 @@ try{
  await page.getByRole('searchbox',{name:'Search settings'}).fill('not a real setting');
  assert(await page.locator('.sms-settings [data-filtered]').count());
  await page.getByRole('searchbox',{name:'Search settings'}).clear();
+ // WT-021 discoverability: left-hand finder indexes downloads and physical
+ // tools independently of the right-hand precision settings filter.
+ const findTools=page.getByRole('searchbox',{name:'Find tools and downloads'});
+ await findTools.fill('pixel fit test');
+ assert(await page.getByRole('button',{name:/Download pixel fit test \(STL\)/}).isVisible(),
+  'Find tools locates the actual printable pixel test coupon');
+ await findTools.fill('magnet');
+ assert(await page.getByRole('button',{name:/Open mounting and attachments/}).isVisible());
+ await findTools.fill('Cura');
+ assert(await page.getByRole('button',{name:/Open Cura profile download/}).isVisible());
+ await findTools.fill('fictional missing tool');
+ assert(await page.getByText(/No matching tools/).isVisible());
+ await findTools.fill('pixel');await findTools.press('Escape');
+ assert.equal(await findTools.inputValue(),'');
  await shot('wt014-desktop');
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
  await page.locator('.sms-palette').getByRole('button',{name:'Add pixel automatically',exact:true}).click();
@@ -931,6 +945,14 @@ try{
  assert.match(tabSTL.name,/\.stl$/);
  assert(tabSTL.bytes.readUInt32LE(80)>0);
  assert(zipEntries((await useDownload(tabJob.locator('[data-job-3mf]'))).bytes).has('3D/3dmodel.model'));
+
+
+ await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+ await page.reload();await page.waitForFunction(()=>window.__sensoryStudio);
+ assert.equal((await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles))[0].x,changed[0].x,
+  'Native mounting state must survive workspace reload');
+ await page.locator('.sms-workspace-nav [data-tab=build]').click();
+ assert(await page.locator('.sms-palette').getByRole('button',{name:'M1',exact:true}).isVisible());
 
  await page.evaluate(()=>window.__sensoryStudio.addModel('crystals',null,'WT017 Crystals'));
  await page.locator('.sms-workspace-nav [data-tab=build]').click();

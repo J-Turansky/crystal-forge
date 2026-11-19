@@ -451,7 +451,9 @@ export const characterGenerator=define('characters','Characters & Silhouettes','
  }
  return {positive,secondary,negative:[],bounds:{width:w,depth:h,height:t+1.2},warnings:['Broad joined features reduce fragility; inspect printed horns, ears, legs and edges before participant use.']};
 });
-export const tileGenerator={...tactileTileGenerator,parameterSchema:tactileTileGenerator.parameterSchema.map(s=>({...s,label:s.label||s.key.replace(/[A-Z]/g,c=>' '+c.toLowerCase()),step:s.key==='seed'?1:s.key==='randomness'?.05:.5})),
+export const tileGenerator={...tactileTileGenerator,
+ capabilities:{...tactileTileGenerator.capabilities,supportsStationaryFittingBacking:true},
+ parameterSchema:tactileTileGenerator.parameterSchema.map(s=>({...s,label:s.label||s.key.replace(/[A-Z]/g,c=>' '+c.toLowerCase()),step:s.key==='seed'?1:s.key==='randomness'?.05:.5})),
  recipe(input){const r=generateTile(input);return {serialSupport:{outline:r.bodies[0].mesh.boreOutline,thickness:r.parameters.thickness},pixelBoreSupport:{outline:r.bodies[0].mesh.boreOutline,minThickness:r.parameters.thickness},positive:[{kind:'mesh',mesh:r.bodies[0].mesh}],partitioned:r.parameters.dualMaterial,secondary:r.bodies.length===2?[{kind:'mesh',mesh:r.bodies[1].mesh}]:[],negative:[],dualMaterial:r.parameters.dualMaterial,bounds:this.estimateBounds(input),warnings:['Tactile feel, cleanability and edge comfort require a printed sample.']};}};
 export const svgArtworkGenerator=define('svg-artwork','Imported SVG artwork','Imports',[],[],
  p=>buildSvgExtrusionRecipe(p.artwork),{supportsDualMaterial:false});
@@ -539,8 +541,8 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
  // An opt-in, real positive backing provides material for pixel seats on
  // curves and open shells. Old models never receive this automatically.
  if(build.pixelBacking){
-  if(!capabilities.supportsBase||r.partitioned)
-   throw Error('Fitting backing needs a compatible single-material model. Turn off dual-material mode.');
+  if((!capabilities.supportsBase&&!capabilities.supportsStationaryFittingBacking)||r.partitioned||r.dualMaterial)
+   throw Error('Fitting backing needs a compatible stationary single-material model. Turn off dual-material mode or choose a supported model.');
   const thickness=Number(build.pixelBackingThickness??4);
   if(!Number.isFinite(thickness)||thickness<3||thickness>10)
    throw Error('Choose 3–10 mm fitting backing thickness.');
