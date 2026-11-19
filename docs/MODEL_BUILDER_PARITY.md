@@ -64,3 +64,7 @@ The profile editor also exports a single negative Test Socket or an optional fiv
 ## WT-021 face-aware drag and profile isolation
 
 Native pixel and through-hole drags now raycast the visible model and retain the installation side. Crystal project clearance is keyed by profile; legacy fallback values and coupon variants remain supported. The existing Tile browser journey checks a real top-face mounting drag and reload. Full 7/7 physical sockets, routing, interaction and export acceptance remains open under #79.
+
+## WT-021 configurable native cable openings
+
+Compatible backing can use editable IN/OUT perimeter percentages or automatic exits. Both use the same recessed cutter with an extension outside the stock. Pins may be rejected when no safe bend or corner clearance is available. Tests cover a curved pinned route, invalid placement, genuine fabrication and persisted browser controls. Seven independent manufacturing journeys remain open under #79.

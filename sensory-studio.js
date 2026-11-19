@@ -1137,6 +1137,29 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    '><option value="25">25 mm</option><option value="50">50 mm</option><option value="100">100 mm</option><option value="custom">Custom</option></select></label>'+
    '<label>IN tail limit (mm)<input data-native-in-tail type="number" min="5" max="250" value="'+esc(settings.inTail)+'"'+disabled+'></label>'+
    '<label>OUT tail limit (mm)<input data-native-out-tail type="number" min="5" max="250" value="'+esc(settings.outTail)+'"'+disabled+'></label>');
+  const edgeControls=document.createElement('fieldset');
+  edgeControls.innerHTML='<legend>Physical cable openings</legend><p>Set a perimeter position from 0 to less than 100%, or leave blank for automatic.</p>';
+  for(const [end,key] of [['in','inEdgePercent'],['out','outEdgePercent']]){
+   const label=document.createElement('label'),input=document.createElement('input');
+   label.textContent=end.toUpperCase()+' perimeter position (%) ';
+   input.type='number';input.min='0';input.max='99.99999999999999';input.step='any';
+   input.dataset.nativeEdge=end;input.disabled=!!model.link;
+   input.value=settings[key]??'';
+   input.onchange=()=>{
+    if(!input.checkValidity()){input.reportValidity();input.value=settings[key]??'';return;}
+    change({[key]:input.value===''?null:input.valueAsNumber});
+   };
+   label.append(input);edgeControls.append(label);
+   const resolved=plan.edgePositions?.[end];
+   if(Number.isFinite(resolved)&&settings[key]==null){
+    const pin=document.createElement('button');
+    pin.type='button';pin.textContent='Pin automatic '+end.toUpperCase()+' opening';
+    pin.dataset.nativePin=end;pin.disabled=!!model.link;
+    pin.onclick=()=>change({[key]:resolved});
+    edgeControls.append(pin);
+   }
+  }
+  block.append(edgeControls);
   const pitch=block.querySelector('[data-native-pitch]');
   pitch.value=settings.customPitch||![25,50,100].includes(settings.pitch)?'custom':settings.pitch;
   pitch.onchange=()=>change(pitch.value==='custom'?{customPitch:true}:{pitch:Number(pitch.value),customPitch:false});
