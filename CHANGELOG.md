@@ -1,5 +1,17 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.31 — Keep native pixel markers on the selected face
+
+- Preserve the chosen through-bore opening and show available cable guides without enabling cutters.
+
+## v0.16.0-dev.30 — Explain the physical face and bore in native placement
+
+- Separate automatic placement, block unsupported side faces and anchor placement actions at the selected point.
+
+## v0.16.0-dev.29 — Keep manual native pixel placement active
+
+- Place successive pixel fittings with a live validity ring and end placement with Done or Escape.
+
 ## v0.16.0-dev.28 — Consolidate WT-018 for main review
 
 - Bring together backed routing, artwork and mesh import, native pixel placement and independent cable guides.

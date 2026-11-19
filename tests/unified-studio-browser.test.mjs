@@ -177,7 +177,7 @@ try{
  await page.getByRole('searchbox',{name:'Search settings'}).clear();
  await shot('wt014-desktop');
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
- await page.locator('.sms-palette').getByRole('button',{name:'Add pixel',exact:true}).click();
+ await page.locator('.sms-palette').getByRole('button',{name:'Add pixel automatically',exact:true}).click();
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles.length),1);
  await page.locator('#smsGlobalUndo').click();
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length||0),0);
@@ -224,7 +224,7 @@ try{
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.mode),'Decorative');
  assert(await purpose.evaluate(input=>document.activeElement===input));
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
- await page.locator('.sms-palette').getByRole('button',{name:'Add pixel',exact:true}).click();
+ await page.locator('.sms-palette').getByRole('button',{name:'Add pixel automatically',exact:true}).click();
  const pixel=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0]);
  assert(pixel);
  assert.notDeepEqual([pixel.x,pixel.z],[25.3,0]);
@@ -254,7 +254,7 @@ try{
  await page.locator('#smsPicker [data-generator="tactile-tiles"]').click();
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
  const pixelPalette=page.locator('.sms-palette');
- await pixelPalette.getByRole('button',{name:'Add pixel',exact:true}).click();
+ await pixelPalette.getByRole('button',{name:'Add pixel automatically',exact:true}).click();
  const getHoles=()=>page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
  const [initialHole]=await getHoles();
  await page.locator('[data-view=top]').click();
@@ -309,6 +309,7 @@ try{
  await page.mouse.dblclick(surface.x+surface.width/2,surface.y+surface.height/2);
  const fittingActions=page.getByRole('dialog',{name:'Hardware at this point'});
  await fittingActions.waitFor();
+ assert.match(await fittingActions.innerText(),/bore opens on both faces/);
  await shot('wt018-tile-hardware-context');
  await page.keyboard.press('Escape');
  await fittingActions.waitFor({state:'hidden'});
@@ -320,6 +321,24 @@ try{
  assert.notEqual(placed.id,sameId);
  assert.equal(placed.checked,true);
  await shot('wt006-pixel-placement');
+ await pixelPalette.getByRole('button',{name:'Place LED fitting in 3D'}).click();
+ const nativeCanvas=viewer.locator('canvas');
+ await pixelPalette.getByRole('button',{name:'Done placing pixels'}).waitFor();
+ const y=surface.y+surface.height/2;
+ for(const fraction of [.58,.42,.64,.36,.70,.30]){
+  const x=surface.x+surface.width*fraction;
+  await page.mouse.move(x,y);
+  if(await nativeCanvas.getAttribute('data-native-placement')==='valid'){
+   await page.mouse.click(x,y);
+   break;
+  }
+ }
+ assert.equal((await getHoles()).length,2,'Manual placement adds another fitting and remains active.');
+ await pixelPalette.getByRole('button',{name:'Done placing pixels'}).waitFor();
+ await shot('wt019-native-placement');
+ await page.keyboard.press('Escape');
+ await pixelPalette.getByRole('button',{name:'Done placing pixels'}).waitFor({state:'hidden'});
+ assert.equal((await getHoles()).length,2,'Exiting placement keeps accepted fittings.');
  const nameProject=async name=>{
   await page.locator('#smsProjectTitle').fill(name);
   await page.locator('#smsProjectTitle').press('Tab');
@@ -671,10 +690,10 @@ try{
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
   const palette=page.locator('.sms-palette');
   const serial=palette.getByRole('group',{name:'Serial LED string'});
-  await palette.getByRole('button',{name:'Add pixel',exact:true}).click();
+  await palette.getByRole('button',{name:'Add pixel automatically',exact:true}).click();
   const position=palette.locator('[data-pixel-field=x]');
   await position.fill('-15');await position.press('Tab');
-  await palette.getByRole('button',{name:'Add pixel',exact:true}).click();
+  await palette.getByRole('button',{name:'Add pixel automatically',exact:true}).click();
   await position.fill('15');await position.press('Tab');
   await serial.locator('[data-native-route]').click();
   assert(await serial.locator('[data-native-route]').isChecked());
@@ -716,10 +735,26 @@ try{
   await page.locator('.sms-workspace-nav [data-tab=design]').click();
   await palette.getByRole('button',{name:'Solid',exact:true}).click();
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
-  await palette.getByRole('button',{name:'Add pixel',exact:true}).click();
+  await palette.getByRole('button',{name:'Add pixel automatically',exact:true}).click();
   await position.fill('-15');await position.press('Tab');
-  await palette.getByRole('button',{name:'Add pixel',exact:true}).click();
+  await palette.getByRole('button',{name:'Add pixel automatically',exact:true}).click();
   await position.fill('15');await position.press('Tab');
+  assert(await serial.locator('[data-native-preview]').isChecked(),'Gear route guide defaults on when a path exists');
+  assert(!(await serial.locator('[data-native-route]').isChecked()),'Viewing Gear wiring does not enable machining');
+  await page.locator('[data-view=bottom]').click();
+  await page.waitForTimeout(500);
+  const second=(await getHoles())[1];
+  assert.equal(second.x,15,'Gear P2 accepts its exact X coordinate before placement');
+  await palette.getByRole('button',{name:'Remove P2',exact:true}).click();
+  const underside=await page.evaluate(({x,z})=>window.__sensoryStudio.fittingPointScreen(x,z,'underside'),second);
+  assert(underside,'Gear P2 has a solid underside at the intended position');
+  await page.mouse.dblclick(underside.x,underside.y);
+  await fittingActions.getByRole('button',{name:'Add pixel',exact:true}).click();
+  const replaced=(await getHoles())[1];
+  assert.equal(replaced.entryFace,'underside');
+  assert(Math.hypot(replaced.x-second.x,replaced.z-second.z)<1,
+   'Gear placement preserves the clicked underside location: '+JSON.stringify({second,replaced}));
+  await shot('wt019-gear-underside');
   await serial.locator('[data-native-route]').click();
   assert(await serial.locator('[data-native-route]').isChecked());
   assert.match(await serial.innerText(),/Channels ready/);
@@ -754,7 +789,7 @@ try{
  await page.locator('#pixelFlangeDiameter').fill('5');
  await page.locator('#savePixelProfileBtn').click();
  await wavePalette.getByRole('button',{name:/Reusable 4.5 mm seed/}).waitFor();
- await wavePalette.getByRole('button',{name:'Add pixel',exact:true}).click();
+ await wavePalette.getByRole('button',{name:'Add pixel automatically',exact:true}).click();
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].diameter),4.5);
  await shot('wt017-pixel-profile-build');
  const nativeFamilies=[
@@ -768,11 +803,11 @@ try{
   await page.evaluate(({type,parameters})=>window.__sensoryStudio.addModel(type,parameters,'WT017 '+type),{type,parameters});
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
   const pal=page.locator('.sms-palette');
-  assert(await pal.getByRole('button',{name:'Add pixel',exact:true}).isVisible(),type+' has Add pixel');
+  assert(await pal.getByRole('button',{name:'Add pixel automatically',exact:true}).isVisible(),type+' has Add pixel');
   assert(await pal.getByRole('button',{name:'Create / edit pixel profile'}).isVisible());
   await pal.getByRole('button',{name:/Reusable 4.5 mm seed/}).click();
   if(backing)await pal.locator('[data-pixel-backing]').check();
-  await pal.getByRole('button',{name:'Add pixel',exact:true}).click();
+  await pal.getByRole('button',{name:'Add pixel automatically',exact:true}).click();
   const saved=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
   assert.equal(saved.length,1,type+' accepted a measured fitting');
   assert.equal(saved[0].diameter,4.5,type+' reused named profile');

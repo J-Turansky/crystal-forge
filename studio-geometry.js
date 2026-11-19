@@ -66,9 +66,10 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
    new THREE.MeshBasicMaterial({color:0xffbe47,depthTest:false}));
   ring.rotation.x=-Math.PI/2;
   const [x,,z]=hole.position;
-  surfaceRay.set(new THREE.Vector3(x,recipe.bounds.height+100,z),new THREE.Vector3(0,-1,0));
+  const underside=hole.pixelEntryFace==='underside';
+  surfaceRay.set(new THREE.Vector3(x,underside?-100:recipe.bounds.height+100,z),new THREE.Vector3(0,underside?1:-1,0));
   const surface=surfaceRay.intersectObjects(solidSurfaces,false)[0];
-  ring.position.set(x,(surface?.point.y??recipe.bounds.height)+.3,z);
+  ring.position.set(x,(surface?.point.y??(underside?0:recipe.bounds.height))+(underside?-.3:.3),z);
   ring.renderOrder=5;
   ring.userData.previewOnly=true;
   ring.userData.pixelId=hole.pixelId;
@@ -85,7 +86,7 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
    text.fillStyle='#193146';text.fillRect(0,0,96,48);text.fillStyle='#fff9db';text.font='bold 32px sans-serif';text.textAlign='center';
    text.fillText('P'+hole.pixelHole.split(' ').at(-1),48,36);
    const tag=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthTest:false}));
-   tag.position.copy(ring.position);tag.position.y+=2;tag.scale.set(6,3,1);tag.renderOrder=6;
+   tag.position.copy(ring.position);tag.position.y+=underside?-2:2;tag.scale.set(6,3,1);tag.renderOrder=6;
    tag.userData.previewOnly=true;tag.userData.pixelLabel=hole.pixelId;group.add(tag);
   }
  }

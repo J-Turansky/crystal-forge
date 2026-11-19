@@ -25,7 +25,7 @@ export function addPixelHoleCuts(recipe,holes=[]){
    throw Error(label+' is too close to the edge of the model bounds.');
   if(holes.slice(0,index).some(other=>Math.hypot(hole.x-other.x,hole.z-other.z)<bore+radius(other)+minimumWeb))
    throw Error(label+' overlaps or is too close to another pixel hole.');
-  recipe.negative.push({kind:'cylinder',radius:bore,height:height+12,position:[hole.x,height/2,hole.z],pixelHole:label,pixelId:pixelId(hole,index),pixelRotation:hole.rotation??0});
+  recipe.negative.push({kind:'cylinder',radius:bore,height:height+12,position:[hole.x,height/2,hole.z],pixelHole:label,pixelId:pixelId(hole,index),pixelRotation:hole.rotation??0,pixelEntryFace:hole.entryFace});
  }
  if(holes.length)recipe.warnings.push('Pixel bores are cut vertically through the model. Inspect the prepared mesh and print a fit test before making the full part.');
 }
