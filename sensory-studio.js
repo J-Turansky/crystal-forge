@@ -1240,6 +1240,20 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   block.insertAdjacentHTML('beforeend','<label><input type="checkbox" data-vaulted-route'+
    (settings.vaulted?' checked':'')+disabled+'> Vault wire-track roofs for underside-down printing</label>');
   block.querySelector('[data-vaulted-route]').onchange=e=>change({vaulted:e.target.checked});
+  const widthLabel=document.createElement('label'),widthInput=document.createElement('input');
+  widthLabel.textContent='Requested wire-track width (mm) ';
+  widthInput.type='number';widthInput.min='1.5';widthInput.max='12';widthInput.step='any';
+  widthInput.value=settings.channelWidthMm??3.2;
+  widthInput.required=true;widthInput.disabled=!!model.link;
+  widthInput.dataset.nativeChannelWidth='';
+  widthInput.onchange=()=>{
+   if(!widthInput.checkValidity()){widthInput.reportValidity();widthInput.value=settings.channelWidthMm??3.2;return;}
+   change({channelWidthMm:widthInput.valueAsNumber});
+  };
+  widthLabel.append(widthInput);block.append(widthLabel);
+  const widthNote=document.createElement('p');
+  widthNote.textContent='Planned usable width: '+plan.channelWidthMm.toFixed(2)+' mm. Fitting relief may require a wider track.';
+  block.append(widthNote);
   const guide=document.createElement('label'),show=document.createElement('input');
   show.type='checkbox';show.dataset.nativePreview='';show.checked=showNativeGuide(model);
   show.onchange=()=>{nativeGuideChoices.set(model.id,show.checked);refreshPixelMarkers(model);};

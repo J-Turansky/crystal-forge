@@ -102,13 +102,18 @@ function cutter(points,label,radius,depth,vaulted){
 
 function channelSize(build){
  const shaped=(build.pixelHoles||[]).filter(hole=>hole.socketProfile);
- return {radius:Math.max(radius,...shaped.map(hole=>(hole.socketProfile.wireWidth+hole.clearance)/2)),
+ const requested=build.serialRouting?.channelWidthMm;
+ const requestedRadius=Number.isFinite(requested)&&requested>=1.5&&requested<=12?requested/2:radius;
+ return {radius:Math.max(requestedRadius,...shaped.map(hole=>(hole.socketProfile.wireWidth+hole.clearance)/2)),
   depth:Math.max(depth,...shaped.map(hole=>hole.socketProfile.wireDepth))};
 }
 
 export function nativeRouteEligibility(recipe,build){
  if((build.pixelHoles||[]).some(hole=>hole.socketProfile&&hole.surface))
   return 'Physical grooves require sockets on the flat underside backing. Disable physical routing or move the sockets to that backing.';
+ const requested=build.serialRouting?.channelWidthMm;
+ if(requested!=null&&(!Number.isFinite(requested)||requested<1.5||requested>12))
+  return 'Wire-track width must be between 1.5 and 12 mm.';
  if(!recipe.serialSupport)return recipe.serialReason||'Enable fitting backing to check this model for serial routing.';
  if(recipe.dualMaterial)return 'Use a single material for native serial routing.';
  const channel=channelSize(build);
@@ -126,7 +131,7 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
  const {radius,depth}=channelSize(build);
  const enabled=build.serialRouting?.enabled===true;
  const settings=enabled?build.serialRouting:{version:1,pitch:50,...build.serialRouting};
- const plan={enabled,ready:false,links:[],cutters:[],reason:nativeRouteEligibility(recipe,build)};
+ const plan={enabled,channelWidthMm:radius*2,ready:false,links:[],cutters:[],reason:nativeRouteEligibility(recipe,build)};
  if(!plan.enabled&&!guide)return plan;
  if(settings.version!==1){plan.reason='This serial route version is unsupported. Turn routing off to prepare bores only.';return plan;}
  if(plan.reason)return plan;
