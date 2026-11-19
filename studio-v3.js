@@ -674,7 +674,7 @@ function centreOrbitOnModel(){
 window.__crystalForgeViewMetrics=()=>{
  const box=modelBounds(),center=box.getCenter(new THREE.Vector3());
  const p=center.clone().project(camera);
- return {screen:[p.x,p.y,p.z],center:center.toArray(),
+ return {settled:cameraTween===null,screen:[p.x,p.y,p.z],center:center.toArray(),
   target:orbit.target.toArray(),camera:camera.position.toArray(),modelSize:box.getSize(new THREE.Vector3()).toArray(),
   distance:camera.position.distanceTo(orbit.target)};
 };
@@ -734,12 +734,23 @@ function resize(){
  }
 }
 new ResizeObserver(resize).observe($('viewport'));resize();requestAnimationFrame(animate);
-let rebuildTimer;
+let rebuildTimer,pendingRebuild;
+function cancelScheduledEdit(){
+ clearTimeout(rebuildTimer);
+ pendingRebuild=null;
+}
+function flushScheduledEdit(){
+ const run=pendingRebuild;
+ cancelScheduledEdit();
+ run?.();
+}
 function schedule(full=true){
- clearTimeout(rebuildTimer);rebuildTimer=setTimeout(()=>{
+ cancelScheduledEdit();
+ pendingRebuild=()=>{
   if(full)rebuild();else{updateLEDs();renderInfo()}
   snapshot();
- },85);
+ };
+ rebuildTimer=setTimeout(flushScheduledEdit,85);
 }
 document.querySelectorAll('[data-family-weight]').forEach(input=>input.addEventListener('input',()=>{
  const name=input.dataset.familyWeight;
@@ -1244,6 +1255,8 @@ function cancelActivePreparation(reason='Preparation cancelled'){
 async function buildManufacturing(){
  $('prepareStatus').classList.remove('issue-box');delete $('prepareStatus').dataset.severity;
  if($('prepareBtn').disabled)return;
+ // Synchronise preview components before the worker captures them.
+ flushScheduledEdit();
  const btn=$('prepareBtn'),cancelBtn=$('cancelPrepareBtn'),source=sourceHash();
  // Reuse the cached manifold result unless the editable model changed.
  if(manufacturingMesh&&manufacturingReport&&preparedSource===source){
@@ -1723,7 +1736,7 @@ if(studioBootstrap&&!new URLSearchParams(location.search).has('legacy'))studioBr
  createCrystals:parameters=>({crystals:generateFormation({...defaults,...parameters}),selectedId:null}),
  previewGroup:()=>{const group=new THREE.Group();for(const mesh of [...crystalMeshes,...(baseMesh?[baseMesh]:[]),...baseAccents])group.add(mesh.clone());return group;},
  detach:()=>{
-  clearTimeout(rebuildTimer);cameraTween=null;hardwareUI?.cancel();cancelActivePreparation('Switched model');gizmo.detach();clearHardwareAnnotations();
+  cancelScheduledEdit();cameraTween=null;hardwareUI?.cancel();cancelActivePreparation('Switched model');gizmo.detach();clearHardwareAnnotations();
   const value={meshes:crystalMeshes,base:baseMesh,accents:baseAccents,pixels:pixelGroup,manufacturingMesh,manufacturingReport,preparedSource,
    history:[...history],historyIndex,camera:camera.position.toArray(),target:orbit.target.toArray()};
   for(const mesh of [...crystalMeshes,...(baseMesh?[baseMesh]:[]),...baseAccents,pixelGroup,...(manufacturingMesh?[manufacturingMesh]:[])])scene.remove(mesh);
@@ -1731,7 +1744,7 @@ if(studioBootstrap&&!new URLSearchParams(location.search).has('legacy'))studioBr
   pixelGroup=new THREE.Group();scene.add(pixelGroup);hardwareUI?.refresh();return value;
  },
  activate:(model,cached)=>{
-  cameraTween=null;clearTimeout(rebuildTimer);s={...defaults,...clone(model.parameters)};crystals=clone(model.editableState.crystals||[]);selectedId=model.editableState.selectedId||null;
+  cameraTween=null;cancelScheduledEdit();s={...defaults,...clone(model.parameters)};crystals=clone(model.editableState.crystals||[]);selectedId=model.editableState.selectedId||null;
   history.splice(0);historyIndex=-1;
   if(cached){
    scene.remove(pixelGroup);crystalMeshes=cached.meshes;baseMesh=cached.base;baseAccents=cached.accents;pixelGroup=cached.pixels;

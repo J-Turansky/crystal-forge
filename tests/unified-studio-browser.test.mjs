@@ -838,11 +838,11 @@ try{
   for(const [view,direction] of [['iso',[1,.75,1]],['front',[0,.12,1]],['back',[0,.12,-1]],['bottom',[0,-1,.0001]],['top',[0,1,.0001]]]){
    await page.locator('[data-view='+view+']').click();
    await page.waitForFunction(direction=>{
-    const {modelSize,center,target,camera,screen}=window.__crystalForgeViewMetrics();
+    const {settled,modelSize,center,target,camera,screen}=window.__crystalForgeViewMetrics();
     const offset=camera.map((value,i)=>value-target[i]);
     const dot=offset.reduce((sum,value,i)=>sum+value*direction[i],0);
     const aligned=dot/(Math.hypot(...offset)*Math.hypot(...direction))>.999;
-    return aligned&&modelSize.every(size=>size>0)&&Math.abs(screen[0])<.02&&Math.abs(screen[1])<.02&&
+    return settled&&aligned&&modelSize.every(size=>size>0)&&Math.abs(screen[0])<.02&&Math.abs(screen[1])<.02&&
      Math.hypot(...center.map((value,i)=>value-target[i]))<.1;
    },direction);
   }
