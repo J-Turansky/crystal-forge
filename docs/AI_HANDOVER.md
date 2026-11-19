@@ -1,5 +1,9 @@
 # AI handover — read immediately after AGENTS.md
 
+## WT-015 — Library organisation
+
+Library favourites apply to saved Library records and saved project snapshots. Collections use stable IDs and unique case-insensitive names. Saved snapshots get an additive identity separate from the project ID. Project templates keep valid project-scoped model IDs and reset print readiness. Models pin an explicit Library revision. Local JSON and the private vault retain the optional versioned organisation record. Missing template sources are displayed for recovery.
+
 ## WT-013 — Prepared light-path inspection
 
 - Crystal fabrication samples the final solid in the worker. The audit probes 0.2 mm radius segments from the underside along each known bore, counts obstruction above 0.001 mm³, limits each segment to 300 mm and limits inspection to 160 probes. Shared hollowing is reported as unknown where a source-to-spike route cannot be traced.

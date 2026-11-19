@@ -1,3 +1,4 @@
+import {readOrganisation,organisationName,ensureSnapshotIds,templateProject,mergeOrganisation} from './studio-organisation.js';
 import {createLightInspector} from './studio-light-inspector.js';
 import {lightPassageExportBlock,lightPassageReportEntries} from './light-passage-inspection.js';
 import {renderPixelProfileDiagram} from './pixel-profile-diagram.js';
@@ -22,7 +23,13 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  const unified=new URLSearchParams(location.search).get('layout')!=='legacy';
  let printExpanded=false,quickPrintThumbnail=null;
  const printSizes=new WeakMap();
- state.savedProjects??=[];project.printer={printer:'Ultimaker 3 Extended',curaNozzle:.4,curaMaterial:'PLA',curaQuality:60,curaIntent:'balanced',...project.printer};
+ state.savedProjects??=[];
+ ensureSnapshotIds(state.savedProjects);
+ state.organisation=readOrganisation(state.organisation);
+ let collectionFilter='',favouritesOnly=false,templatesOnly=false;
+ function saveProjectSnapshot(){
+  const saved=copy(project);saved.snapshotId=newId();state.savedProjects.push(saved);return saved;
+ }project.printer={printer:'Ultimaker 3 Extended',curaNozzle:.4,curaMaterial:'PLA',curaQuality:60,curaIntent:'balanced',...project.printer};
  const crystalAdapter={typeId:'crystals',typeVersion:1,displayName:'Crystal Clusters',category:'Lighting',defaultParameters:adapter.capture().settings,
   parameterSchema:[],presets:crystalStartingPoints(adapter.formationDefaults()),capabilities:{supportsBase:true,supportsLEDs:true,supportsMounting:true,supportsTactileSurfaces:false,supportsMechanisms:false,supportsDualMaterial:false,supportsPartSplitting:true},
   validateParameters:p=>({valid:!!p,errors:[],parameters:p}),generatePreview:()=>adapter.capture(),
@@ -870,7 +877,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     const item=document.createElement('button');item.className='sms-tile';item.append(modelPicture(model.thumbnail||(model.id===currentId&&model.generator.typeId==='crystals'?thumbnail(adapter.previewGroup()):null)),model.name);item.onclick=()=>switchModel(model.id);root.append(item);
    }
    for(const saved of state.savedProjects.filter(item=>item.title.toLowerCase().includes(query))){
-    const item=document.createElement('button');item.textContent='Open project: '+saved.title;item.onclick=()=>{if(!confirm('Open this project and save a copy of the current project?'))return;remember();state.savedProjects.push(copy(project));replaceProject(saved);};root.append(item);
+    const item=document.createElement('button');item.textContent='Open project: '+saved.title;item.onclick=()=>{if(!confirm('Open this project and save a copy of the current project?'))return;remember();saveProjectSnapshot();replaceProject(saved);};root.append(item);
    }
    if(!root.children.length)root.textContent='No matching work. Clear search or create a model.';
   };
@@ -1077,11 +1084,91 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const syncActions=document.createElement('div');syncActions.className='sms-actions';syncActions.innerHTML='<button id="smsCloudPush">Upload studio backup</button><button id="smsCloudPull">Pull and reconcile studio backup</button><p id="smsSyncState" role="status">Local — no sync requested</p>';panel.append(syncActions);
   $('smsCloudPush').onclick=()=>syncStudio(false);$('smsCloudPull').onclick=()=>syncStudio(true);
   $('smsSearch').oninput=e=>{search=e.target.value;renderLibraryCards();};$('smsFilter').onchange=e=>{filter=e.target.value;renderLibraryCards();};
-  $('smsBrowseModels').onclick=openPicker;$('smsDemo').onclick=demo;$('smsSaveProject').onclick=()=>{state.savedProjects.push(copy(project));save();renderLibraryCards();};$('smsBackup').onclick=backup;$('smsImport').onchange=importFile;
+  $('smsBrowseModels').onclick=openPicker;$('smsDemo').onclick=demo;$('smsSaveProject').onclick=()=>{saveProjectSnapshot();save();renderLibraryCards();};$('smsBackup').onclick=backup;$('smsImport').onchange=importFile;
+  const organise=document.createElement('section');
+  organise.innerHTML='<h3>Organise Library</h3><div class="sms-actions"><button id="smsLibraryAll">All items</button><button id="smsFavourites">Favourites</button><button id="smsTemplates">Templates</button></div><label>Collections<select id="smsCollections"></select></label><div class="sms-actions"><button id="smsCollectionNew">Create collection</button><button id="smsCollectionRename">Rename collection</button><button id="smsCollectionDelete">Delete collection</button></div><p id="smsOrganisationStatus" role="status">Organisation is stored locally until you back up your workspace.</p>';
+  panel.append(organise);
+  $('smsLibraryAll').onclick=()=>{collectionFilter='';favouritesOnly=false;templatesOnly=false;renderLibraryCards();};
+  $('smsFavourites').onclick=()=>{favouritesOnly=!favouritesOnly;templatesOnly=false;renderLibraryCards();};
+  $('smsTemplates').onclick=()=>{templatesOnly=!templatesOnly;renderLibraryCards();};
+  $('smsCollections').onchange=e=>{collectionFilter=e.target.value;templatesOnly=false;renderLibraryCards();};
+  $('smsCollectionNew').onclick=()=>editCollection(false);
+  $('smsCollectionRename').onclick=()=>editCollection(true);
+  $('smsCollectionDelete').onclick=()=>{
+   const collection=state.organisation.collections.find(c=>c.id===collectionFilter);
+   if(!collection||!confirm('Delete collection “'+collection.name+'”? Its models, projects and templates stay in the Library.'))return;
+   editOrganisation(next=>{
+    next.collections=next.collections.filter(c=>c.id!==collection.id);
+    for(const item of Object.values(next.items))item.collectionIds=item.collectionIds.filter(id=>id!==collection.id);
+   },()=>{collectionFilter='';});
+  };
   renderTabs();renderLibraryCards();
+ }
+ function editOrganisation(change,after=()=>{},redraw=true){
+  try{
+   const next=copy(state.organisation);change(next);
+   const valid=readOrganisation(next);
+   validateProject(project);
+   localStorage.setItem(WORKSPACE_KEY,JSON.stringify({...state,organisation:valid}));
+   state.organisation=valid;after();if(redraw)renderLibraryCards();
+   $('smsOrganisationStatus').textContent='Saved locally.';
+  }catch(error){$('smsOrganisationStatus').textContent=error.message;}
+ }
+ function editCollection(rename){
+  const current=state.organisation.collections.find(c=>c.id===collectionFilter);
+  if(rename&&!current)return;
+  const input=prompt(rename?'Rename collection':'Name the new collection',rename?current.name:'');
+  if(input===null)return;
+  const id=rename?current.id:newId();
+  editOrganisation(next=>{
+   const name=organisationName(input);
+   if(rename)next.collections.find(c=>c.id===id).name=name;
+   else next.collections.push({id,name});
+  },()=>{collectionFilter=id;templatesOnly=false;});
+ }
+ function organisationActions(actions,kind,id,revision){
+  const key=kind+':'+id,item=state.organisation.items[key]||{favorite:false,collectionIds:[]};
+  const update=(change,after,redraw)=>editOrganisation(next=>{
+   const entry=next.items[key]||={favorite:false,collectionIds:[]};change(entry);
+   if(!entry.favorite&&!entry.collectionIds.length)delete next.items[key];
+  },after,redraw);
+  const add=(name,handler)=>{
+   const button=document.createElement('button');button.type='button';button.textContent=name;button.onclick=handler;actions.append(button);return button;
+  };
+  add(item.favorite?'★ Favourited':'☆ Favourite',()=>update(entry=>{entry.favorite=!entry.favorite;})).setAttribute('aria-pressed',String(item.favorite));
+  const picker=document.createElement('details'),summary=document.createElement('summary');
+  summary.textContent='Collections'+(item.collectionIds.length?' ('+item.collectionIds.length+')':'');picker.append(summary);
+  for(const collection of state.organisation.collections){
+   const label=document.createElement('label'),input=document.createElement('input');
+   input.type='checkbox';input.checked=item.collectionIds.includes(collection.id);
+   input.onchange=()=>update(entry=>{
+    entry.collectionIds=input.checked?[...entry.collectionIds,collection.id]:entry.collectionIds.filter(cid=>cid!==collection.id);
+   },()=>{
+    const count=state.organisation.items[key]?.collectionIds.length||0;
+    summary.textContent='Collections'+(count?' ('+count+')':'');
+   },!input.checked&&collectionFilter===collection.id);
+   label.append(input,' '+collection.name);picker.append(label);
+  }
+  if(!state.organisation.collections.length)picker.append('Create a collection to organise this item.');
+  actions.append(picker);
+  add('Save as reusable template',()=>{
+   const input=prompt('Template name');if(input===null)return;
+   editOrganisation(next=>next.templates.push({id:newId(),name:organisationName(input),kind,sourceId:id,...(kind==='model'?{revision}:{})}));
+  });
  }
  function renderLibraryCards(){
   overlay.innerHTML='<h1>Your model library</h1><p>Closing a tab keeps its model here.</p><h2>In this project</h2><div id="smsProjectModels" class="sms-grid"></div><h2>Saved models</h2><div id="smsSavedModels" class="sms-grid"></div><h2>Saved projects</h2><div id="smsSavedProjects" class="sms-grid"></div>';
+  const org=state.organisation;
+  const select=$('smsCollections');
+  select.replaceChildren(new Option('All collections',''),...org.collections.map(c=>new Option(c.name,c.id)));
+  select.value=collectionFilter;
+  for(const [id,pressed] of [['smsLibraryAll',!favouritesOnly&&!templatesOnly&&!collectionFilter],['smsFavourites',favouritesOnly],['smsTemplates',templatesOnly]])$(id).setAttribute('aria-pressed',String(pressed));
+  $('smsCollectionRename').disabled=$('smsCollectionDelete').disabled=!collectionFilter;
+  const includesItem=(kind,id)=>{
+   const item=org.items[kind+':'+id];
+   return (!favouritesOnly||item?.favorite)&&(!collectionFilter||item?.collectionIds.includes(collectionFilter));
+  };
+  if(templatesOnly){renderTemplates(org);return;}
   const matches=m=>(filter==='all'||m.generator.typeId===filter)&&(!search||m.name.toLowerCase().includes(search.toLowerCase()));
   function card(model,root,libraryRecord=null){
    const tile=document.createElement('article');tile.className='sms-tile';
@@ -1092,19 +1179,21 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    tile.prepend(modelPicture(src));
    const actions=tile.querySelector('.sms-actions');
    const action=(name,fn)=>{const b=document.createElement('button');b.textContent=name;b.onclick=fn;actions.append(b);};
-   if(!libraryRecord){action('Open',()=>switchModel(model.id));action('Save to library',()=>saveModel(model));action('Duplicate',()=>{const m=duplicateModel(project,model.id);switchModel(m.id);});}
+   if(!libraryRecord){action('Open',()=>switchModel(model.id));action('Save to library',()=>{saveModel(model);renderLibraryCards();});action('Duplicate',()=>{const m=duplicateModel(project,model.id);switchModel(m.id);});}
    else{
     action('Independent copy',()=>{const m=insertLibraryModel(project,state.library,libraryRecord.id);switchModel(m.id);});
     action('Linked copy',()=>{const m=insertLibraryModel(project,state.library,libraryRecord.id,{linked:true});switchModel(m.id);});
+    organisationActions(actions,'model',libraryRecord.id,libraryRecord.versions.at(-1).revision);
     if(libraryRecord.versions.length>1)action('Older revision',()=>{const versions=libraryRecord.versions;const chosen=prompt('Revision to open ('+versions.map(v=>v.revision).join(', ')+')',String(versions.at(-2).revision));if(chosen){const m=insertLibraryModel(project,state.library,libraryRecord.id,{revision:Number(chosen)});switchModel(m.id);}});
    }
    action('Export editable JSON',()=>adapter.download(new Blob([JSON.stringify(model,null,2)],{type:'application/json'}),model.generator.typeId+'-model.json'));
    root.append(tile);
   }
-  project.models.filter(matches).forEach(m=>card(m,$('smsProjectModels')));
-  state.library.filter(r=>matches(r.versions.at(-1).model)).forEach(r=>card(r.versions.at(-1).model,$('smsSavedModels'),r));
+  if(!favouritesOnly&&!collectionFilter)project.models.filter(matches).forEach(m=>card(m,$('smsProjectModels')));
+  state.library.filter(r=>includesItem('model',r.id)&&matches(r.versions.at(-1).model)).forEach(r=>card(r.versions.at(-1).model,$('smsSavedModels'),r));
   for(const saved of state.savedProjects){
-   if(!saved.title.toLowerCase().includes(search.toLowerCase()))continue;
+   if(!includesItem('project',saved.snapshotId)||!saved.title.toLowerCase().includes(search.toLowerCase())||
+    (filter!=='all'&&!saved.models.some(model=>model.generator.typeId===filter)))continue;
    const tile=document.createElement('article');tile.className='sms-tile';
    const thumbnail=saved.models.find(model=>isModelThumbnail(model.thumbnail))?.thumbnail;
    const count=saved.models.length;
@@ -1114,7 +1203,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    button.setAttribute('aria-label','Open project '+saved.title);
    button.onclick=()=>{
     if(!confirm('Open this saved project? Your current project will be kept as a saved copy.'))return;
-    remember();state.savedProjects.push(copy(project));replaceProject(saved);
+    remember();saveProjectSnapshot();replaceProject(saved);
    };
    const rename=document.createElement('button');
    rename.type='button';rename.textContent='Rename';
@@ -1133,9 +1222,48 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     saved.title=title;save();renderLibraryCards();
    };
    tile.querySelector('.sms-actions').append(rename);
+   organisationActions(tile.querySelector('.sms-actions'),'project',saved.snapshotId);
    tile.append(status);
    $('smsSavedProjects').append(tile);
   }
+  for(const id of ['smsProjectModels','smsSavedModels','smsSavedProjects'])if(!$(id).childElementCount)$(id).textContent='No matching items.';
+ }
+ function renderTemplates(org){
+  overlay.replaceChildren();
+  const heading=document.createElement('h1');heading.textContent='Reusable templates';overlay.append(heading);
+  const grid=document.createElement('div');grid.className='sms-grid';overlay.append(grid);
+  for(const template of org.templates){
+   if(!template.name.toLowerCase().includes(search.toLowerCase()))continue;
+   const source=template.kind==='model'
+    ?state.library.find(record=>record.id===template.sourceId)?.versions.find(version=>version.revision===template.revision)?.model
+    :state.savedProjects.find(saved=>saved.snapshotId===template.sourceId);
+   if(filter!=='all'&&source&&!(source.models||[source]).some(model=>model.generator.typeId===filter))continue;
+   const tile=document.createElement('article');tile.className='sms-tile';
+   const title=document.createElement('h3');title.textContent=template.name;
+   const status=document.createElement('p');
+   status.textContent=source?(template.kind==='model'?'Model · revision '+template.revision:'Project template'):'Unavailable source';
+   tile.append(modelPicture(source?.thumbnail||source?.models?.find(model=>isModelThumbnail(model.thumbnail))?.thumbnail),title,status);
+   const controls=document.createElement('div');controls.className='sms-actions';tile.append(controls);
+   const action=(name,handler)=>{
+    const button=document.createElement('button');button.type='button';button.textContent=name;button.onclick=handler;controls.append(button);
+   };
+   if(source&&template.kind==='model')for(const [name,linked] of [['Independent copy',false],['Linked copy',true]])action(name,()=>{
+    const model=insertLibraryModel(project,state.library,template.sourceId,{revision:template.revision,linked});switchModel(model.id);
+   });
+   if(source&&template.kind==='project')action('Create project from template',()=>{
+    if(!confirm('Create a new project from this template? Your current project will be saved as a recoverable copy.'))return;
+    try{
+     const next=templateProject(source);captureCrystal();
+     const saved=copy(project);saved.snapshotId=newId();
+     const savedProjects=[...state.savedProjects,saved];
+     localStorage.setItem(WORKSPACE_KEY,JSON.stringify({...state,savedProjects}));
+     state.savedProjects=savedProjects;remember();replaceProject(next);
+    }catch(error){$('smsOrganisationStatus').textContent=error.message;}
+   });
+   action('Remove template',()=>{if(confirm('Remove this template? Its source stays in the Library.'))editOrganisation(next=>{next.templates=next.templates.filter(t=>t.id!==template.id);});});
+   grid.append(tile);
+  }
+  if(!grid.childElementCount)grid.textContent='No matching templates. Save a model or project as a reusable template to get started.';
  }
  async function syncStudio(pull){
   const label=$('smsSyncState');
@@ -1145,9 +1273,10 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    captureCrystal();saveImmediately();if(label)label.textContent=pull?'Checking and downloading…':'Uploading changed assets…';
    if(pull){
     const remote=await studioVault.pull();localStorage.setItem('sensory-model-studio-before-cloud-'+Date.now(),JSON.stringify(state));
-    const sourceIds=new Map();
+    const sourceIds=new Map(),organisationIds=new Map();
+    ensureSnapshotIds(remote.savedProjects);
     for(const record of remote.library){const local=state.library.find(r=>r.id===record.id);
-     if(local&&JSON.stringify(local)!==JSON.stringify(record)){const old=record.id;record.id=newId();sourceIds.set(old,record.id);for(const version of record.versions){version.model.id=record.id;version.model.name+=' (cloud copy)';}state.library.push(record);}
+     if(local&&JSON.stringify(local)!==JSON.stringify(record)){const old=record.id;record.id=newId();sourceIds.set(old,record.id);organisationIds.set('model:'+old,'model:'+record.id);for(const version of record.versions){version.model.id=record.id;version.model.name+=' (cloud copy)';}state.library.push(record);}
      else if(!local)state.library.push(record);
     }
     const all=[...state.savedProjects,project];
@@ -1155,8 +1284,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
      for(const model of candidate.models)if(model.link&&sourceIds.has(model.link.sourceId))model.link.sourceId=sourceIds.get(model.link.sourceId);
      if(all.some(p=>JSON.stringify(p)===JSON.stringify(candidate)))continue;
      if(all.some(p=>p.id===candidate.id)){candidate.id=newId();candidate.title+=' (cloud copy)';}
+     const oldSnapshot=candidate.snapshotId;
+     if(!oldSnapshot||state.savedProjects.some(saved=>saved.snapshotId===oldSnapshot))candidate.snapshotId=newId();
+     if(oldSnapshot)organisationIds.set('project:'+oldSnapshot,'project:'+candidate.snapshotId);
      state.savedProjects.push(candidate);all.push(candidate);
     }
+    state.organisation=mergeOrganisation(state.organisation,remote.organisation,organisationIds);
     saveImmediately();renderLibraryCards();if(label)label.textContent='Synced — local and cloud versions preserved. Open the cloud project copy from Saved projects.';
    }else{await studioVault.push(state);if(label)label.textContent='Synced — complete private backup saved.';}
   }catch(error){if(label)label.textContent='Sync paused / conflict: '+error.message;adapter.status(error.message);}
@@ -1413,7 +1546,19 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  async function importFile(e){
   const file=e.target.files[0];if(!file)return;
   try{const data=JSON.parse(await file.text());
-   if(data.schemaVersion===1&&data.project){validateProject(data.project);saveImmediately();localStorage.setItem('sensory-model-studio-before-import-'+Date.now(),JSON.stringify(state));state.savedProjects.push(copy(project));state.library.push(...(data.library||[]).filter(r=>!state.library.some(ours=>ours.id===r.id)));replaceProject(data.project);}
+   if(data.schemaVersion===1&&data.project){
+    validateProject(data.project);
+    const organisation=mergeOrganisation(state.organisation,data.organisation);
+    const savedProjects=ensureSnapshotIds([...(data.savedProjects||[])].map(validateProject));
+    if(!confirm('Restore this workspace backup? Your current workspace will be kept in a local recovery copy.'))return;
+    saveImmediately();localStorage.setItem('sensory-model-studio-before-import-'+Date.now(),JSON.stringify(state));
+    saveProjectSnapshot();
+    state.library.push(...(data.library||[]).filter(r=>!state.library.some(ours=>ours.id===r.id)));
+    state.savedProjects.push(...savedProjects.filter(saved=>!state.savedProjects.some(ours=>ours.snapshotId===saved.snapshotId)));
+    state.organisation=organisation;
+    if(!state.legacyTemplates?.length)state.legacyTemplates=data.legacyTemplates||[];
+    replaceProject(data.project);
+   }
    else if(data.schemaVersion===1&&data.generator){addModel(project,data);switchModel(data.id);}
    else if(data.settings&&Array.isArray(data.crystals)){const model=createModel({name:data.settings.title||file.name,typeId:'crystals',parameters:data.settings,editableState:{crystals:data.crystals,selectedId:null}});addModel(project,model);switchModel(model.id);}
    else throw Error('This is not a supported studio backup or Crystal project.');
