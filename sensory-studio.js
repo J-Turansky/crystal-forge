@@ -1241,12 +1241,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   renderMountPalette(root,model);
  }
  async function downloadPixelCoupon(model,hole,options,button){
-  button.disabled=true;
+  if(button)button.disabled=true;
   try{
    const sizes=await adapter.pixelFitCoupon(hole,options);
    if(active()?.id===model.id)pixelStatus(model,'Fit test downloaded. Bore diameters: '+sizes.map(size=>size.toFixed(2)).join(', ')+' mm.');
   }catch(error){if(active()?.id===model.id)pixelStatus(model,error.message);}
-  finally{button.disabled=false;}
+  finally{if(button)button.disabled=false;}
  }
  function bindPixelEditor(root,model,holes,profiles){
   bindPixelBuilder(root,{holes,profiles,onAdd:()=>addAutomaticPixel(model),onRemove:index=>removePixel(model,index),
