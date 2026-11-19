@@ -226,6 +226,17 @@ for(const recipe of [tileRoute,gearRoute]){
 }
 const curveBuild={pixelHoles:[checked('left',-15),checked('right',15,2)],pixelBuilderVersion:1,serialRouting:serial};
 const curvePlan=applyBuildModules(tileRoute,curveBuild).nativeRouting;
+const flatStock={bounds:{width:70,depth:40,height:10},
+ positive:[{kind:'box',size:[70,10,40],position:[0,5,0]}],negative:[],
+ serialSupport:{outline:[[-35,-20],[35,-20],[35,20],[-35,20]],thickness:10}};
+const flatBuild={...curveBuild,pixelHoles:[checked('left',-15),checked('right',15)],serialRouting:serial};
+const automatic=applyBuildModules(flatStock,flatBuild).nativeRouting;
+const pinnedBuild={...flatBuild,serialRouting:{...serial,inEdgePercent:automatic.edgePositions.in-2,outEdgePercent:automatic.edgePositions.out+2}};
+const pinned=applyBuildModules(flatStock,pinnedBuild);
+assert.equal(pinned.nativeRouting.cutters.length,3,'Pinned openings retain both exterior cutters');
+assert(pinned.nativeRouting.links[0].path.length>2,'Offset IN is a smooth curved path');
+assert(prepareRecipe(THREE,wasm,pinned).bodies[0].volume>0);
+assert.throws(()=>applyBuildModules(flatStock,{...pinnedBuild,serialRouting:{...serial,inEdgePercent:100}}),/Chosen IN edge/);
 const guideBuild={...curveBuild,serialRouting:{...serial,enabled:false}};
 const guideRecipe=applyBuildModules(tileRoute,guideBuild,{},{preview:true});
 const boreOnly=applyBuildModules(tileRoute,guideBuild);

@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.35.6 — Configurable cable openings
+
+- Pin or adjust physical IN and OUT openings on compatible native backing while preserving bend and cable-length checks.
+
 ## v0.16.0-dev.35.4 — Face-aware fitting movement and profile clearance
 
 - Keep native fitting drags on their installation face and isolate saved Crystal socket allowances by profile.

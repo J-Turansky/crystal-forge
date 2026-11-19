@@ -32,6 +32,40 @@ function exitAlong(port,direction,outline){
  if(!first||first.incidence<.6)return null;
  return add(port,direction,first.t);
 }
+function perimeterEnds(outline){
+ const ccw=outline.reduce((sum,a,i)=>sum+cross(a,outline[(i+1)%outline.length]),0)>0;
+ const segments=[];
+ let perimeter=0;
+ for(let i=0;i<outline.length;i++){
+  const a=outline[i],d=sub(outline[(i+1)%outline.length],a),span=length(d);
+  if(span<1e-6)continue;
+  const tangent=unit(d),outward=ccw?{x:tangent.z,z:-tangent.x}:{x:-tangent.z,z:tangent.x};
+  segments.push({a,d,span,offset:perimeter,outward});
+  perimeter+=span;
+ }
+ return {
+  pin(percent){
+   if(!Number.isFinite(percent)||percent<0||percent>=100)return null;
+   const at=percent*perimeter/100;
+   const segment=segments.find(edge=>at<edge.offset+edge.span);
+   if(!segment)return null;
+   const along=at-segment.offset;
+   const point=add(segment.a,segment.d,along/segment.span);
+   if(segments.some((edge,i)=>gap(point,edge.a)<radius+1&&
+    dot(unit(edge.d),unit(segments[(i+segments.length-1)%segments.length].d))<.9))return null;
+   return {point,outward:segment.outward};
+  },
+  percent(point){
+   let best=null;
+   for(const edge of segments){
+    const along=Math.max(0,Math.min(edge.span,dot(sub(point,edge.a),unit(edge.d))));
+    const miss=gap(point,add(edge.a,edge.d,along/edge.span));
+    if(!best||miss<best.miss)best={miss,percent:(edge.offset+along)*100/perimeter};
+   }
+   return best?.percent%100;
+  }
+ };
+}
 function samples(points){
  const result=[points[0]];
  for(let i=1;i<points.length;i++){
@@ -105,10 +139,24 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
  };
  const start=pixels[0],end=pixels.at(-1),inPort=pixelStringPort(start,'input'),outPort=pixelStringPort(end,'output');
  const inAxis=pixelStringAxis(start),outAxis=pixelStringAxis(end);
- const outside=(edge,axis)=>edge&&[.5,1,1.5,2,2.5,3,3.5,4].every(step=>boundary(add(edge,axis,step),outline)<0)?edge:null;
- const outward={x:-inAxis.x,z:-inAxis.z};
- const entry=outside(exitAlong(inPort,outward,outline),outward),exit=outside(exitAlong(outPort,outAxis,outline),outAxis);
- addLink('EDGE IN → P1',entry?[entry,inPort]:null,[start.id],inTail,entry);
+ const outside=(edge,axis)=>edge&&[.5,1,1.5,2,2.5,3,3.5,4].every(step=>boundary(add(edge,axis,step),outline)<0);
+ const perimeter=perimeterEnds(outline);
+ const tail=(port,axis,percent)=>{
+  if(percent==null){
+   const point=exitAlong(port,axis,outline);
+   return outside(point,axis)?{point,outward:axis,path:[port,point]}:null;
+  }
+  const chosen=perimeter.pin(percent);
+  if(!chosen||!outside(chosen.point,chosen.outward))return null;
+  const path=sampleCableCurve(port,chosen.point,axis,chosen.outward);
+  return path?{...chosen,path}:null;
+ };
+ const entry=tail(inPort,{x:-inAxis.x,z:-inAxis.z},settings.inEdgePercent);
+ const exit=tail(outPort,outAxis,settings.outEdgePercent);
+ plan.edgePositions={in:entry?perimeter.percent(entry.point):null,out:exit?perimeter.percent(exit.point):null};
+ addLink('EDGE IN → P1',entry?.path.slice().reverse(),[start.id],inTail,entry?.point);
+ if(!entry&&settings.inEdgePercent!=null)plan.links.at(-1).reason='Chosen IN edge is too close to a corner or has no safe bend. Move the endpoint or use automatic.';
+
  for(let i=0;i<pixels.length-1;i++){
   const a=pixels[i],b=pixels[i+1],p=pixelStringPort(a,'output'),q=pixelStringPort(b,'input');
   const forward=unit(sub(q,p)),from=pixelStringAxis(a),to=pixelStringAxis(b);
@@ -116,14 +164,15 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
   // Include the in-bore distance at each end for physical centre-to-centre pitch.
   addLink('P'+(i+1)+' → P'+(i+2),curve,[a.id,b.id],pitch,null,gap(a,p)+gap(b,q));
  }
- addLink('P'+pixels.length+' → EDGE OUT',exit?[outPort,exit]:null,[end.id],outTail,exit);
- if(entry&&exit&&gap(entry,exit)<6)plan.links.at(-1).reason='Use distinct perimeter exits at least 6 mm apart.';
+ addLink('P'+pixels.length+' → EDGE OUT',exit?.path,[end.id],outTail,exit?.point);
+ if(!exit&&settings.outEdgePercent!=null)plan.links.at(-1).reason='Chosen OUT edge is too close to a corner or has no safe bend. Move the endpoint or use automatic.';
+ if(entry&&exit&&gap(entry.point,exit.point)<6)plan.links.at(-1).reason='Use distinct perimeter exits at least 6 mm apart.';
  plan.reason=plan.links.filter(link=>link.reason).map(link=>link.label+': '+link.reason).join(' ');
  plan.ready=!plan.reason;
  if(plan.ready&&plan.enabled)plan.cutters=plan.links.map((link,i)=>{
   const points=link.path.slice();
-  if(i===0)points.unshift(add(entry,inAxis,-4));
-  if(i===plan.links.length-1)points.push(add(exit,outAxis,4));
+  if(i===0)points.unshift(add(entry.point,entry.outward,4));
+  if(i===plan.links.length-1)points.push(add(exit.point,exit.outward,4));
   return cutter(points,link.label);
  });
  for(const link of plan.links){delete link.dense;delete link.ends;}
