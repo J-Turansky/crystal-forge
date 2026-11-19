@@ -1187,12 +1187,39 @@ try{
    assert(socket.socketProfile.bodyHeight>0);
    assert(socket.surface.normal[1]>.999);
    assert.equal(socket.entryFace,'top');
+   const nativeToggle=page.getByRole('checkbox',{name:'Show physical pixels and socket cutters'});
+   await nativeToggle.check();
+   const nativePreview=page.locator('[data-native-fit-preview-status]');
+   await nativePreview.filter({hasText:/insertion 22\\.00 mm/}).waitFor({timeout:120000});
+   assert.match(await nativePreview.innerText(),/centre roof .*mm/);
+   assert.match(await nativePreview.innerText(),/stock interference/);
+   await nativeToggle.uncheck();
+   assert.equal(await nativePreview.innerText(),'');
   }else{
    await page.locator('[data-pixel-status]').filter({hasText:/continuous stock/}).waitFor();
    assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length??0),0);
   }
   await page.keyboard.press('Escape');
  }
+ // FIT-02: actual Gear and Tile profile/cutter overlay UI parity.
+ await page.evaluate(()=>window.__sensoryStudio.addModel('tactile-tiles',{
+  pattern:'terraces',width:90,depth:90,thickness:20,relief:2,dualMaterial:false
+ },'FIT-02 Tile underside'));
+ await page.locator('.sms-workspace-nav [data-tab=build]').click();
+ await page.locator('[data-view=bottom]').click();
+ await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+ await page.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+ const tilePoint=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(0,0,'underside'));
+ assert(tilePoint,'Tile fitting needs a physical underside');
+ await page.mouse.click(tilePoint.x,tilePoint.y);
+ await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===1,{timeout:120000});
+ const tileToggle=page.getByRole('checkbox',{name:'Show physical pixels and socket cutters'});
+ await tileToggle.check();
+ const tilePreview=page.locator('[data-native-fit-preview-status]');
+ await tilePreview.filter({hasText:/insertion 9\\.00 mm/}).waitFor({timeout:120000});
+ assert.match(await tilePreview.innerText(),/stock interference/);
+ await tileToggle.uncheck();
+ await page.keyboard.press('Escape');
  assert.deepEqual(errors,[]);
  console.log('Unified Home, Design, Build, Library and Quick Print screenshots captured.');
 }catch(error){
