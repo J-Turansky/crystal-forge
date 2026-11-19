@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.26 — Document the WT-018 review and production gates
+
+- Record the current roadmap, review order and acceptance checks.
+
 ## v0.16.0-dev.25 — Open pixel placement from the 3D model
 
 - Double-click a solid native Build surface to check and place the selected pixel profile.
