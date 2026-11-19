@@ -723,7 +723,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  placementGhost.visible=false;
  scene.add(placementGhost);
  function endPixelPlacement(){
-  placementModel=null;pendingDuplicate=null;placementGhost.visible=false;
+  placementModel=null;mountingModel=null;pendingDuplicate=null;placementGhost.visible=false;
   delete viewport.dataset.nativePlacement;
  }
  function fittingCandidate(model,point,duplicate=null){
@@ -733,10 +733,13 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  function updatePlacementGhost(model,event){
   const hit=fittingSurface(model,event);
   if(!hit){placementGhost.visible=false;viewport.dataset.nativePlacement='outside';return;}
-  const {point}=hit,hole=fittingCandidate(model,point,pendingDuplicate),holes=pixelHoles(model);
-  const issue=fittingFaceIssue(hit)||(holes.length>=16?'Use up to 16 fittings per model.':pixelIssue(model,hole,holes));
+  const {point}=hit,placingMount=mountingModel===model.id;
+  const hole=placingMount?newMount(Math.round(point.x*10)/10,Math.round(point.z*10)/10):fittingCandidate(model,point,pendingDuplicate);
+  const holes=placingMount?mountHoles(model):pixelHoles(model);
+  const issue=fittingFaceIssue(hit)||(holes.length>=16?'Maximum 16 fittings per model.':
+   placingMount?mountIssue(model,{...hole,entryFace:hit.normal.y<0?'underside':'top'},holes):pixelIssue(model,hole,holes));
   placementGhost.position.set(hole.x,point.y+(hit.normal.y<0?-.3:.3),hole.z);
-  placementGhost.scale.setScalar((hole.diameter+hole.clearance)/2);
+  placementGhost.scale.setScalar((hole.diameter+(hole.clearance||0))/2);
   placementGhost.material.color.setHex(issue?0xff3c59:0x48e4f1);
   placementGhost.visible=true;
   viewport.dataset.nativePlacement=issue?'invalid':'valid';
@@ -749,16 +752,25 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(issue){pixelStatus(model,pixelPlacementAdvice(model,issue));return false;}
   return savePixels(model,[...holes,{...hole,checked:true}],hole.id);
  }
+ function placeMountAt(model,{point,normal}){
+  const mounts=mountHoles(model);
+  if(mounts.length>=16){pixelStatus(model,'Use up to 16 mounting holes per model.');return false;}
+  const mount=newMount(Math.round(point.x*10)/10,Math.round(point.z*10)/10);
+  mount.entryFace=normal.y<0?'underside':'top';
+  const issue=fittingFaceIssue({normal})||mountIssue(model,mount,mounts);
+  if(issue){pixelStatus(model,issue);return false;}
+  return saveMounts(model,[...mounts,mount],mount.id);
+ }
  const fittingActions=document.createElement('dialog');
  fittingActions.setAttribute('aria-label','Hardware at this point');
- fittingActions.innerHTML='<p data-fitting-message></p><button type="button" data-add-point-pixel>Add pixel</button> <button type="button" data-cancel-point>Cancel</button>';
+ fittingActions.innerHTML='<p data-fitting-message></p><button type="button" data-add-point-pixel>Add pixel</button> <button type="button" data-add-point-mount>Add mounting feature</button> <button type="button" data-cancel-point>Cancel</button>';
  document.body.append(fittingActions);
  fittingActions.querySelector('[data-cancel-point]').onclick=()=>fittingActions.close();
  viewport.addEventListener('dblclick',event=>{
    const model=active();
-   if(event.button!==0||!canEditPixels(model)||model.link||placementModel===model.id)return;
+   if(event.button!==0||!canEditPixels(model)||model.link||placementModel===model.id||mountingModel===model.id)return;
    const marker=markerAt(model,event);
-   if(marker){consume(event);selectPixel(model,marker.userData.pixelId);return;}
+   if(marker){consume(event);if(marker.userData.mountId)selectMount(model,marker.userData.mountId);else selectPixel(model,marker.userData.pixelId);return;}
    const hit=fittingSurface(model,event);
    if(!hit)return;
    const {point}=hit;
@@ -767,6 +779,18 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    const holes=pixelHoles(model), candidate=fittingCandidate(model,point);
    const issue=fittingFaceIssue(hit)||(holes.length>=16?'Use up to 16 fittings per model.':pixelIssue(model,candidate,holes));
    fittingActions.querySelector('[data-fitting-message]').textContent=issue?pixelPlacementAdvice(model,issue):'Place a vertical through-bore here. The bore opens on both faces; cable cuts are on the underside.';
+   const holeMount=newMount(Math.round(point.x*10)/10,Math.round(point.z*10)/10);
+   holeMount.entryFace=hit.normal.y<0?'underside':'top';
+   const mounts=mountHoles(model),mountButton=fittingActions.querySelector('[data-add-point-mount]');
+   const mountProblem=fittingFaceIssue(hit)||(mounts.length>=16?'Use up to 16 mounting holes per model.':mountIssue(model,holeMount,mounts));
+   mountButton.disabled=!!mountProblem;
+   mountButton.title=mountProblem||'Cut a measured 3.4 mm vertical through-hole on verified solid material';
+   mountButton.onclick=()=>{
+    fittingActions.close();
+    if(active()?.id===model.id&&canEditPixels(model))placeMountAt(model,hit);
+   };
+   if(mountProblem&&!issue)fittingActions.querySelector('[data-fitting-message]').textContent+=
+    ' Mount: '+mountProblem;
    add.disabled=!!issue;
    add.onclick=()=>{
     fittingActions.close();
