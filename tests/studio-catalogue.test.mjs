@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import Module from 'manifold-3d';
 import {waveGenerator,tileGenerator,gearGenerator,capGenerator,characterGenerator,pebbleGenerator,generators,applyBuildModules} from '../studio-catalogue.js';
 import {findPixelPosition,newPixel} from '../studio-pixel-builder.js';
+import {planNativePixelString} from '../studio-native-routing.js';
 import {previewRecipe,disposeGroup,prepareRecipe} from '../studio-geometry.js';
 import {exportMaterialBodies,preparedDimensionsMm} from '../studio-material-export.js';
 const wasm=await Module();wasm.setup();
@@ -204,6 +205,31 @@ for(const id of ['knob','selector']){
 
 const checked=(id,x,z=0,rotation=0)=>({id,x,z,rotation,checked:true,diameter:5,clearance:.3,profileId:'seed'});
 const serial={version:1,enabled:true,pitch:50,tail:200};
+
+/* WT-021 AUD-02: socket fit tolerance is *not* an independent wire-width knob.
+ * A changed body-bore clearance must never alter the channel's usable width.
+ * The physical relief F or explicit channelWidthMm governs that dimension. */
+{
+ const recipe=gearGenerator.recipe({mode:'Decorative',wheelStyle:'Rounded lobes',
+  webStyle:'Solid',bore:0,diameter:100,teeth:12,thickness:8});
+ const build=(boreClearance,physicalWireWidth=5.5,requestedWireWidth=2.5)=>({
+  pixelHoles:[checked('wire-a',-15),checked('wire-b',15)].map(hole=>({
+   ...hole,clearance:boreClearance,entryFace:'underside',
+   socketProfile:{wireWidth:physicalWireWidth,wireDepth:1.8}
+  })),
+  serialRouting:{...serial,channelWidthMm:requestedWireWidth}
+ });
+ const tight=planNativePixelString(recipe,build(.1));
+ const loose=planNativePixelString(recipe,build(.5));
+ assert.equal(tight.channelWidthMm,5.5);
+ assert.equal(loose.channelWidthMm,tight.channelWidthMm,
+  'Changing socket diametral fit clearance must not change the actual routed wire width');
+ assert.equal(planNativePixelString(recipe,build(.1,6)).channelWidthMm,6,
+  'Changing measured physical wire relief F must change the minimum route width');
+ assert.equal(planNativePixelString(recipe,build(.1,5.5,7)).channelWidthMm,7,
+  'An independently requested wider wire channel must be respected');
+ console.log('WT-021 native route width stays independent from body-bore clearance');
+}
 const tileRoute=tileGenerator.recipe({pattern:'terraces',width:84,depth:76,thickness:5});
 const gearRoute=gearGenerator.recipe({mode:'Decorative',wheelStyle:'Rounded lobes',webStyle:'Solid',bore:0,diameter:100,teeth:12,thickness:8});
 for(const [recipe,family] of [[tileRoute,tileGenerator],[gearRoute,gearGenerator]]){
