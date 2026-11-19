@@ -1151,7 +1151,6 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   });
   const remove=block.querySelector('[data-remove-mount]');
   if(remove)remove.onclick=()=>removeMount(model,selected);
- }
   const tabList=model.build.backingTabs||[],tabDiameter=model.build.backingTabDiameter??3.4;
   const tabs=document.createElement('fieldset');
   tabs.innerHTML='<legend>External backing tabs</legend>'+
