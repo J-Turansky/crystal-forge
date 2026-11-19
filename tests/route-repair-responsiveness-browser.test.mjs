@@ -27,7 +27,10 @@ try{
  await page.reload();
  await page.waitForFunction(()=>document.querySelector('#status')?.textContent?.includes('Ready'),null,{timeout:45000});
  await page.locator('[data-tab="build"]').click();
- const repair=page.locator('#wireRouteStatus button').filter({hasText:'Try automatic routing'});
+ const lighting=page.locator('summary').filter({hasText:'Pixel lighting plan'});
+ await lighting.waitFor({state:'visible'});
+ if(!(await lighting.evaluate(summary=>summary.parentElement.open)))await lighting.click();
+ const repair=page.locator('#wireRouteStatus').getByRole('button',{name:'Try automatic routing',exact:true});
  await repair.waitFor({timeout:10000});
  const before=await page.evaluate(()=>JSON.parse(localStorage.getItem('crystal-forge-v3')).settings.manualPixelHoles);
  await repair.click({timeout:5000});
