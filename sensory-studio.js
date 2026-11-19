@@ -1174,7 +1174,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    tile.prepend(modelPicture(src));
    const actions=tile.querySelector('.sms-actions');
    const action=(name,fn)=>{const b=document.createElement('button');b.textContent=name;b.onclick=fn;actions.append(b);};
-   if(!libraryRecord){action('Open',()=>switchModel(model.id));action('Save to library',()=>saveModel(model));action('Duplicate',()=>{const m=duplicateModel(project,model.id);switchModel(m.id);});}
+   if(!libraryRecord){action('Open',()=>switchModel(model.id));action('Save to library',()=>{saveModel(model);renderLibraryCards();});action('Duplicate',()=>{const m=duplicateModel(project,model.id);switchModel(m.id);});}
    else{
     action('Independent copy',()=>{const m=insertLibraryModel(project,state.library,libraryRecord.id);switchModel(m.id);});
     action('Linked copy',()=>{const m=insertLibraryModel(project,state.library,libraryRecord.id,{linked:true});switchModel(m.id);});
@@ -1248,11 +1248,11 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    if(source&&template.kind==='project')action('Create project from template',()=>{
     if(!confirm('Create a new project from this template? Your current project will be saved as a recoverable copy.'))return;
     try{
-     const next=templateProject(source);remember();
+     const next=templateProject(source);captureCrystal();
      const saved=copy(project);saved.snapshotId=newId();
      const savedProjects=[...state.savedProjects,saved];
      localStorage.setItem(WORKSPACE_KEY,JSON.stringify({...state,savedProjects}));
-     state.savedProjects=savedProjects;replaceProject(next);
+     state.savedProjects=savedProjects;remember();replaceProject(next);
     }catch(error){$('smsOrganisationStatus').textContent=error.message;}
    });
    action('Remove template',()=>{if(confirm('Remove this template? Its source stays in the Library.'))editOrganisation(next=>{next.templates=next.templates.filter(t=>t.id!==template.id);});});

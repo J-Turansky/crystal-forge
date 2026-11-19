@@ -1,5 +1,9 @@
 # Crystal Forge — verification strategy and commands
 
+## WT-015 Library organisation
+
+Static tests check organisation validation, project template identity, legacy manifest compatibility and the mocked private-vault round-trip. Chromium exercises Library filtering and template actions with real browser controls.
+
 ## WT-013 inspection
 
 Fabrication tests intersect actual Manifold material with small route probes, including a known open and a known blocked source. Chromium checks sections, keyboard slider movement, selection, strict download rejection, package report metadata, and illuminated Pod inspection. The screenshot artifact captures prepared sections. Use installed Cura layer view and a physical coupon/print to check remaining walls, fittings, cable access and real illumination.
