@@ -207,6 +207,23 @@ for(const recipe of [tileRoute,gearRoute]){
  assert.throws(()=>applyBuildModules(recipe,short),/P1 → P2: Cable budget exceeded/);
  assert.throws(()=>applyBuildModules(recipe,{...build,mounting:true},{supportsMounting:true}),/mounting cuts/);
 }
+// The selected opening changes the viewport marker, while both openings
+// are machined by the same through-bore and route cutters.
+{
+ const pixelHoles=[checked('left',-15),checked('right',15)];
+ const prepare=entryFace=>applyBuildModules(gearRoute,{
+  pixelBuilderVersion:1,serialRouting:serial,pixelHoles:pixelHoles.map(hole=>({...hole,entryFace}))
+ },gearGenerator.capabilities);
+ const top=prepare('top'),underside=prepare('underside');
+ assert.equal(underside.negative.find(part=>part.pixelHole).pixelEntryFace,'underside');
+ assert.deepEqual(top.nativeRouting,underside.nativeRouting);
+ const topBody=prepareRecipe(THREE,wasm,top);
+ const undersideBody=prepareRecipe(THREE,wasm,underside);
+ assert.equal(topBody.bodies[0].volume,undersideBody.bodies[0].volume);
+ const output=exportMaterialBodies(undersideBody,{name:'gear-underside'});
+ assert.equal(output.stls.length,1);
+ assert(output.threeMF.length>100);
+}
 const curveBuild={pixelHoles:[checked('left',-15),checked('right',15,2)],pixelBuilderVersion:1,serialRouting:serial};
 const curvePlan=applyBuildModules(tileRoute,curveBuild).nativeRouting;
 const guideBuild={...curveBuild,serialRouting:{...serial,enabled:false}};
