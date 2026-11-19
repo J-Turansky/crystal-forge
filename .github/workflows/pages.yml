@@ -2,6 +2,9 @@ name: Deploy Crystal Forge to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/pages.yml']
 permissions:
   contents: read
   pages: write
@@ -11,10 +14,7 @@ concurrency:
   cancel-in-progress: false
   queue: max
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,20 +25,42 @@ jobs:
           node-version: '22'
       - name: Verify production release
         env:
-          RELEASE_BASE: ${{ github.event.before }}
+          RELEASE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: node tests/release-metadata.mjs "$RELEASE_BASE"
       - uses: actions/configure-pages@v5
+        if: github.event_name == 'push'
         with:
           enablement: true
       - name: Stage release assets
         run: |
-          mkdir -p "_site/releases/$GITHUB_SHA"
+          mkdir -p _site
           git archive HEAD | tar -x -C _site
-          cp _site/*.js _site/*.css "_site/releases/$GITHUB_SHA/"
-          sed "s|<head>|<head><base href=\"./releases/$GITHUB_SHA/\"><meta name=\"studio-release\" content=\"$GITHUB_SHA\">|" index.html > _site/index.html
+          release="_site/releases/$GITHUB_SHA"
+          mkdir -p "$release/vendor"
+          cp _site/*.js _site/*.css "$release/"
+          cp -R _site/svg-import "$release/"
+          npm install --prefix "$RUNNER_TEMP/crystal-forge-vendor" --no-save --no-package-lock --ignore-scripts three@0.165.0 manifold-3d@3.5.4
+          vendor="$RUNNER_TEMP/crystal-forge-vendor/node_modules"
+          mkdir -p "$release/vendor/three" "$release/vendor/manifold"
+          cp -R "$vendor/three/build" "$vendor/three/examples" "$vendor/three/LICENSE" "$release/vendor/three/"
+          cp "$vendor/manifold-3d/manifold.js" "$vendor/manifold-3d/manifold.wasm" "$release/vendor/manifold/"
+          sed -i 's|https://cdn.jsdelivr.net/npm/three@0.165.0/|./vendor/three/|g; s|https://cdn.jsdelivr.net/npm/manifold-3d@3.5.4/|./vendor/manifold/|g' "$release/"*.js
+          sed "s|<head>|<head><base href=\"./releases/$GITHUB_SHA/\"><meta name=\"studio-release\" content=\"$GITHUB_SHA\">|; s|https://cdn.jsdelivr.net/npm/three@0.165.0/|./vendor/three/|g" index.html > _site/index.html
+          test -s "$release/svg-import/index.js"
+          test -s "$release/vendor/three/build/three.module.js"
+          test -s "$release/vendor/manifold/manifold.wasm"
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3
+        if: github.event_name == 'push'
         with:
           path: _site
+  deploy:
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v4
