@@ -101,10 +101,12 @@ function cutter(points,label,radius,depth,vaulted){
 }
 
 function channelSize(build){
+ // Physical wire relief F and user-requested track width are independent of
+ // the socket's diametral body clearance (which changes the negative bore only).
  const shaped=(build.pixelHoles||[]).filter(hole=>hole.socketProfile);
  const requested=build.serialRouting?.channelWidthMm;
  const requestedRadius=Number.isFinite(requested)&&requested>=1.5&&requested<=12?requested/2:radius;
- return {radius:Math.max(requestedRadius,...shaped.map(hole=>(hole.socketProfile.wireWidth+hole.clearance)/2)),
+ return {radius:Math.max(requestedRadius,...shaped.map(hole=>hole.socketProfile.wireWidth/2)),
   depth:Math.max(depth,...shaped.map(hole=>hole.socketProfile.wireDepth))};
 }
 
