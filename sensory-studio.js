@@ -220,7 +220,9 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  };
  const release=document.querySelector('meta[name="studio-release"]')?.content;
  if(release)$('smsReload').title+=' · Build '+release.slice(0,7);
- $('smsLibrary').onclick=()=>showLibrary();$('smsPrint').onclick=()=>showPrint();$('smsNew').onclick=openPicker;
+ $('smsLibrary').onclick=()=>showLibrary();
+ if(!shell)$('smsPrint').onclick=()=>showPrint();
+ $('smsNew').onclick=openPicker;
  const editors=installExactValueEditors();
  function active(){return currentId?findModel(project,currentId):null;}
  function captureCrystal(){

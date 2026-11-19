@@ -86,6 +86,19 @@ try{
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.id),id);
  await page.locator('#advancedBtn').click();
  await page.locator('#simpleBtn').click();
+ for(const id of ['helpBtn','changelogBtn']){
+  await page.locator('#'+id).click();
+  assert(await page.locator('#infoOverlay').isVisible());
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#infoOverlay').isVisible(),false);
+ }
+ const descriptions=page.locator('#descriptionsBtn');
+ const described=await descriptions.getAttribute('aria-pressed');
+ await descriptions.click();assert.notEqual(await descriptions.getAttribute('aria-pressed'),described);
+ await descriptions.click();
+ const [savedBackup]=await Promise.all([page.waitForEvent('download'),page.locator('#saveBtn').click()]);
+ assert.match(savedBackup.suggestedFilename(),/\.json$/);
+ await Promise.all([page.waitForEvent('filechooser'),page.locator('#loadBtn').click()]);
  await page.locator('#smsFocus').click();
  assert(await page.locator('body.sms-focused').count());await page.keyboard.press('Escape');
  assert.equal(await page.locator('body.sms-focused').count(),0);
@@ -95,6 +108,10 @@ try{
  await shot('wt014-desktop');
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
  await page.locator('.sms-palette').getByRole('button',{name:'Add pixel hole',exact:true}).click();
+ assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles.length),1);
+ await page.locator('#smsGlobalUndo').click();
+ assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length||0),0);
+ await page.locator('#smsGlobalRedo').click();
  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles.length),1);
  await shot('build');
  await page.locator('#smsLibrary').click();await shot('library');
@@ -555,6 +572,10 @@ try{
  assert(await page.locator('#smsPrecision header button').isVisible());
  const bottomTabs=page.locator('#smsModelRail #smsTabs');
  assert(await bottomTabs.evaluate(node=>node.scrollWidth>node.clientWidth));
+ const last=bottomTabs.getByRole('tab').last(),lastId=await last.getAttribute('id');
+ await last.press('Alt+ArrowLeft');
+ assert.equal(await bottomTabs.getByRole('tab').nth(-2).getAttribute('id'),lastId);
+ await bottomTabs.locator('#'+lastId).press('Alt+ArrowRight');
  await bottomTabs.evaluate(node=>{node.scrollLeft=node.scrollWidth;});
  assert(await bottomTabs.evaluate(node=>node.scrollLeft>0));
  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
