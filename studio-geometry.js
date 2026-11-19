@@ -163,7 +163,7 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
    for(const part of recipe.negative){
     const cut=hold(convert(part).setTolerance(tolerance));
     if(hold(total.intersect(cut)).volume()<.1)
-     throw Error((part.pixelHole||part.mountHole||part.wireChannel||'Cut')+' does not cut the model.');
+     throw Error((part.pixelHole||part.mountHole||part.tabHole||part.wireChannel||'Cut')+' does not cut the model.');
     cuts.push(cut);
    }
    const originalVolume=total.volume();
@@ -194,8 +194,8 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
   }else for(const part of recipe.negative||[]){
    const before=total;
    total=hold(total.subtract(convert(part)));
-   if((part.pixelHole||part.mountHole||part.wireChannel)&&before.volume()-total.volume()<.1)
-    throw Error((part.pixelHole||part.mountHole||part.wireChannel)+' does not cut the model. Move it onto solid material in Build.');
+   if((part.pixelHole||part.mountHole||part.tabHole||part.wireChannel)&&before.volume()-total.volume()<.1)
+    throw Error((part.pixelHole||part.mountHole||part.tabHole||part.wireChannel)+' does not cut the model. Move it onto solid material in Build.');
   }
   if(total.status()!=='NoError'||total.isEmpty()||total.volume()<=0)throw Error('Manufacturing produced no valid material.');
   let regions=[{role:'primary',solid:total}];

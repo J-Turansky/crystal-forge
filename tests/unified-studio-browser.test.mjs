@@ -921,7 +921,32 @@ try{
  await mountX.fill(String(mounted[0].x+1));await mountX.press('Tab');
  const changed=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles);
  assert.equal(changed[0].x,mounted[0].x+1,'M1 supports precise position editing');
- await shot('wt020-native-mounting');
+ await mountPalette.locator('[data-pixel-backing]').check();
+ const addTab=mountPalette.getByRole('button',{name:'Add external tab',exact:true});
+ await addTab.click();await addTab.click();
+ const tabPosition=mountPalette.locator('[data-backing-tab="0"]');
+ await tabPosition.fill('13');await tabPosition.press('Tab');
+ const savedTabs=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.backingTabs);
+ assert.equal(savedTabs.length,2);
+ assert.equal(savedTabs[0].u,.13);
+ await shot('wt021-native-backing-tabs');
+ await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+ await page.reload();await page.waitForFunction(()=>window.__sensoryStudio);
+ assert.equal((await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles))[0].x,changed[0].x,
+  'Native mounting state must survive workspace reload');
+ await page.locator('.sms-workspace-nav [data-tab=build]').click();
+ assert(await page.locator('.sms-palette').getByRole('button',{name:'M1',exact:true}).isVisible());
+ assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.backingTabs),savedTabs);
+ await page.locator('.sms-workspace-nav [data-tab=print]').click();
+ await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+ const tabJob=page.locator('#smsJobs article');
+ await tabJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+ const tabSTL=await useDownload(tabJob.locator('[data-job-stl]'));
+ assert.match(tabSTL.name,/\.stl$/);
+ assert(tabSTL.bytes.readUInt32LE(80)>0);
+ assert(zipEntries((await useDownload(tabJob.locator('[data-job-3mf]'))).bytes).has('3D/3dmodel.model'));
+
+
  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
  await page.reload();await page.waitForFunction(()=>window.__sensoryStudio);
  assert.equal((await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles))[0].x,changed[0].x,

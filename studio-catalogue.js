@@ -5,6 +5,7 @@ import {layeredCharacter} from './studio-character-relief.js';
 import {createPodShell} from './wt002-pod-shell.js';
 import {addPixelHoleCuts,checkedPixelBore} from './studio-pixel-builder.js';
 import {addManualMountCuts} from './studio-mount-builder.js';
+import {planEdgeTabs} from './edge-tabs.js';
 import {generateTile,tactileTileGenerator} from './tactile-tile-generator.js';
 import {createGeneratorRegistry} from './studio-generator-registry.js';
 import {circle,heightField} from './studio-geometry.js';
@@ -450,7 +451,9 @@ export const characterGenerator=define('characters','Characters & Silhouettes','
  }
  return {positive,secondary,negative:[],bounds:{width:w,depth:h,height:t+1.2},warnings:['Broad joined features reduce fragility; inspect printed horns, ears, legs and edges before participant use.']};
 });
-export const tileGenerator={...tactileTileGenerator,parameterSchema:tactileTileGenerator.parameterSchema.map(s=>({...s,label:s.label||s.key.replace(/[A-Z]/g,c=>' '+c.toLowerCase()),step:s.key==='seed'?1:s.key==='randomness'?.05:.5})),
+export const tileGenerator={...tactileTileGenerator,
+ capabilities:{...tactileTileGenerator.capabilities,supportsStationaryFittingBacking:true},
+ parameterSchema:tactileTileGenerator.parameterSchema.map(s=>({...s,label:s.label||s.key.replace(/[A-Z]/g,c=>' '+c.toLowerCase()),step:s.key==='seed'?1:s.key==='randomness'?.05:.5})),
  recipe(input){const r=generateTile(input);return {serialSupport:{outline:r.bodies[0].mesh.boreOutline,thickness:r.parameters.thickness},pixelBoreSupport:{outline:r.bodies[0].mesh.boreOutline,minThickness:r.parameters.thickness},positive:[{kind:'mesh',mesh:r.bodies[0].mesh}],partitioned:r.parameters.dualMaterial,secondary:r.bodies.length===2?[{kind:'mesh',mesh:r.bodies[1].mesh}]:[],negative:[],dualMaterial:r.parameters.dualMaterial,bounds:this.estimateBounds(input),warnings:['Tactile feel, cleanability and edge comfort require a printed sample.']};}};
 export const svgArtworkGenerator=define('svg-artwork','Imported SVG artwork','Imports',[],[],
  p=>buildSvgExtrusionRecipe(p.artwork),{supportsDualMaterial:false});
@@ -465,6 +468,41 @@ export const importedMeshGenerator=define('imported-mesh','Imported 3D model','I
 ],[],p=>importedMeshRecipe(p.source,{...p,previewOnly:true}),{supportsDualMaterial:false});
 export const studioGenerators=[...generators,svgArtworkGenerator,importedMeshGenerator];
 export function makeCatalogue(crystalAdapter){const registry=createGeneratorRegistry();for(const g of [crystalAdapter,...studioGenerators].filter(Boolean))registry.register(g);return registry;}
+function addBackingTabs(recipe,build,routing){
+ const tabs=build.backingTabs??[];
+ if(!Array.isArray(tabs)||tabs.length>24||
+  tabs.some(tab=>!tab||!Number.isFinite(tab.u)||tab.u<0||tab.u>=1))
+  throw Error('Use up to 24 tabs with perimeter positions from 0 to less than 100%.');
+ if(!tabs.length)return;
+ const backing=recipe.serialSupport;
+ if(!backing?.explicitBacking||recipe.dualMaterial)
+  throw Error('External tabs need a single-material stationary fitting backing. Enable Add fitting backing or choose a compatible solid design.');
+ const diameter=build.backingTabDiameter??3.4;
+ if(!Number.isFinite(diameter)||diameter<2||diameter>8)
+  throw Error('Tab fixing hole diameter must be 2–8 mm.');
+ const stockHoles=[...(build.pixelHoles||[]),...(build.manualMountHoles||[])].map(h=>
+  ({x:h.x,z:h.z,radius:(h.diameter+(h.clearance??0))/2}));
+ const plan=planEdgeTabs(backing.outline.map(([x,z])=>({x,z})),{
+  manualEdgeTabs:tabs,tabHoleDiameter:diameter,tabHolesPerTab:1,tabThickness:backing.thickness,tabWall:3
+ },stockHoles);
+ if(plan.skipped)throw Error(plan.messages.join(' '));
+ for(const tab of plan.tabs){
+  if(stockHoles.some(h=>Math.hypot(h.x-tab.x,h.z-tab.z)<tab.radius+h.radius+2))
+   throw Error('Tab '+(tab.index+1)+' intersects a fitting or mounting hole. Move it along the backing edge.');
+  if(routing.enabled&&routing.links.some(link=>link.path.some(p=>Math.hypot(p.x-tab.x,p.z-tab.z)<tab.radius+6)))
+   throw Error('Tab '+(tab.index+1)+' is too close to a cut cable route. Move the tab away from the cable exit.');
+  recipe.positive.push(cylinder(tab.radius,tab.thickness,[tab.x,tab.thickness/2,tab.z]));
+ }
+ for(const hole of plan.tabHoles)recipe.negative.push({
+  ...cylinder(hole.radius,backing.thickness+2,[hole.x,backing.thickness/2,hole.z]),
+  tabHole:'Tab fixing hole '+(hole.tabIndex+1)
+ });
+ recipe.bounds={...recipe.bounds,
+  width:Math.max(recipe.bounds.width,...plan.tabs.map(tab=>2*(Math.abs(tab.x)+tab.radius))),
+  depth:Math.max(recipe.bounds.depth,...plan.tabs.map(tab=>2*(Math.abs(tab.z)+tab.radius)))};
+ recipe.warnings.push('External tabs are integrated with the stationary backing. Confirm fastener fit and load on a physical sample.');
+}
+
 export function applyBuildModules(recipe,build={},capabilities={}, {preview=false}={}){
  const r={...recipe,positive:[...recipe.positive],negative:[...(recipe.negative||[])],secondary:[...(recipe.secondary||[])],warnings:[...(recipe.warnings||[])]};
  if(r.meshIssue){
@@ -503,8 +541,8 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
  // An opt-in, real positive backing provides material for pixel seats on
  // curves and open shells. Old models never receive this automatically.
  if(build.pixelBacking){
-  if(!capabilities.supportsBase||r.partitioned)
-   throw Error('Fitting backing needs a compatible single-material model. Turn off dual-material mode.');
+  if((!capabilities.supportsBase&&!capabilities.supportsStationaryFittingBacking)||r.partitioned||r.dualMaterial)
+   throw Error('Fitting backing needs a compatible stationary single-material model. Turn off dual-material mode or choose a supported model.');
   const thickness=Number(build.pixelBackingThickness??4);
   if(!Number.isFinite(thickness)||thickness<3||thickness>10)
    throw Error('Choose 3–10 mm fitting backing thickness.');
@@ -532,6 +570,7 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
   r.negative.push(...routing.cutters);
   r.warnings.push('Serial grooves are underside-open. Check cable seating and roof layers in Cura and on a physical print.');
  }
+ addBackingTabs(r,build,routing);
  r.nativeRouting=routing;
  return r;
 }
