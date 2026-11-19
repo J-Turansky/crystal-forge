@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.27 — Preview cable routes without cutting channels
+
+- Show planned native cable paths and arrows independently of the setting that cuts printable grooves.
+
 ## v0.16.0-dev.26 — Document the WT-018 review and production gates
 
 - Record the current roadmap, review order and acceptance checks.
