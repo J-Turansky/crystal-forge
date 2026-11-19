@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.30 — Explain the physical face and bore in native placement
+
+- Separate automatic placement, block unsupported side faces and anchor placement actions at the selected point.
+
 ## v0.16.0-dev.29 — Keep manual native pixel placement active
 
 - Place successive pixel fittings with a live validity ring and end placement with Done or Escape.

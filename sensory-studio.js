@@ -643,7 +643,13 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  function fittingSurface(model,event){
   pixelRay(event);
   const meshes=cache.get(model.id)?.group?.children.filter(mesh=>mesh.visible&&mesh.isMesh&&!mesh.userData.previewOnly)||[];
-  return partRay.intersectObjects(meshes,false)[0]?.point;
+  const hit=partRay.intersectObjects(meshes,false)[0];
+  if(!hit?.face)return null;
+  const normal=hit.face.normal.clone().applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld));
+  return {point:hit.point,normal};
+ }
+ function fittingFaceIssue({normal}){
+  return Math.abs(normal.y)<.7?'This face cannot take a vertical through-bore. Choose a top or underside surface with solid material.':'';
  }
  const placementGhost=new THREE.Mesh(new THREE.RingGeometry(.82,1,40),
   new THREE.MeshBasicMaterial({side:THREE.DoubleSide,depthTest:false}));
@@ -660,10 +666,10 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   return duplicate?{...duplicate,id:fresh.id,x:fresh.x,z:fresh.z}:fresh;
  }
  function updatePlacementGhost(model,event){
-  const point=fittingSurface(model,event);
-  if(!point){placementGhost.visible=false;viewport.dataset.nativePlacement='outside';return;}
-  const hole=fittingCandidate(model,point,pendingDuplicate),holes=pixelHoles(model);
-  const issue=holes.length>=16?'Use up to 16 fittings per model.':pixelIssue(model,hole,holes);
+  const hit=fittingSurface(model,event);
+  if(!hit){placementGhost.visible=false;viewport.dataset.nativePlacement='outside';return;}
+  const {point}=hit,hole=fittingCandidate(model,point,pendingDuplicate),holes=pixelHoles(model);
+  const issue=fittingFaceIssue(hit)||(holes.length>=16?'Use up to 16 fittings per model.':pixelIssue(model,hole,holes));
   placementGhost.position.set(hole.x,point.y+.3,hole.z);
   placementGhost.scale.setScalar((hole.diameter+hole.clearance)/2);
   placementGhost.material.color.setHex(issue?0xff3c59:0x48e4f1);
@@ -688,19 +694,24 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    if(event.button!==0||!canEditPixels(model)||model.link||placementModel===model.id||!panel.querySelector('#smsPixelAdd'))return;
    const marker=markerAt(model,event);
    if(marker){consume(event);selectPixel(model,marker.userData.pixelId);return;}
-   const point=fittingSurface(model,event);
-   if(!point)return;
+   const hit=fittingSurface(model,event);
+   if(!hit)return;
+   const {point}=hit;
    consume(event);
    const add=fittingActions.querySelector('[data-add-point-pixel]');
    const holes=pixelHoles(model), candidate=fittingCandidate(model,point);
-   const issue=holes.length>=16?'Use up to 16 fittings per model.':pixelIssue(model,candidate,holes);
-   fittingActions.querySelector('[data-fitting-message]').textContent=issue?pixelPlacementAdvice(model,issue):'Place the selected pixel profile here.';
+   const issue=fittingFaceIssue(hit)||(holes.length>=16?'Use up to 16 fittings per model.':pixelIssue(model,candidate,holes));
+   fittingActions.querySelector('[data-fitting-message]').textContent=issue?pixelPlacementAdvice(model,issue):'Place a vertical through-bore here. The bore opens on both faces; cable cuts are on the underside.';
    add.disabled=!!issue;
    add.onclick=()=>{
     fittingActions.close();
     if(active()?.id===model.id&&canEditPixels(model))placeFittingAt(model,point);
    };
+   fittingActions.style.position='fixed';fittingActions.style.margin='0';fittingActions.style.inset='0 auto auto 0';
    fittingActions.showModal();
+   const bounds=fittingActions.getBoundingClientRect();
+   fittingActions.style.left=Math.max(0,Math.min(event.clientX,window.innerWidth-bounds.width))+'px';
+   fittingActions.style.top=Math.max(0,Math.min(event.clientY,window.innerHeight-bounds.height))+'px';
   },true);
  const consume=event=>{event.preventDefault();event.stopImmediatePropagation();};
  const canEditPixels=model=>mode==='model'&&stage==='build'&&model&&model.generator.typeId!=='crystals';
@@ -769,9 +780,11 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    editPixel(model,index,gesture.candidate);return;
   }
   if(!gesture.placing||gesture.marker)return;
-  const point=fittingSurface(model,event);
-  if(!point){pixelStatus(model,pixelPlacementAdvice(model,'Click a solid model surface to place this fitting.'));return;}
-  if(placeFittingAt(model,point,pendingDuplicate)){
+  const hit=fittingSurface(model,event);
+  if(!hit){pixelStatus(model,'Click a solid model surface to place this fitting.');return;}
+  const faceIssue=fittingFaceIssue(hit);
+  if(faceIssue){pixelStatus(model,faceIssue);return;}
+  if(placeFittingAt(model,hit.point,pendingDuplicate)){
    if(pendingDuplicate||pixelHoles(active()).length>=16){endPixelPlacement();renderPalette();}
    else updatePlacementGhost(active(),event);
   }
@@ -935,14 +948,14 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const hole=holes[selected]||newPixel(chosenProfile(model));
   const fit=resolvePixelFitting(hole,adapter.pixelFitProfiles());
   root.innerHTML='<h3>Pixel fittings</h3><div class="sms-actions"><button type="button" data-pixel-profile-editor>Create / edit pixel profile</button></div>'+
-   '<p>Choose a saved measured profile before placing. A profile selection with P1/P2 selected updates <strong>only that fitting</strong>; otherwise it chooses the next fitting. Nominal measurements are not proof of printed fit.</p>'+
+   '<p>Choose a saved measured profile before placing. A profile selection with P1/P2 selected updates <strong>only that fitting</strong>; otherwise it chooses the next fitting. Native fittings use vertical through-bores with openings on both faces. Cable cuts open on the underside. Print a coupon to check fit.</p>'+
    '<label><input type="checkbox" data-pixel-backing'+(model.build.pixelBacking?' checked':'')+disabled+'> Add fitting backing (12 mm of additional material around each edge)</label>'+
    '<p>Fitting bores need continuous solid material. Thin walls, cavities and narrow rims can block placement.</p>'+
    '<div class="sms-actions" aria-label="Hardware library">'+profiles.map(profile=>
     '<button type="button" data-fit-profile="'+esc(profile.id)+'" aria-pressed="'+(chosenProfile(model)?.id===profile.id)+'"'+disabled+
     '>◉ '+esc(profile.name)+' · '+profile.bodyDiameter+' mm</button>').join('')+'</div>'+
    '<div class="sms-actions"><button type="button" data-place-pixel'+noAdd+'>Place LED fitting in 3D</button>'+
-   '<button type="button" data-auto-pixel'+noAdd+'>Add pixel</button>'+
+   '<button type="button" data-auto-pixel'+noAdd+'>Add pixel automatically</button>'+
    (placementModel===model.id?'<button type="button" data-done-pixel>Done placing pixels</button>':'')+'</div>'+
    '<div class="sms-actions" aria-label="Select pixel">'+holes.map((hole,i)=>'<button type="button" data-select-pixel="'+i+'" aria-pressed="'+(i===selected)+'">P'+(i+1)+'</button>').join('')+'</div>'+
    '<p role="status" data-pixel-status>'+esc(pixelMessages.get(model.id)||'Click a marker to select. Hold then drag to move. Arrow keys nudge 1 mm, or 5 mm with Shift.')+'</p>'+
