@@ -598,7 +598,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  function mountIssue(model,mount,others){
   try{
    const family=registry.get(model.generator.typeId);
-   if(!family.capabilities.supportsMounting)return 'This model does not have verified mounting-hole geometry.';
+   if(!['tactile-tiles','gears','waves','control-caps','characters','light-pods'].includes(family.typeId))return 'This generator cannot certify a physical mounting through-hole.';
    const issue=mountHoleIssue(mountSource(model),mount,others,pixelHoles(model));
    if(issue)return issue;
    // Verify full manufacturing eligibility, including routes that would otherwise
@@ -1059,7 +1059,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  function renderMountPalette(root,model){
   const family=registry.get(model.generator.typeId);
-  if(!family.capabilities.supportsMounting)return;
+  if(!['tactile-tiles','gears','waves','control-caps','characters','light-pods'].includes(family.typeId))return;
   const mounts=mountHoles(model),selected=mounts.findIndex(hole=>hole.id===selectedMounts.get(model.id));
   const locked=!!model.link,disabled=locked?' disabled':'';
   const block=document.createElement('fieldset');block.setAttribute('aria-label','Mounting holes');
