@@ -25,10 +25,10 @@ export function normalisePixelProfile(p){
 export function allPixelProfiles(s){
  return [...PIXEL_PRESETS,...(Array.isArray(s?.pixelProfiles)?s.pixelProfiles.slice(0,30).map(normalisePixelProfile).filter(p=>!PIXEL_PRESETS.some(q=>q.id===p.id)):[])];
 }
-export function resolvePixelProfile(s){
+export function resolvePixelProfile(s,clearanceOverride){
  const p=allPixelProfiles(s).find(p=>p.id===s?.pixelProfileId)||PIXEL_PRESETS[0];
  const diameter=Number(s?.pixelDiameter)>0?Number(s.pixelDiameter):p.bodyDiameter;
- const fit=clamp(Number(s?.pixelFit)||0,-.5,.8);
+ const fit=clamp(Number(clearanceOverride??s?.pixelClearanceByProfile?.[p.id]??s?.pixelFit)||0,-.5,.8);
  return {...p,bodyDiameter:diameter,clearance:fit,retentionLip:clamp(Number(s?.pixelRetentionLip)||0,0,.7),boreDiameter:diameter+fit,
   maxDiameter:Math.max(diameter,p.flangeDiameter)+fit};
 }
