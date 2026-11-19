@@ -235,12 +235,16 @@ for(const id of ['knob','selector']){
   const finished=prepareRecipe(THREE,wasm,recipe);
   const blankSolid=new wasm.Manifold(stock.bodies[0].mesh);
   const negativeSolid=new wasm.Manifold(preview.negative);
+  const positiveSolid=new wasm.Manifold(preview.positive);
   const expected=blankSolid.subtract(negativeSolid);
+  const missingEnvelope=positiveSolid.subtract(negativeSolid);
   try{
    const expectedVolume=expected.volume(),manufacturedVolume=finished.bodies[0].volume;
    assert(Math.abs(expectedVolume-manufacturedVolume)<.02,
     fixture.type+' preview negative must be same Boolean cutter and pose as manufactured model');
-  }finally{expected.delete();negativeSolid.delete();blankSolid.delete();}
+   assert(missingEnvelope.volume()<.02,
+    fixture.type+' actual production socket must enclose the full positive pixel, including flange, tip and wire relief');
+  }finally{missingEnvelope.delete();expected.delete();positiveSolid.delete();negativeSolid.delete();blankSolid.delete();}
  }
  console.log('FIT-02 native Gear top/Tile underside positive and negative overlays match manufactured cutter');
 }
