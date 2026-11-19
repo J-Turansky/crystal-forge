@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.35.9 — Inspect shaped sockets on the selected installation face
+
+- On compatible single-material stock, native shaped sockets use the selected face and refuse obstructed openings or inadequate material.
+
 ## v0.16.0-dev.35.8 — Inspect the prepared manufacturing mesh from Build
 
 - Render the actual prepared mesh from Build and toggle a cut section without exporting.
