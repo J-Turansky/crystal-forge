@@ -1177,6 +1177,7 @@ try{
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
   await page.locator('[data-view=top]').click();
   await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await page.locator('[data-fit-profile="gumdrop"]').click();
   await page.getByRole('button',{name:'Place shaped socket in 3D'}).click();
   const target=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(0,0,'top'));
   assert(target);
@@ -1190,7 +1191,10 @@ try{
    const nativeToggle=page.getByRole('checkbox',{name:'Show physical pixels and socket cutters'});
    await nativeToggle.check();
    const nativePreview=page.locator('[data-native-fit-preview-status]');
-   await nativePreview.filter({hasText:/insertion 22\.00 mm/}).waitFor({timeout:120000});
+   await page.waitForFunction(()=>/insertion|unavailable/.test(
+    document.querySelector('[data-native-fit-preview-status]')?.textContent||''),null,{timeout:60000});
+   assert.match(await nativePreview.innerText(),/insertion 22\.00 mm/,
+    'Gear preview: '+await nativePreview.innerText());
    assert.match(await nativePreview.innerText(),/nominal cutter roof allowance .*mm/);
    assert.match(await nativePreview.innerText(),/stock interference/);
    await nativeToggle.uncheck();
@@ -1216,7 +1220,10 @@ try{
  const tileToggle=page.getByRole('checkbox',{name:'Show physical pixels and socket cutters'});
  await tileToggle.check();
  const tilePreview=page.locator('[data-native-fit-preview-status]');
- await tilePreview.filter({hasText:/insertion 9\.00 mm/}).waitFor({timeout:120000});
+ await page.waitForFunction(()=>/insertion|unavailable/.test(
+  document.querySelector('[data-native-fit-preview-status]')?.textContent||''),null,{timeout:60000});
+ assert.match(await tilePreview.innerText(),/insertion 9\.00 mm/,
+  'Tile preview: '+await tilePreview.innerText());
  assert.match(await tilePreview.innerText(),/stock interference/);
  await tileToggle.uncheck();
  await page.keyboard.press('Escape');
