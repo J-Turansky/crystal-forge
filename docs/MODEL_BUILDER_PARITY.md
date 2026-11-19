@@ -64,3 +64,7 @@ The profile editor also exports a single negative Test Socket or an optional fiv
 ## WT-021 face-aware drag and profile isolation
 
 Native pixel and through-hole drags now raycast the visible model and retain the installation side. Crystal project clearance is keyed by profile; legacy fallback values and coupon variants remain supported. The existing Tile browser journey checks a real top-face mounting drag and reload. Full 7/7 physical sockets, routing, interaction and export acceptance remains open under #79.
+
+## WT-021 Pixel Profile Library discovery
+
+Build shows an active profile selector, profile editing or duplication, and standalone library import/export. Native selection lives in the model build data. A conflicting import creates a copy. Browser-local storage does not sync across computers. Existing pinned revisions and explicit fitting overrides remain separate; complete shape/manufacturing parity and wider Library acceptance remain #79.

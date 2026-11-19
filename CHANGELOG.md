@@ -1,5 +1,9 @@
 # Crystal Forge — Changelog
 
+## v0.16.0-dev.35.7 — Discover and move saved pixel profiles
+
+- Select the active profile in Build, keep the selection on reload and move custom profiles between computers with a library file.
+
 ## v0.16.0-dev.35.4 — Face-aware fitting movement and profile clearance
 
 - Keep native fitting drags on their installation face and isolate saved Crystal socket allowances by profile.

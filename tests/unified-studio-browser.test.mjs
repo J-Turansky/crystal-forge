@@ -930,7 +930,15 @@ try{
   const pal=page.locator('.sms-palette');
   assert(await pal.getByRole('button',{name:'Add pixel automatically',exact:true}).isVisible(),type+' has Add pixel');
   assert(await pal.getByRole('button',{name:'Create / edit pixel profile'}).isVisible());
-  await pal.getByRole('button',{name:/Reusable 4.5 mm seed/}).click();
+  const activeProfile=pal.getByLabel('Active Pixel Profile');
+  await activeProfile.selectOption({label:'Reusable 4.5 mm seed'});
+  const activeProfileId=await activeProfile.inputValue();
+  if(type==='tactile-tiles'){
+   await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+   await page.reload();await page.waitForFunction(()=>window.__sensoryStudio);
+   await page.locator('.sms-workspace-nav [data-tab=build]').click();
+   assert.equal(await activeProfile.inputValue(),activeProfileId);
+  }
   if(backing)await pal.locator('[data-pixel-backing]').check();
   await pal.getByRole('button',{name:'Add pixel automatically',exact:true}).click();
   const saved=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
