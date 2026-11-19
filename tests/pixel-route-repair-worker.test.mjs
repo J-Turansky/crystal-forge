@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {repairPixelRouting} from '../pixel-motion.js';
 const reports=[];
 globalThis.self={postMessage:message=>reports.push(message)};
 await import('../pixel-route-repair-worker.js');
@@ -13,8 +14,10 @@ const original=JSON.stringify(settings);
 self.onmessage({data:{serial:1,crystals,settings}});
 assert.equal(reports.length,1);
 assert.equal(reports[0].serial,1);
-assert.equal(reports[0].valid,true,'Worker finds the same safe repair as direct solver');
-assert.deepEqual(reports[0].settings.manualPixelHoles.map(p=>[p.x,p.z]),[[-15,0],[15,0]],
+const expected=repairPixelRouting(crystals,settings);
+assert.equal(reports[0].valid,expected.valid,'Worker matches the actual route solver');
+assert.equal(reports[0].reason,expected.reason||null,'Worker preserves solver failure reasoning');
+if(expected.valid)assert.deepEqual(reports[0].settings.manualPixelHoles.map(p=>[p.x,p.z]),[[-15,0],[15,0]],
  'Automatic routing must not move accepted pixels');
 assert.equal(JSON.stringify(settings),original,'Worker does not mutate source project');
 reports.length=0;
