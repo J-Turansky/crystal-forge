@@ -2150,11 +2150,54 @@ try{
   await inspector.getByText('Prepared manufacturing mesh', {exact:false}).waitFor();
   const ranges=await sectionRanges(inspector);
   const position=inspector.getByRole('slider');
+  await inspector.getByLabel('Section axis').selectOption('X');
+  const sectionX=await position.evaluate((slider,x)=>{
+   slider.value=x;
+   slider.dispatchEvent(new Event('input',{bubbles:true}));
+   return Number(slider.value);
+  },topMount.x);
+  const section=await page.evaluate(async x=>{
+   const {Mesh}=await import('three');
+   const previous=Mesh.prototype.onBeforeRender;
+   return new Promise((resolve,reject)=>{
+    const timeout=setTimeout(()=>{
+     Mesh.prototype.onBeforeRender=previous;
+     reject(new Error('The prepared cutaway was not rendered at X='+x));
+    },5000);
+    Mesh.prototype.onBeforeRender=function(renderer,scene,camera,geometry,material,...rest){
+     previous.call(this,renderer,scene,camera,geometry,material,...rest);
+     const plane=material.clippingPlanes?.[0];
+     if(plane?.normal.x!==1||Math.abs(plane.constant+x)>.0001)return;
+     clearTimeout(timeout);
+     Mesh.prototype.onBeforeRender=previous;
+     resolve({positions:Array.from(geometry.attributes.position.array),indices:Array.from(geometry.index.array)});
+    };
+   });
+  },sectionX);
+  const viewportMesh=new THREE.BufferGeometry();
+  const printPositions=[];
+  for(let i=0;i<section.positions.length;i+=3)
+   printPositions.push(section.positions[i],-section.positions[i+2],section.positions[i+1]);
+  viewportMesh.setAttribute('position',new THREE.Float32BufferAttribute(printPositions,3));
+  viewportMesh.setIndex(section.indices);
+  const sectionMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  const profileAt=geometry=>{
+   const mesh=new THREE.Mesh(geometry,sectionMaterial);
+   return [8,9.3,9.9].map(height=>[-1,1].map(sign=>new THREE.Raycaster(
+    new THREE.Vector3(sectionX,-topMount.z,height),new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0]?.distance));
+  };
+  const expectedProfile=profileAt(viewportMesh).flat();
+  assert(expectedProfile.every(Number.isFinite),'The visible cutaway contains the top pilot and taper walls');
+  viewportMesh.dispose();
   for(const geometry of [new STLLoader().parse(Uint8Array.from(linkedSTL.bytes).buffer),
    read3MFGeometry(zipEntries(linkedMF.bytes).get('3D/3dmodel.model').toString())]){
    assertSectionBounds(geometry,ranges,'Linked Gear');
+   const profile=profileAt(geometry).flat();
+   assert(profile.every((value,index)=>Math.abs(value-expectedProfile[index])<.01),
+    'The exported pilot and taper walls match the visible cutaway at the same X plane');
    geometry.dispose();
   }
+  sectionMaterial.dispose();
   const inspected=await modelState();
   await position.press('ArrowRight');
   assert.deepEqual(await modelState(),inspected);

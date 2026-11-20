@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** PAR-03, compare the prepared section profiles at critical holes and routes across native builders.
+- **Target:** PAR-03, compare the prepared section profile at a routed Tile or Wave opening.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** The full unified Chromium suite passed native cutaway/export range comparisons. Focused Chromium passed stale Gear cutaway withdrawal and disabled downloads. Next measure profiles at known cutaway planes.
+- **Next test:** The full unified Chromium suite passed native cutaway/export range comparisons. Focused Chromium passed stale Gear cutaway withdrawal and disabled downloads. The rendered Gear cutaway matches both exports at three heights through its countersink and pilot. Next measure a routed opening at the same plane in the viewport and downloads.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction
