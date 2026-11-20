@@ -829,13 +829,23 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   redrawPixelEditor(focus);
   return true;
  }
- function editPixel(model,index,hole,focus){
-  const holes=pixelHoles(model);
-  if(!holes[index]||model.link)return false;
+ function editPixel(model,index,hole,focus,onSaved){
+  const holes=pixelHoles(model),previous=holes[index];
+  if(!previous||model.link)return false;
   const issue=pixelIssue(model,hole,holes.filter((_,i)=>i!==index));
   if(issue){pixelStatus(model,pixelPlacementAdvice(model,issue));return false;}
   holes[index]={...hole,checked:true};
-  return savePixels(model,holes,hole.id,focus);
+  const save=()=>{
+   const saved=savePixels(model,holes,hole.id,focus);
+   if(saved)onSaved?.();
+   return saved;
+  };
+  if(hole.socketProfile&&(hole.socketProfile!==previous.socketProfile||
+     hole.diameter!==previous.diameter||hole.clearance!==previous.clearance)){
+   checkFittingBuild(model,{...model.build,pixelHoles:holes,pixelBuilderVersion:1},save);
+   return false;
+  }
+  return save();
  }
  function removePixel(model,index){
   const holes=pixelHoles(model);
@@ -1703,10 +1713,10 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    try{
     if(!name){editPixel(model,selected,withMeasuredPixelFit(hole,measurement));return;}
     const calibrated=saveablePixelFit(hole,measurement,{name,id:'custom-'+newPixel().id,customProfiles:adapter.pixelFitProfiles()});
-    if(editPixel(model,selected,calibrated.hole)){
+    editPixel(model,selected,calibrated.hole,undefined,()=>{
      adapter.savePixelFitProfile(calibrated.profile);
      redrawPixelEditor();pixelStatus(model,'Saved measured fit to the profile library.');
-    }
+    });
    }catch(error){pixelStatus(model,error.message);}
   };
   bindPixelEditor(root,model,holes,profiles);

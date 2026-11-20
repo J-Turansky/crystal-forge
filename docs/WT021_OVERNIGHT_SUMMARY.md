@@ -4,6 +4,7 @@
 
 ## Latest checkpoint
 
+- Focused Chromium measured a flanged Gear before and after independent clearance and retention edits. STL and 3MF agree on the flange, bore, throat and 9 mm depth. The additional oversized-diameter rollback assertion is pending because automatic review reached its usage limit.
 - A 6 mm native vault initially narrowed at its junction with an 8.3 mm socket. The cutter now reaches the first bore chord wide enough to accept it. Manifold and both export formats confirm the full lower corridor, upper clearance, taper and both exterior openings. Focused Chromium verified a 6 mm Tile width edit after reload, withheld stale downloads and measured both fresh files.
 - A pinned Tile vault passed Chromium preparation and both downloads. STL and 3MF agree on upper clearance through the bent channel and both apertures, and on the tapered side walls. Build validates active vaults when switched on and when route settings change. Focused Chromium verified width and edge rollback and measured 4 mm usable width in the edited exports.
 - All six native families passed Manifold containment for a backed underside conical socket, and both exported formats matched the apex and slope for each family. Routed native test coupons carry the selected fitting’s geometry and fit settings. Chromium confirmed matching apex in both coupon and full model files.

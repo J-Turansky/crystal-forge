@@ -2284,6 +2284,12 @@ try{
    continue;
   }
   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].conical===true);
+  const acceptedCone=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  const measuredDiameter=palette.getByLabel('Measured body diameter (mm)');
+  await measuredDiameter.fill('20');await measuredDiameter.press('Tab');
+  await page.locator('#smsModelError').getByText(/needs .* mm of stock for its socket and roof/).waitFor();
+  assert.equal(Number(await measuredDiameter.inputValue()),before.build.pixelHoles[0].diameter);
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),acceptedCone);
   await palette.getByRole('button',{name:'Create / edit pixel profile'}).click();
   assert(await page.locator('#routeSpecimenConical').isChecked());
   assert.equal(Number(await page.locator('#pixelSocketClearance').inputValue()),before.build.pixelHoles[0].clearance);
@@ -2419,6 +2425,74 @@ try{
    geometry.dispose();
   }
   wideMaterial.dispose();
+ }
+ // DIM-03/CAL-01: change the fitted bore and retention independently on a measured flanged Gear socket.
+ {
+  const name='Gear independent socket calibration',profileName='Measured flanged calibration profile';
+  await page.evaluate(name=>window.__sensoryStudio.addModel('gears',{mode:'Decorative',wheelStyle:'Rounded lobes',
+   webStyle:'Solid',diameter:100,thickness:18,bore:0,reliefStyle:'None',dualMaterial:false},name),name);
+  const buildTab=page.locator('.sms-workspace-nav [data-tab=build]');
+  const printTab=page.locator('.sms-workspace-nav [data-tab=print]');
+  await buildTab.click();
+  const palette=page.locator('.sms-palette');
+  await palette.locator('[data-fit-profile=seed]').click();
+  await palette.getByRole('button',{name:'Create / edit pixel profile'}).click();
+  await page.locator('#pixelKind').selectOption('gumdrop');
+  for(const [id,value] of Object.entries({pixelName:profileName,pixelBodyDiameter:'8',pixelBodyHeight:'9',
+   pixelFlangeDiameter:'9',pixelFlangeHeight:'1.2',pixelCapHeight:'1.2',pixelWireWidth:'2.4',pixelWireDepth:'1.6',pixelSocketClearance:'.3'}))
+   await page.locator('#'+id).fill(value);
+  await page.locator('#applyPixelSocketFit').click();
+  await palette.getByRole('button',{name:new RegExp(profileName)}).click();
+  await page.locator('[data-view=bottom]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await palette.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+  const target=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(0,0,'underside'));
+  assert(target);await page.mouse.click(target.x,target.y);
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===1);
+  await page.keyboard.press('Escape');
+  const hole=()=>page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0]);
+  const original=await hole();
+  const job=page.locator('#smsJobs article').filter({hasText:name});
+  const measure=async expected=>{
+   await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+   const stl=await useDownload(job.locator('[data-job-stl]'));
+   const mf=await useDownload(job.locator('[data-job-3mf]'));
+   for(const geometry of [new STLLoader().parse(Uint8Array.from(stl.bytes).buffer),
+    read3MFGeometry(zipEntries(mf.bytes).get('3D/3dmodel.model').toString())]){
+    const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),mesh=new THREE.Mesh(geometry,material);
+    const rays=(z,dy,dz)=>new THREE.Raycaster(new THREE.Vector3(original.x,-original.z,z),
+     new THREE.Vector3(0,dy,dz)).intersectObject(mesh)[0];
+    const boreAt=z=>rays(z,1,0).distance+rays(z,-1,0).distance;
+    for(const [index,height] of [.7,2.8,5].entries())assert(Math.abs(boreAt(height)-expected[index])<.02);
+    assert(Math.abs(rays(-1,0,1).point.z-9)<.01);
+    geometry.dispose();material.dispose();
+   }
+  };
+  await printTab.click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  await measure([9.3,8.3,8.3]);
+  await buildTab.click();
+  const clearance=palette.getByLabel('Diameter clearance (mm)');
+  await clearance.fill('.6');await clearance.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].clearance===.6);
+  await printTab.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  assert(await job.locator('[data-job-stl]').isDisabled());
+  await job.locator('[data-job-prepare]').click();
+  await measure([9.6,8.6,8.6]);
+  await buildTab.click();
+  const retention=palette.getByLabel('Retention lip (mm)');
+  await retention.fill('.4');await retention.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].socketProfile.retentionLip===.4);
+  assert.deepEqual((await hole()).socketProfile,{...original.socketProfile,retentionLip:.4});
+  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+  await page.reload();
+  await page.waitForFunction(()=>window.__sensoryStudio?.currentModel?.build.pixelHoles?.[0]?.socketProfile.retentionLip===.4);
+  await printTab.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  assert(await job.locator('[data-job-3mf]').isDisabled());
+  await job.locator('[data-job-prepare]').click();
+  await measure([9.6,7.8,8.6]);
  }
  assert.deepEqual(errors,[]);
  console.log('Unified Home, Design, Build, Library and Quick Print screenshots captured.');

@@ -4,6 +4,8 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
+- Shaped socket profile and bore size edits are checked against the manufactured geometry before saving.
+
 - Wide native cable tracks extend into round sockets far enough to preserve clearance at the join when the bore can accommodate the track.
 
 - Build checks vaulted channel clearance and supporting roof material before enabling a vault or saving changes to its route settings.

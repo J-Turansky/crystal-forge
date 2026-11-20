@@ -12,7 +12,7 @@
 
 - **Target:** DIM-03 and CAL-01, compare retained bore, flange and insertion depth after an independent fitting edit.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** The 6 mm Tile vault survived reload, disabled both stale downloads and passed fresh export probes. Next use a measured native profile with a flange and retention, change fit independently, and compare the installed STL and 3MF sections.
+- **Next test:** The flanged Gear calibration passed focused Chromium and both exported formats. Run the conical oversized-diameter rollback test and full unified Chromium suite, then check exact-head CI.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

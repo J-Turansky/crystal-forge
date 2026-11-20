@@ -212,3 +212,7 @@
 ### 2026-11-20 - wide vault socket junction
 
 - A 6 mm routed fixture exposed partial obstructions at the junction between the round socket and the cutter’s original endpoints. Extending the cutter to the matching bore chord preserves the full usable corridor and planned cable length. STL and 3MF now pass the through-junction and exterior probes, and verify taper and apex. The full Chromium journey suite passed after widening the junction cutter. A focused follow-up verified the 6 mm Tile edit, stale download protection, reload and fresh measured STL/3MF.
+
+### 2026-11-20 - native shaped calibration
+
+- Validate shaped profile and bore-size edits in the production worker. Focused Chromium measured successive flanged Gear exports after clearance and retention updates, including reload and stale-download protection. Static and profile tests passed. Approval usage blocked the separate oversized-conical-diameter Chromium run.
