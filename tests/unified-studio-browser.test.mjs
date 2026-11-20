@@ -1545,6 +1545,7 @@ try{
    const calibration=gearPalette.locator('[data-fit-calibration]');
    await calibration.locator('[name=printedBoreDiameter]').fill('12.5');
    await calibration.getByRole('button',{name:'Save measured fit'}).click();
+   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].clearance===.5);
    const retention=gearPalette.getByLabel('Retention lip (mm)');
    await retention.fill('.2');await retention.press('Tab');
    await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].socketProfile.retentionLip===.2);
@@ -1707,7 +1708,7 @@ try{
   const calibration=sidePalette.locator('[data-fit-calibration]');
   await calibration.locator('[name=printedBoreDiameter]').fill('5.5');
   await calibration.getByRole('button',{name:'Save measured fit'}).click();
-  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].clearance),.5);
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].clearance===.5);
   const {parameters,build,geometries}=await finishNativeJourney('FIT-01 Tile side');
   const [a,b]=build.pixelHoles;
   const width=parameters.width+24,depth=parameters.depth+24;
@@ -1823,7 +1824,7 @@ try{
   const calibration=wavePalette.locator('[data-fit-calibration]');
   await calibration.locator('[name=printedBoreDiameter]').fill('5.4');
   await calibration.getByRole('button',{name:'Save measured fit'}).click();
-  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].clearance),.4);
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].clearance===.4);
   const {parameters,build,geometries}=await finishNativeJourney('FIT-03 gentle Wave',{inspectCurvedRoute:true});
   const [a,b]=build.pixelHoles;
   const width=parameters.width+24,depth=parameters.depth+24;
@@ -1957,7 +1958,7 @@ try{
   const calibration=palette.locator('[data-fit-calibration]');
   await calibration.locator('[name=printedBoreDiameter]').fill('5.45');
   await calibration.getByRole('button',{name:'Save measured fit'}).click();
-  assert.equal((await seats())[0].clearance,.45);
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].clearance===.45);
   const {build,geometries}=await finishNativeJourney(name);
   const [a,b]=build.pixelHoles;
   const width=designX+24,depth=designY+24;

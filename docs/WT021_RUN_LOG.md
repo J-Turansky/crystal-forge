@@ -215,4 +215,4 @@
 
 ### 2026-11-20 - native shaped calibration
 
-- Validate shaped profile and bore-size edits in the production worker. Focused Chromium measured successive flanged Gear exports after clearance and retention updates, including reload and stale-download protection. Static and profile tests passed. Approval usage blocked the separate oversized-conical-diameter Chromium run.
+- Validate shaped profile and bore-size edits in the production worker. Focused Chromium measured successive flanged Gear exports after clearance and retention updates, including reload and stale-download protection. Static and profile tests passed. The subsequent full Chromium suite passed the oversized conical diameter rollback and the existing family journeys after the tests were updated to await production validation.

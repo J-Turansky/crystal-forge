@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** DIM-03 and CAL-01, compare retained bore, flange and insertion depth after an independent fitting edit.
+- **Target:** CAL-02, verify fitted clearances across separately saved project snapshots and Crystal imports.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** The flanged Gear calibration passed focused Chromium and both exported formats. Run the conical oversized-diameter rollback test and full unified Chromium suite, then check exact-head CI.
+- **Next test:** Full Chromium passed shaped calibration, oversized diameter rollback and native exports. Next create separate project snapshots with a library-following and a local fit. Import a revised profile, reopen and verify the intended release of each fit in STL and 3MF.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction
