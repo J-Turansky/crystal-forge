@@ -260,3 +260,7 @@
 ### 2026-11-20 - edited tab recesses and stock
 
 - All six native families passed Manifold and both export decoders for tab counterbore and countersink diameter, through pilot, depth and retained material. Chromium verified edits and stale job handling on Character, Light Pod and Rotary Cap.
+
+### 2026-11-20 - blind native mounting profiles
+
+- Added editable magnet pockets and threaded insert pilots to native mounts. Shared production stock guards validate the blind cuts. Both file formats measure diameter and depth for all six native families, and Chromium verified both Tile pockets and rollback when insufficient stock remains.

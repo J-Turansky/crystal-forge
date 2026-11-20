@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** DIM-05 and PAR-01, add real blind magnet pockets and threaded insert pilots to native mounts.
+- **Target:** DIM-05 and PAR-01, verify direct placement and saved state for blind native mounting profiles.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** All six native tab recess fixtures passed paired section tests. Next add blind mounting profiles with editable depth and diameter, preserving material behind the cut. Verify an unsafe edit leaves the prepared revision intact.
+- **Next test:** Blind magnet and insert profiles passed paired geometry probes on all native families and Chromium edits on Tile. Next verify choosing a blind profile before placement, then use it on solid stock and refuse a conflicting placement before save.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

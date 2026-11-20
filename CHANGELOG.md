@@ -4,6 +4,8 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
+- Native mounts support blind magnet pockets and threaded insert pilots with editable diameter and depth. Build checks the remaining stock before saving.
+
 - Native cable routes validate minimum bend-radius edits before saving, preserving the last valid setting when a bend cannot fit.
 
 - Gentle Wave cable grooves can follow height changes in both directions across the actual mesh. Steeper relief still requires another supported installation surface.

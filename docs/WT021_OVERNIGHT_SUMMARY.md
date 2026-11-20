@@ -1,9 +1,10 @@
 # WT-021 overnight checkpoint
 
-[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `71ee17c3bd7c57eae73efe9d0bfdde0703691a9f`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
+[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `a5ab788f8a5d83a3231aa0dd1525e0237f7bc2d1`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
 
 ## Latest checkpoint
 
+- Native manual mounts support blind magnet pockets and threaded insert pilots. All six families passed STL and 3MF diameter and floor checks. Chromium edited both profiles on a Tile and verified that excessive pocket depth rolled back.
 - All six native builders passed counterbore and countersink section measurements on backed tabs. Chromium measured the edited Character, Light Pod and Rotary Cap tab in fresh STL and 3MF and verified that stale downloads were disabled.
 - DIM-02 is verified. Removing a tab on six native builders invalidates the older downloads. Fresh STL and 3MF agree on the updated manufacturing bounds and match the viewport, Print Centre and ZIP manifest. Crystal has a separate browser and export dimensional trail.
 - A pinned two-axis Wave channel matches the planned three-dimensional span and passes sampled bend checks in both export formats. Chromium refused a 60 mm radius that could not fit and prepared both files after a valid 6 mm edit.

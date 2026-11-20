@@ -2820,6 +2820,61 @@ try{
   }
   material.dispose();
  }
+ // DIM-05: blind hardware pockets retain the stock behind each cut.
+ {
+  const name='Blind hardware Tile';
+  await page.evaluate(name=>window.__sensoryStudio.addModel('tactile-tiles',{width:100,depth:80,thickness:6,
+   outline:'square',relief:1,pattern:'terraces',dualMaterial:false},name),name);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await page.locator('[data-view=bottom]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  const palette=page.locator('.sms-palette');
+  await palette.getByRole('button',{name:'Place mounting hole in 3D'}).click();
+  for(const [i,x] of [-20,20].entries()){
+   const point=await page.evaluate(x=>window.__sensoryStudio.fittingPointScreen(x,0,'underside'),x);
+   assert(point);await page.mouse.click(point.x,point.y);
+   await page.waitForFunction(count=>window.__sensoryStudio.currentModel.build.manualMountHoles?.length===count,i+1);
+  }
+  await page.keyboard.press('Escape');
+  const profile=palette.getByLabel('Mount profile');
+  const diameter=palette.getByLabel('Pocket diameter (mm)');
+  const depth=palette.getByLabel('Pocket depth (mm)');
+  const model=()=>page.evaluate(()=>window.__sensoryStudio.currentModel);
+  for(const [index,kind,width,targetDepth] of [[0,'Magnet pocket',6.2,3],[1,'Threaded insert pilot',4.1,4]]){
+   await palette.getByRole('button',{name:'M'+(index+1),exact:true}).click();
+   await profile.selectOption(kind);
+   await page.waitForFunction(({index,kind})=>window.__sensoryStudio.currentModel.build.manualMountHoles[index].profile===kind,{index,kind});
+   await diameter.fill(String(width));await diameter.press('Tab');
+   await page.waitForFunction(({index,width})=>window.__sensoryStudio.currentModel.build.manualMountHoles[index].recessDiameter===width,{index,width});
+   if(index===0){
+    await depth.fill('3');await depth.press('Tab');
+    await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[0].recessDepth===3);
+    const accepted=await model();
+    await depth.fill('5.9');await depth.press('Tab');
+    await page.locator('#smsModelError').getByText(/M1 magnet pocket needs continuous underside stock/).waitFor();
+    assert.equal(Number(await depth.inputValue()),targetDepth);
+    assert.deepEqual(await model(),accepted);
+   }
+  }
+  const {build}=await model();
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  const job=page.locator('#smsJobs article').filter({hasText:name});
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const stl=await useDownload(job.locator('[data-job-stl]'));
+  const mf=await useDownload(job.locator('[data-job-3mf]'));
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(stl.bytes).buffer),
+   read3MFGeometry(zipEntries(mf.bytes).get('3D/3dmodel.model').toString())]){
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),mesh=new THREE.Mesh(geometry,material);
+   for(const [index,{x,z,recessDiameter}] of build.manualMountHoles.entries()){
+    const ray=(height,dx,dz)=>new THREE.Raycaster(new THREE.Vector3(x,-z,height),new THREE.Vector3(dx,0,dz)).intersectObject(mesh)[0];
+    const span=ray(1,-1,0).distance+ray(1,1,0).distance;
+    assert(Math.abs(span-recessDiameter)<.01);
+    assert(Math.abs(ray(-1,0,1).point.z-[3,4][index])<.01);
+   }
+   geometry.dispose();material.dispose();
+  }
+ }
  assert.deepEqual(errors,[]);
  console.log('Unified Home, Design, Build, Library and Quick Print screenshots captured.');
 }catch(error){
