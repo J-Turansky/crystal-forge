@@ -58,6 +58,10 @@ Only in the draft integration branch; **not a production release**. Owner approv
 
 **Codex rule:** after each independently tested *user-visible* milestone, update this draft section with concise impact and limitations in the same batched source/test commit. Synchronise in-app What's New/version data through UX-01. Never mislabel a draft-only change as shipped.
 
+## v0.16.0-dev.35.15 — Studio backup and recovery guide
+
+- Document how to download a workspace backup, preview and recover its contents, and troubleshoot local or private GitHub backups.
+
 ## v0.16.0-dev.35.14 — Support-Free Pixel Shoulders
 
 - Taper the flange-to-bore transition on base-down shaped pixel sockets in all seven builders. Choose 30–60° from horizontal, with 45° as the default. Existing sockets keep their original geometry until enabled.
