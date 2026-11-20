@@ -1209,7 +1209,7 @@ try{
    assert.match(await nativePreview.innerText(),/insertion 22\.00 mm/,
     'Gear preview: '+await nativePreview.innerText());
    assert.match(await nativePreview.innerText(),/nominal cutter roof allowance .*mm/);
-   assert.match(await nativePreview.innerText(),/stock interference; 0\.00 mm3 overlap with wire cuts/);
+   assert.match(await nativePreview.innerText(),/stock interference; 0\.00 mm³ overlap with wire cuts/);
    await nativeToggle.uncheck();
    assert.equal(await nativePreview.innerText(),'');
    assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),gearStateBefore,
@@ -1240,7 +1240,7 @@ try{
   document.querySelector('[data-native-fit-preview-status]')?.textContent||''),null,{timeout:60000});
  assert.match(await tilePreview.innerText(),/insertion 9\.00 mm/,
   'Tile preview: '+await tilePreview.innerText());
- assert.match(await tilePreview.innerText(),/stock interference; 0\.00 mm3 overlap with wire cuts/);
+ assert.match(await tilePreview.innerText(),/stock interference; 0\.00 mm³ overlap with wire cuts/);
  await tileToggle.uncheck();
  assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),tileStateBefore,
   'Toggling Tile physical overlays must not mutate fittings, dimensions or saved model revision');

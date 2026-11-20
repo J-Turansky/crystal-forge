@@ -43,3 +43,5 @@
 - Native preview and preparation share insertion opening, stock and adjacent-cut checks. Preview reports measured wire cut overlap separately.
 - The Gear/Tile test injects physical wire and mounting cuts; both preview warning and manufacturing rejection are exercised for the mounting conflict.
 - FIT-02 remains PARTIAL. Next action is the invalid-pose Chromium case and actual routed wall verification in NOW.
+
+- First checkpoint e6dc8a8d1ea61aee9b037a6c7e57d87342ac9d8a failed the exact-head release-metadata gate because a draft note was inside the release entry. Moved the note to a labelled unreleased paragraph and verified node tests/release-metadata.mjs against main. Local Chromium also caught the missing readout text; wired the measured overlap and warnings into the DOM and started the browser retry.
