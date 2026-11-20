@@ -2,7 +2,7 @@
 
 ## UX-02 keyboard regression checks
 
-With the same local server as `npm run test:browser`, run `node tests/exact-value-accessibility-browser.mjs` and `node tests/studio-tool-finder-browser.mjs`. Browser CI runs both before the existing suite. The finder test uses the real Studio model picker for all seven built-in families, verifies arrow navigation, Escape focus restoration, no-match feedback, and the Cura shortcut (keyboard and emulated touch). It samples light and dark at 390, 768 and 1440 px; screenshots are uploaded with browser CI. This checks shared navigation, not keyboard alternatives for editing 3D geometry.
+With the same local server as `npm run test:browser`, run `node tests/exact-value-accessibility-browser.mjs` and `node tests/studio-tool-finder-browser.mjs`. Browser CI runs both before the existing suite. The finder test uses the real Studio model picker for all seven built-in families, verifies arrow navigation, Escape focus restoration, no-match feedback, and the Cura shortcut (keyboard and emulated touch). It renames and reopens the project in each case and checks that the active family survives reload. It samples light and dark at 390, 768 and 1440 px; screenshots are uploaded with browser CI. This checks shared navigation, not keyboard alternatives for editing 3D geometry.
 
 Run `node tests/studio-help-diagnostics-browser.mjs` to exercise the in-app Help checks, an offline refresh, and the exact fields in the downloaded JSON. This reports local browser capabilities; it does not fetch assets, prove autosave works, or recover from a failed startup. Browser CI also runs this test.
 
@@ -10,6 +10,7 @@ Run `node tests/studio-help-diagnostics-browser.mjs` to exercise the in-app Help
 | --- | --- | --- | --- |
 | Tool Finder | Down reached only the first result; Escape from a result did not return to search | Arrow traversal, Escape reset and Cura destination focus tested in all seven builders | Widths/themes are sampled across families, not a full cross-product |
 | Help troubleshooting | Static guidance only | Live browser capability checks, offline feedback and a minimal downloadable report | No asset probe, save test or write to local storage |
+| Rejected exact values | Transient browser validation bubble | Persistent inline error, associated with the field; focus and previous value stay put until the correction is applied | Covers numeric range validation, not fabrication constraints |
 
 The Studio Chromium suite (`node tests/studio-browser.test.mjs`) checks that shared keyboard help adds to an existing control description and that pressing Escape dismisses the tooltip without removing that description or moving focus.
 

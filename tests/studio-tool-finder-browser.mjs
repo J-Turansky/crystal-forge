@@ -44,6 +44,16 @@ try{
     await page.keyboard.press('Enter');
    }
    await page.waitForFunction(()=>document.activeElement?.id==='smsCura');
+   await page.locator('.sms-workspace-nav [data-tab=design]').click();
+   const title=page.getByRole('textbox',{name:'Project name'});
+   const projectName=`UX-02 fixture: ${family}`;
+   await title.fill(projectName);
+   await title.press('Tab');
+   await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+   await page.reload();
+   await page.locator('.sms-workspace-nav [data-tab=design]').click();
+   assert.equal(await title.inputValue(),projectName,`${family}: project name survived reload`);
+   assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.generator.typeId),family);
    console.log(`Tool finder: ${family}, ${width}px, ${dark?'dark':'light'}`);
   }finally{
    await page.close();
