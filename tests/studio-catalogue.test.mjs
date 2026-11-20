@@ -682,6 +682,12 @@ for(const [family,parameters] of fittingCases){
 // Single-material Tiles have separate fitting-backing capability from legacy base.
 assert.equal(tileGenerator.capabilities.supportsBase,false);
 assert.equal(tileGenerator.capabilities.supportsStationaryFittingBacking,true);
+const knobSettings={controlStyle:'Rotary knob',shaft:0,diameter:70,height:19,dualMaterial:false};
+const knobBacking={pixelBacking:true,pixelBackingThickness:10,backingTabs:[{u:.125},{u:.625}]};
+assert.throws(()=>applyBuildModules(capGenerator.recipe(knobSettings),knobBacking,capGenerator.capabilities),/Stationary display/);
+const stationaryKnob=applyBuildModules(capGenerator.recipe({...knobSettings,knobInstallation:'Stationary display'}),knobBacking,capGenerator.capabilities);
+assert.equal(stationaryKnob.negative.filter(part=>part.tabHole).length,2);
+assert.equal(prepareRecipe(THREE,wasm,stationaryKnob).bodies.length,1);
 assert.throws(()=>applyBuildModules(tileGenerator.recipe({pattern:'grass',dualMaterial:true}),
  {pixelBacking:true,backingTabs:[{u:.125}]},tileGenerator.capabilities),
  /stationary single-material|dual-material/);

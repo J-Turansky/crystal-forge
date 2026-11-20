@@ -1,3 +1,4 @@
+import {installFeatureCatalogue} from './studio-features.js';
 import {makePixelReplicaRecipe} from './pixel-replica.js';
 import {prepareRecipe} from './studio-geometry.js';
 import {makeRoutedSocketSpecimen} from './studio-catalogue.js';
@@ -47,7 +48,7 @@ const defaults={
   familyMix:'Quartz',familyWeights:{Quartz:1,Shard:1,Blade:1,Cubic:1,'Double terminated':1,Fantasy:1},bottomScale:1,topScale:.80,cornerRadius:.7,shoulderRound:0,tipRound:3.5,tipStyle:'Rounded',
   tipFlat:.25,tipLength:.27,roundSteps:3,
   baseType:'integrated',baseHeight:25,baseDome:0,baseEdgeRadius:0,baseProfile:'Plinth + dome',domeFalloff:1.8,sideWall:100,baseWidth:3,baseStyle:'Fitted',undersideAccess:false,baseVault:false,vaultSupportPitch:25,wallThickness:1.2,lightPorts:false,lightPortDiameter:3.2,lightPortReach:55,
-  showPixels:false,pixelCount:1,pixelProfileId:'gumdrop',pixelProfiles:[],lightingMode:'single',glowPreview:false,glowColour:'0x77c4ff',pixelDiameter:12,pixelFit:.15,pixelRetentionLip:0,socketConical:false,fitCalibration:null,fitCouponLast:null,fitCouponStyle:'stepped',cutSockets:true,hollowCrystals:false,targetedLightPaths:false,lightBoreDiameter:4,lightReach:85,pixelPlacement:'auto',manualPixelHoles:[],mountPlacement:'auto',manualMountHoles:[],splitParts:false,autoBedSplit:false,splitX:0,splitAlignment:false,splitPinDiameter:5,splitPinDepth:7,splitPinClearance:.25,plateThickness:4,mountPlateThickness:4.5,mount:'None',mountHoleDiameter:4.5,mountHoleDepth:9,mountSpacing:40,wireChannels:false,wireExit:true,wireMode:'string',pixelStringSpacing:50,pixelSnapMaxMove:5,wireMinBendRadius:5,wireInputTailLength:0,wireOutputTailLength:0,wireDirectionArrows:true,wireShowLengths:true,wirePairSpacing:7,wireWidth:3,wireDepth:2,wireVaulted:false,wireSlack:0,manualEdgeTabs:null,tabCount:4,tabHolesPerTab:2,tabHoleDiameter:4.5,tabThickness:5,tabWall:3,
+  showPixels:false,pixelCount:1,pixelProfileId:'gumdrop',pixelProfiles:[],lightingMode:'single',glowPreview:false,glowColour:'0x77c4ff',pixelDiameter:12,pixelFit:.15,pixelRetentionLip:0,socketConical:false,fitCalibration:null,fitCouponLast:null,fitCouponStyle:'stepped',cutSockets:true,hollowCrystals:false,targetedLightPaths:false,lightBoreDiameter:4,lightReach:85,pixelPlacement:'auto',manualPixelHoles:[],mountPlacement:'auto',manualMountHoles:[],splitParts:false,autoBedSplit:false,splitX:0,splitAlignment:false,splitPinDiameter:5,splitPinDepth:7,splitPinClearance:.25,plateThickness:4,mountPlateThickness:4.5,mount:'None',mountHoleDiameter:4.5,mountHoleDepth:9,mountSpacing:40,wireChannels:false,wireExit:true,wireMode:'string',pixelStringSpacing:50,pixelSnapMaxMove:5,wireMinBendRadius:5,wireInputTailLength:0,wireOutputTailLength:0,wireDirectionArrows:true,wireShowLengths:true,wirePairSpacing:7,wireWidth:3,wireDepth:2,wireVaulted:false,wireSlack:0,manualEdgeTabs:null,edgeManualMounts:false,tabCount:4,tabHolesPerTab:2,tabHoleDiameter:4.5,tabThickness:5,tabWall:3,
   printer:'Ultimaker 3 Extended',printerX:220,printerY:220,printerZ:220,curaNozzle:.4,curaMaterial:'PLA',curaQuality:60,curaQualityType:'auto',curaIntent:'light',overhang:45,preserveLocked:true,snap:true,hardwareSnap:false,hardwareSnapStep:5,
   colour:0x8bbcff,mode:'simple',floatView:false,hardwareColourMode:false,evenLighting:true
 };
@@ -1064,42 +1065,71 @@ function applyTheme(theme,save=true){
 $('themeBtn').onclick=()=>applyTheme(activeTheme==='light'?'dark':'light');
 applyTheme(activeTheme,false);
 
-// Keyboard-accessible Help and Changelog, available from any workspace.
+// Help, features and release history share one keyboard-accessible dialog.
+const info=$('infoOverlay');
+const infoTabs=[...info.querySelectorAll('[data-info]')];
+const infoTitles={help:'Help',features:'Features',changelog:'What’s new'};
+const renderFeatures=installFeatureCatalogue($('infoFeatures'),{
+ canNavigate:feature=>feature.action==='help'||!!window.__sensoryStudio?.canOpenFeature(feature),
+ navigate:feature=>{
+  if(feature.action==='help'){showInfoTab('help');$('infoTabHelp').focus();return;}
+  if(!window.__sensoryStudio?.canOpenFeature(feature))return;
+  closeInfo();window.__sensoryStudio.openFeature(feature);
+ }
+});
 let returnFocus=null;
 function showInfo(tab='help'){
  returnFocus=document.activeElement;
- $('infoOverlay').hidden=false;
+ info.hidden=false;
  showInfoTab(tab);
  $('closeInfo').focus();
 }
 function showInfoTab(tab){
- const which=tab==='changelog'?'changelog':'help';
- $('infoTitle').textContent=which==='help'?'Crystal Forge — Help':'Crystal Forge — What’s new';
- document.querySelectorAll('[data-info]').forEach(button=>{
-  const on=button.dataset.info===which;
-  button.classList.toggle('active',on);
-  button.setAttribute('aria-selected',on?'true':'false');
- });
- document.querySelectorAll('[data-info-pane]').forEach(panel=>panel.hidden=panel.dataset.infoPane!==which);
- const active=$('infoOverlay').querySelector('[data-info-pane="'+which+'"]');
- if(active)active.scrollTop=0;
+ $('infoTitle').textContent='Crystal Forge — '+infoTitles[tab];
+ for(const button of infoTabs){
+  const selected=button.dataset.info===tab;
+  button.classList.toggle('active',selected);
+  button.setAttribute('aria-selected',String(selected));
+  button.tabIndex=selected?0:-1;
+ }
+ for(const panel of info.querySelectorAll('[data-info-pane]')){
+  panel.hidden=panel.dataset.infoPane!==tab;
+  if(!panel.hidden)panel.scrollTop=0;
+ }
+ if(tab==='features')renderFeatures();
 }
 function closeInfo(){
- if($('infoOverlay').hidden)return;
- $('infoOverlay').hidden=true;
- if(returnFocus&&typeof returnFocus.focus==='function')returnFocus.focus();
+ if(info.hidden)return;
+ info.hidden=true;
+ returnFocus?.focus();
 }
 $('helpBtn').onclick=()=>showInfo('help');
 $('changelogBtn').onclick=()=>showInfo('changelog');
 $('closeInfo').onclick=closeInfo;
-document.querySelectorAll('[data-info]').forEach(button=>button.onclick=()=>showInfoTab(button.dataset.info));
-$('infoOverlay').addEventListener('pointerdown',e=>{if(e.target===$('infoOverlay'))closeInfo()});
-document.addEventListener('keydown',e=>{
- if(!$('infoOverlay').hidden){
-  if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeInfo()}
+for(const [i,button] of infoTabs.entries()){
+ button.onclick=()=>showInfoTab(button.dataset.info);
+ button.onkeydown=event=>{
+  const target={ArrowLeft:(i+infoTabs.length-1)%infoTabs.length,ArrowRight:(i+1)%infoTabs.length,Home:0,End:infoTabs.length-1}[event.key];
+  if(target===undefined)return;
+  event.preventDefault();
+  const next=infoTabs[target];
+  showInfoTab(next.dataset.info);next.focus();
+ };
+}
+info.addEventListener('pointerdown',event=>{if(event.target===info)closeInfo();});
+document.addEventListener('keydown',event=>{
+ if(!info.hidden){
+  if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();closeInfo();}
+  if(event.key==='Tab'){
+   const focusable=[...info.querySelectorAll('button:not(:disabled),input,select,a[href],summary,[tabindex]')]
+    .filter(node=>node.tabIndex>=0&&node.getClientRects().length);
+   const first=focusable[0],last=focusable.at(-1);
+   if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}
+   if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
+  }
   return;
  }
- if(e.key==='?'&&!(e.target instanceof HTMLInputElement)){e.preventDefault();showInfo('help')}
+ if(event.key==='?'&&!(event.target instanceof HTMLInputElement)){event.preventDefault();showInfo('help');}
 });
 
 // Reusable pixel profiles are stored in both browser library and editable projects.

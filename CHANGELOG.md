@@ -4,6 +4,10 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
+- Open the Features tab from Help or What’s New to search all seven model builders and open the relevant workspace.
+- What’s New takes its version, current notes, unreleased changes and earlier releases directly from this changelog.
+- Rotary Caps support an explicit Stationary display mode for fixed external tabs. The moving-control mode refuses attached fixing ears.
+- Crystal edge tabs can be used with separately placed manual through-holes. Build rejects a mounting edit that blocks a previously valid cable route.
 - External-tab backing preserves eligible Gear top, Wave surface and Tile front routes. Tile backing changes that would obstruct a front channel are rejected.
 - Native wiring and manual through-mounts can share a model when the holes clear the channels. Build refuses conflicting mount edits and preserves the saved route.
 - Gentle parallel Waves support an open serial groove that follows the measured surface between shaped sockets and out to the perimeter.
@@ -17,7 +21,6 @@ Only in the draft integration branch; **not a production release**. Owner approv
 - Rebuilt the socket cutter as a connected profile after finding a measured 0.62463 mm³ positive-envelope mismatch; added stricter fail-closed export mesh checks.
 - Improved route-roof and independent physical-wire-width versus bore-fit acceptance tests.
 - Archived original Codex briefs and added a token-efficient overnight execution protocol, acceptance register, progress log and recovery pointer in PR #102.
-- **Approved but not yet implemented:** UX-01 visual, categorised, clickable in-app Features & What's New catalogue (see [brief](docs/WT021_FEATURE_CATALOGUE_BRIEF.md)); an updated [owner morning summary](docs/WT021_OVERNIGHT_SUMMARY.md) is required.
 
 **Codex rule:** after each independently tested *user-visible* milestone, update this draft section with concise impact and limitations in the same batched source/test commit. Synchronise in-app What's New/version data through UX-01. Never mislabel a draft-only change as shipped.
 

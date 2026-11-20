@@ -640,7 +640,7 @@ try{
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
   await page.getByRole('button',{name:'Render actual model',exact:true}).click();
   const inspection=page.locator('#smsLightInspector');
-  await inspection.getByText('Prepared manufacturing mesh').waitFor({timeout:120000});
+  await inspection.getByText(/Prepared (?:manufacturing mesh|Light Pod)/).waitFor({timeout:120000});
   await inspection.getByLabel('Cut section').check();
   await inspection.getByRole('button',{name:'Close inspection'}).click();
   await page.locator('.sms-workspace-nav [data-tab=print]').click();
@@ -1680,6 +1680,134 @@ try{
    }
    material.dispose();geometry.dispose();
   }
+ }
+ // Independent stationary backed journeys. Each uses its own model, placement, calibration and actual files.
+ const backedFamilies=[
+  {type:'characters',name:'Layered Character',key:'width',source:{character:'Cloud',construction:'Layered',width:90,depth:8,dualMaterial:false}},
+  {type:'light-pods',name:'Solid Beacon Pod',key:'width',source:{shellForm:'Beacon',illuminated:false,width:80,depth:68,height:32,dualMaterial:false}},
+  {type:'control-caps',name:'Stationary Rotary Cap',key:'diameter',source:{controlStyle:'Rotary knob',shaft:0,diameter:70,height:19,dualMaterial:false}}
+ ];
+ const compactProfile='Measured compact backing pixel';
+ for(const {type,name,key,source} of backedFamilies){
+  await page.evaluate(({type,source,name})=>window.__sensoryStudio.addModel(type,source,name),{type,source,name});
+  await page.locator('.sms-workspace-nav [data-tab=design]').click();
+  await page.locator('.sms-palette [data-palette-key="'+key+'"]').press('ArrowRight');
+  const shape=await page.evaluate(key=>window.__sensoryStudio.currentModel.parameters[key],key);
+  assert(shape>source[key],name+' accepts a Design size edit');
+  const {width:designX,depth:designY}=await page.evaluate(type=>{
+   const {registry,currentModel}=window.__sensoryStudio;
+   return registry.get(type).recipe(currentModel.parameters).bounds;
+  },type);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  const palette=page.locator('.sms-palette');
+  await palette.locator('[data-pixel-backing]').check();
+  const thickness=palette.getByLabel('Fitting backing thickness (mm)');
+  await thickness.fill('10');
+  await thickness.press('Tab');
+  assert.equal(await thickness.inputValue(),'10');
+  if(type==='control-caps'){
+   const moving=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
+   await palette.getByRole('button',{name:'Add external tab',exact:true}).click();
+   await palette.locator('[data-pixel-status]').filter({hasText:/Stationary display/}).waitFor();
+   assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),moving);
+   await page.locator('.sms-workspace-nav [data-tab=design]').click();
+   await palette.getByRole('button',{name:'Stationary display',exact:true}).click();
+   assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.knobInstallation),'Stationary display');
+   await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  }
+  if(type==='characters'){
+   await palette.locator('[data-fit-profile=seed]').click();
+   await palette.getByRole('button',{name:'Create / edit pixel profile'}).click();
+   for(const [id,value] of Object.entries({pixelName:compactProfile,pixelBodyDiameter:'5',pixelBodyHeight:'6',
+    pixelFlangeDiameter:'6',pixelFlangeHeight:'.5',pixelCapHeight:'1.2',pixelWireWidth:'2',pixelWireDepth:'1.5',pixelSocketClearance:'.25'}))
+    await page.locator('#'+id).fill(value);
+   await page.locator('#applyPixelSocketFit').click();
+  }
+  await palette.getByRole('button',{name:/Measured compact backing pixel/}).click();
+  await page.locator('[data-view=bottom]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  const fitting=palette.getByRole('button',{name:'Place shaped socket in 3D'});
+  await fitting.click();
+  for(const [index,x] of [-15,15].entries()){
+   const screen=await page.evaluate(x=>window.__sensoryStudio.fittingPointScreen(x,0,'underside'),x);
+   assert(screen);
+   await page.mouse.click(screen.x,screen.y);
+   await page.waitForFunction(n=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===n,index+1);
+  }
+  await page.keyboard.press('Escape');
+  const seats=()=>page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
+  const [,second]=await seats();
+  assert.equal(second.entryFace,'underside');
+  assert.equal(second.socketProfile.bodyHeight,6);
+  const drag=await page.evaluate(id=>[window.__sensoryStudio.pixelMarkerScreen(id),
+   window.__sensoryStudio.fittingPointScreen(20,0,'underside')],second.id);
+  assert(drag.every(Boolean));
+  await page.mouse.move(drag[0].x,drag[0].y);
+  await page.mouse.down();
+  await page.waitForTimeout(225);
+  await page.mouse.move(drag[1].x,drag[1].y,{steps:6});
+  await page.mouse.up();
+  await page.waitForFunction(x=>window.__sensoryStudio.currentModel.build.pixelHoles[1].x>x+2,second.x);
+  const serial=palette.getByRole('group',{name:'Serial LED string'});
+  const route=serial.locator('[data-native-route]');
+  assert(!(await route.isDisabled()),await serial.innerText());
+  await route.check();
+  await serial.getByText('Channels ready for preparation.').waitFor();
+  const addTab=palette.getByRole('button',{name:'Add external tab',exact:true});
+  await addTab.click();
+  await addTab.click();
+  for(const [index,position] of [13,63].entries()){
+   const perimeter=palette.locator('[data-backing-tab="'+index+'"]');
+   await perimeter.fill(String(position));
+   await perimeter.press('Tab');
+  }
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.backingTabs),[{u:.13},{u:.63}]);
+  await palette.getByRole('button',{name:'Place mounting hole in 3D'}).click();
+  for(const [index,x] of [-8,8].entries()){
+   const point=await page.evaluate(x=>window.__sensoryStudio.fittingPointScreen(x,-14,'underside'),x);
+   assert(point);
+   await page.mouse.click(point.x,point.y);
+   await page.waitForFunction(n=>window.__sensoryStudio.currentModel.build.manualMountHoles?.length===n,index+1);
+  }
+  await page.keyboard.press('Escape');
+  const mountZ=palette.locator('[data-mount-field=z]');
+  const mounted=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
+  await mountZ.fill('0');
+  await mountZ.press('Tab');
+  await palette.locator('[data-pixel-status]').filter({hasText:/too close to Mount hole/}).waitFor();
+  assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),mounted);
+  await mountZ.fill('-16');
+  await mountZ.press('Tab');
+  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[1].z),-16);
+  await palette.getByRole('button',{name:'P1',exact:true}).click();
+  await palette.getByText('Record measured fit',{exact:true}).click();
+  const calibration=palette.locator('[data-fit-calibration]');
+  await calibration.locator('[name=printedBoreDiameter]').fill('5.45');
+  await calibration.getByRole('button',{name:'Save measured fit'}).click();
+  assert.equal((await seats())[0].clearance,.45);
+  const {build,geometries}=await finishNativeJourney(name);
+  const [a,b]=build.pixelHoles;
+  const width=designX+24,depth=designY+24;
+  const tabX=-width/2+.13*2*(width+depth),tabY=depth/2+5.05;
+  for(const [format,geometry] of geometries){
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+   const mesh=new THREE.Mesh(geometry,material);
+   const hit=(origin,direction)=>new THREE.Raycaster(new THREE.Vector3(...origin),new THREE.Vector3(...direction)).intersectObject(mesh)[0]?.point;
+   const bore=[a.x,-a.z,3];
+   const left=hit(bore,[0,-1,0]),right=hit(bore,[0,1,0]);
+   assert(left&&right&&Math.abs(left.distanceTo(right)-5.45)<.02,name+' '+format+' calibrated 5.45 mm bore');
+   const wiring=[(a.x+b.x)/2,-(a.z+b.z)/2,.8];
+   const first=hit(wiring,[0,-1,0]),last=hit(wiring,[0,1,0]);
+   assert(first&&last&&Math.abs(first.distanceTo(last)-3.2)<.03,name+' '+format+' independently retains 3.2 mm wire width');
+   for(const hole of build.manualMountHoles)assert.equal(hit([hole.x,-hole.z,-1],[0,0,1]),undefined,name+' '+format+' manual through-hole');
+   for(const sign of [-1,1]){
+    const x=sign*tabX,y=sign*tabY;
+    assert.equal(hit([x,y,-1],[0,0,1]),undefined,name+' '+format+' external tab through-hole');
+    assert(Math.abs((hit([x+2.5,y,15],[0,0,-1])?.z??0)-10)<.01,name+' '+format+' connected outward tab is 10 mm thick');
+   }
+   material.dispose();geometry.dispose();
+  }
+  console.log(name+' manufacturing journey verified');
  }
  // FIT-02: actual Gear and Tile profile/cutter overlay UI parity.
  await page.evaluate(()=>window.__sensoryStudio.addModel('tactile-tiles',{

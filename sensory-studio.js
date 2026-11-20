@@ -235,7 +235,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   },'smsFocus');
   focus.setAttribute('aria-pressed','false');viewer.querySelector('.vcolumn').append(focus);
   window.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.body.classList.contains('sms-focused'))focus.click();});
-  return {palette,home,searchSettings,search,focus};
+  return {palette,home,searchSettings,search,focus,chooseTool,focusAfterNavigation};
  }
  function shellUndo(delta){
   if(mode!=='model'||active()?.link)return;
@@ -661,7 +661,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const familyFields={
    outline:['Pushbutton'],top:['Pushbutton'],
    symbol:model.parameters.rotaryMark==='Recessed pointer'?['Pushbutton','Rotary selector']:['Pushbutton','Rotary knob','Rotary selector'],
-   rotaryTop:['Rotary knob'],rotaryMark:['Rotary knob'],
+   rotaryTop:['Rotary knob'],rotaryMark:['Rotary knob'],knobInstallation:['Rotary knob','Rotary selector'],
    controlGrip:['Thumb joystick','Toggle lever','Rocker','Fader cap','Directional pad'],
    cornerRound:style==='Pushbutton'&&model.parameters.outline==='Square'?['Pushbutton']:[],
    gripProfile:['Rotary knob','Rotary selector'],gripCount:['Rotary knob','Rotary selector'],gripDepth:['Rotary knob','Rotary selector'],
@@ -1809,7 +1809,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    const controlKeys=()=>{
     const style=parameters.controlStyle;
     return ['controlStyle','diameter','height',
-     ...(['Rotary knob','Rotary selector'].includes(style)?['gripProfile','gripCount','gripDepth']:[]),
+     ...(['Rotary knob','Rotary selector'].includes(style)?['knobInstallation','gripProfile','gripCount','gripDepth']:[]),
      ...(style==='Rotary knob'?['rotaryTop','rotaryMark']:[]),
      ...(['Thumb joystick','Toggle lever','Rocker','Fader cap','Directional pad'].includes(style)?['controlGrip']:[])
     ];
@@ -1852,7 +1852,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   }
   if(build&&inspection){
    const render=document.createElement('button');
-   render.type='button';render.textContent='Render actual model';
+   render.type='button';render.textContent='Render actual model';render.dataset.featureInspect='';
    render.onclick=()=>inspection.openManufacturingMesh();
    controls.append(render);
   }
@@ -2536,6 +2536,24 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  for(const job of project.printJobs)if(['preparing','prepared'].includes(job.status)){job.status='stale';job.requestId=null;job.preparedRevision=null;}
  if(shell)showHome();
  save();
- window.__sensoryStudio={project,registry,get currentModel(){return active();},get mode(){return mode;},switchModel,addModel:add,showLibrary,showPrint,send,prepare,saveImmediately,fittingPointScreen,pixelMarkerScreen:id=>{const marker=pixelMarkers(active()).find(item=>item.userData.pixelId===id);return marker?projectMarker(marker):null;},get cacheSize(){return cache.size;},get metrics(){return {previewBuilds,geometries:renderer.info.memory.geometries,activeWorkers:workers.size};}};
+ function canOpenFeature({action,family}){
+  if(!shell)return false;
+  if(action==='family')return !!registry.get(family);
+  if(action==='library'||action==='print')return true;
+  return !!active()&&['design','build','pixels','wires','mounts','inspect'].includes(action);
+ }
+ function openFeature(feature){
+  if(!canOpenFeature(feature))return;
+  const {action,family}=feature;
+  if(action==='family'){renderPicker(registry.get(family));picker.showModal();return;}
+  if(action==='library'){showLibrary();$('smsSearch')?.focus();return;}
+  if(action==='print'){showPrint();shell.focusAfterNavigation(['#smsPrintCurrent button','#smsExpandPrint']);return;}
+  if(['pixels','wires','mounts'].includes(action)){shell.chooseTool(action);return;}
+  const tab=document.querySelector('.workspace-tabs [data-tab="'+(action==='design'?'design':'build')+'"]');
+  tab?.click();
+  if(action==='inspect')shell.focusAfterNavigation(['[data-feature-inspect]']);
+  else tab?.focus();
+ }
+ window.__sensoryStudio={project,registry,canOpenFeature,openFeature,get currentModel(){return active();},get mode(){return mode;},switchModel,addModel:add,showLibrary,showPrint,send,prepare,saveImmediately,fittingPointScreen,pixelMarkerScreen:id=>{const marker=pixelMarkers(active()).find(item=>item.userData.pixelId===id);return marker?projectMarker(marker):null;},get cacheSize(){return cache.size;},get metrics(){return {previewBuilds,geometries:renderer.info.memory.geometries,activeWorkers:workers.size};}};
  return {onCrystalChange:captureCrystal,backup,nativeModelBounds,planPixelProfileClearance};
 }

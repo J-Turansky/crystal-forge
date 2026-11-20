@@ -335,7 +335,8 @@ function panelControlRecipe(p){
  }
  const band=Math.min(2,h*.16);
  const separateRotaryFace=shape==='Rotary knob'&&!secondary.length&&(p.rotaryTop!=='Flat'||p.rotaryMark!=='Raised symbol');
- return {positive,negative,secondary,
+ const rotaryInstallation=['Rotary knob','Rotary selector'].includes(shape)?p.knobInstallation:null;
+ return {positive,negative,secondary,rotaryInstallation,
   materialSplitHeight:shape==='Indicator lens'||separateRotaryFace?band:undefined,
   materialSplitRole:separateRotaryFace?'top':undefined,
   materialBand:secondary.length||shape==='Indicator lens'||separateRotaryFace?undefined:box([width+2,band,depth+2]),
@@ -345,6 +346,7 @@ function panelControlRecipe(p){
 export const capGenerator=define('control-caps','Buttons & Control Caps','Controls',[
  choice('controlStyle','Control family','Pushbutton',['Pushbutton','Rotary knob','Rotary selector','Toggle lever','Rocker','Fader cap','Thumb joystick','Directional pad','Indicator lens']),
  choice('controlGrip','Grip silhouette','Classic',['Classic','Broad']),
+ choice('knobInstallation','Rotary installation','Moving control',['Moving control','Stationary display']),
  choice('rotaryTop','Rotary knob face','Flat',['Flat','Dish','Stepped']),choice('rotaryMark','Rotary knob mark','Raised symbol',['Raised symbol','Recessed pointer']),
  choice('gripProfile','Rotary grip','Fluted',['Smooth','Fluted','Scalloped']),numeric('gripCount','Rotary grip count',16,4,32,'',1),numeric('gripDepth','Rotary grip depth',10,2,25,'%',1),
  numeric('leverAngle','Lever or rocker angle',15,0,32,'degrees',1),choice('socketProfile','Socket profile','Round',['Round','Rectangular']),
@@ -487,6 +489,8 @@ function addBackingTabs(recipe,build,routing){
   tabs.some(tab=>!tab||!Number.isFinite(tab.u)||tab.u<0||tab.u>=1))
   throw Error('Use up to 24 tabs with perimeter positions from 0 to less than 100%.');
  if(!tabs.length)return;
+ if(recipe.rotaryInstallation==='Moving control')
+  throw Error('External tabs need a fixed support. Choose Stationary display in Design to attach tabs to the rotary body.');
  const backing=recipe.serialSupport;
  if(!backing?.explicitBacking||recipe.dualMaterial)
   throw Error('External tabs need a single-material stationary fitting backing. Enable Add fitting backing or choose a compatible solid design.');

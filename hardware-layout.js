@@ -39,14 +39,16 @@ export function hardwareFootprint(crystals,s){
 }
 export function mountingProfile(s){
   const preset=s.mount || 'None';
+  const edgeTabs=preset==='Edge fixing tabs';
+  const independent=edgeTabs&&s.edgeManualMounts===true&&s.mountPlacement==='manual';
   const custom=preset==='Custom dual holes';
   const diameter=custom? Number(s.mountHoleDiameter||4.5) :
     preset==='Magnet inserts'?10.2 : (preset==='Threaded insert M3'||preset==='Detachable plate')?4.2 : 4.5;
   const depth=preset==='Magnet inserts'?Math.min(3.2,s.baseHeight-1.6):
     (preset==='Threaded insert M3'||preset==='Detachable plate')?Math.min(6,s.baseHeight-1.6):
     custom?Math.max(1.2,Number(s.mountHoleDepth||s.baseHeight+2)):s.baseHeight+4;
-  const enabled=!['None','Edge fixing tabs'].includes(preset)&&s.baseType!=='none';
-  return {preset,enabled,diameter,depth,requested:enabled?2:0};
+  const enabled=(independent||(!edgeTabs&&preset!=='None'))&&s.baseType!=='none';
+  return {preset,enabled,diameter,depth,requested:enabled&&!edgeTabs?2:0};
 }
 export function planHardware(crystals,s){
   const all=crystals.filter(c=>!c.hidden);
@@ -120,7 +122,7 @@ export function planHardware(crystals,s){
   if(mp.enabled&&mountManual)manualMounts.slice(0,20).forEach((entry,i)=>{
     const p={x:Number(entry.x),z:Number(entry.z)},radius=mp.diameter/2;
     if(Number.isFinite(p.x)&&Number.isFinite(p.z)&&validHole(p,radius,[...sockets,...mounts]))
-      mounts.push({...p,radius,kind:'mount',diameter:mp.diameter,depth:mp.depth,label:mp.preset+' '+(i+1),id:String(entry.id||'manual-mount-'+(i+1)),manual:true,index:i});
+      mounts.push({...p,radius,kind:'mount',diameter:mp.diameter,depth:mp.depth,label:(mp.preset==='Edge fixing tabs'?'Manual through-hole':mp.preset)+' '+(i+1),id:String(entry.id||'manual-mount-'+(i+1)),manual:true,index:i});
     else invalidManualMounts.push({...p,radius,kind:'mount',index:i});
   });
   if(mp.enabled&&!mountManual){
@@ -158,9 +160,8 @@ export function planHardware(crystals,s){
    planEdgeTabs(polygon,s,[...sockets,...mounts],clearance):
    {tabs:[],tabHoles:[],requested:0,holesEach:0,skipped:0,messages:[]};
   messages.push(...edgePlan.messages);
-  const requestedMounts=mp.preset==='Edge fixing tabs'?
-   edgePlan.requested*edgePlan.holesEach:
-   mp.enabled&&mountManual?min(20,manualMounts.length):mp.requested;
+  const requestedMounts=edgePlan.requested*edgePlan.holesEach+
+   (mp.enabled&&mountManual?min(20,manualMounts.length):mp.requested);
   const wirePlan=planWireRoutes(crystals,s,{sockets,mounts,tabs:edgePlan.tabs,tabHoles:edgePlan.tabHoles,polygon,skippedPixels,invalidManualPixels});
   messages.push(...wirePlan.messages);
   return {sockets,mounts,polygon,collisions,messages,clearance,wirePlan,

@@ -25,3 +25,7 @@ The current Pixel Model Maker already has a **Help / Changelog** dialog in `inde
 5. Existing Help, browser exports, physical manufacturing acceptance and owner-only Cura/printed proof #10 remain unaffected. Capture screenshots, actual tests and exact SHA in UX-01 row.
 
 **Avoid wasting tokens:** reuse existing styles/modal/navigation; make autonomous design choices without owner interview. Complete P0 physical work first.
+
+## Release history maintenance
+
+Edit CHANGELOG.md and run `npm run release:metadata` to update the generated version and release history in index.html. The release metadata test checks for drift. Feature names, availability and routes live in studio-features.js. Local Chromium screenshots are saved under qa/ and uploaded by the browser workflow.

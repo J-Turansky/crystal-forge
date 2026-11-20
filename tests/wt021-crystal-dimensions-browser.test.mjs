@@ -1,6 +1,10 @@
 import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import * as THREE from 'three';
+import {STLLoader} from 'three/addons/loaders/STLLoader.js';
+import {planHardware} from '../hardware-layout.js';
+import {baseSurfaceHeight} from '../geometry-v3.js';
 
 function bounds(points){
  const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
@@ -91,4 +95,153 @@ try{
  await toggle.uncheck();
  assert.equal(await fit.innerText(),'');
  console.log('WT-021 Crystal physical fitting preview toggled in Build');
+ await page.evaluate(()=>window.__sensoryStudio.addModel('crystals',{
+  seed:42,count:5,width:94,baseType:'integrated',baseStyle:'Square',baseHeight:24,baseWidth:32,baseDome:0,
+  cutSockets:true,lightingMode:'multi',pixelPlacement:'manual',manualPixelHoles:[],pixelProfileId:'seed',
+  wireMode:'string',wireChannels:false,wireInputTailLength:150,wireOutputTailLength:150,pixelStringSpacing:100,wireWidth:3.2,
+  tabCount:2,tabHolesPerTab:1,tabHoleDiameter:3.4,tabThickness:5,tabWall:3
+ },'WT021 full Crystal'));
+ const crystal=()=>page.evaluate(()=>window.__sensoryStudio.currentModel);
+ const reveal=async locator=>{
+  await locator.evaluate(element=>{for(let node=element.parentElement;node;node=node.parentElement)if(node.tagName==='DETAILS')node.open=true;});
+  return locator;
+ };
+ await page.locator('.sms-workspace-nav [data-tab=design]').click();
+ const width=await reveal(page.locator('[data-state=width]'));
+ await width.press('ArrowRight');
+ assert((await crystal()).parameters.width>94);
+ await page.locator('.sms-workspace-nav [data-tab=build]').click();
+ const profile=await reveal(page.locator('#pixelProfileSelect'));
+ await profile.selectOption('seed');
+ await page.locator('[data-view=top]').click();
+ await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+ await (await reveal(page.locator('#placePixelBtn'))).click();
+ const sample=async (x,y)=>{
+  await page.mouse.move(x,y);
+  return page.evaluate(()=>window.__crystalForgePlacementMetrics());
+ };
+ const onBase=async(x,z)=>{
+  const viewport=await page.locator('#viewport canvas').boundingBox();
+  const {camera,target}=await page.evaluate(()=>window.__crystalForgeViewMetrics());
+  const model=await crystal();
+  const projection=new THREE.PerspectiveCamera(46,viewport.width/viewport.height,.1,5000);
+  projection.position.fromArray(camera);
+  projection.lookAt(new THREE.Vector3(...target));
+  projection.updateMatrixWorld();
+  const p=new THREE.Vector3(x,baseSurfaceHeight(model.editableState.crystals,model.parameters,x,z),z).project(projection);
+  return {x:viewport.x+(p.x+1)*viewport.width/2,y:viewport.y+(1-p.y)*viewport.height/2};
+ };
+ for(const [i,x] of [-18,18].entries()){
+  const location=await onBase(x,0);
+  const cursor=await sample(location.x,location.y);
+  assert(cursor.valid,JSON.stringify({location,cursor}));
+  await page.mouse.click(location.x,location.y);
+  await page.waitForFunction(count=>window.__sensoryStudio.currentModel.parameters.manualPixelHoles.length===count,i+1);
+ }
+ await page.keyboard.press('Escape');
+ const prior=(await crystal()).parameters.manualPixelHoles;
+ const p2=page.locator('.hardware-marker[data-hw-kind=pixel]').filter({hasText:'P2'});
+ await p2.click();
+ const marker=await p2.boundingBox();
+ const destination=await onBase(32,0);
+ await page.mouse.move(marker.x+marker.width/2,marker.y+marker.height/2);
+ await page.mouse.down();
+ await page.waitForTimeout(225);
+ await page.mouse.move(destination.x,destination.y,{steps:6});
+ await page.mouse.up();
+ await page.waitForFunction(x=>window.__sensoryStudio.currentModel.parameters.manualPixelHoles[1].x>x+2,prior[1].x,{timeout:8000}).catch(async error=>{
+  throw Error('Crystal drag did not commit: '+await page.locator('#status').innerText()+' '+JSON.stringify((await crystal()).parameters.manualPixelHoles),{cause:error});
+ });
+ const p2x=await reveal(page.locator('[data-hole-kind=pixel][data-hole-axis=x][data-hole-index="1"]'));
+ const acceptedX=await p2x.inputValue();
+ await p2x.fill('9999');await p2x.press('Tab');
+ assert.equal(Number(await p2x.inputValue()),Number(acceptedX));
+ await (await reveal(page.locator('[data-state=wireChannels]'))).check();
+ await page.locator('#wireRouteStatus').getByText(/ready|fit/i).first().waitFor();
+ await page.locator('#advancedBtn').click();
+ await (await reveal(page.locator('[data-state=mount]'))).selectOption('Edge fixing tabs');
+ await (await reveal(page.locator('#placeTabBtn'))).click();
+ await page.keyboard.press('Escape');
+ for(const [i,u] of [13,63].entries()){
+  const tab=await reveal(page.locator('[data-tab-u="'+i+'"]'));
+  await tab.fill(String(u));await tab.press('Tab');
+ }
+ assert.equal((await crystal()).parameters.manualEdgeTabs.length,2);
+ await (await reveal(page.locator('#placeMountBtn'))).click();
+ for(const [i,x] of [-14,14].entries()){
+  const location=await onBase(x,-40);
+  assert((await sample(location.x,location.y)).valid);
+  await page.mouse.click(location.x,location.y);
+  await page.waitForFunction(count=>window.__sensoryStudio.currentModel.parameters.manualMountHoles.length===count,i+1);
+ }
+ await page.keyboard.press('Escape');
+ const mountZ=await reveal(page.locator('[data-hole-kind=mount][data-hole-axis=z][data-hole-index="1"]'));
+ await mountZ.fill('-42');await mountZ.press('Tab');
+ assert.equal((await crystal()).parameters.manualMountHoles[1].z,-42);
+ const crystalCalibration=new Map([['pixelName','Crystal measured seed fit'],['pixelSocketClearance','.4']]);
+ await (await reveal(page.locator('#editPixelProfileBtn'))).click();
+ for(const [id,value] of crystalCalibration)await page.locator('#'+id).fill(value);
+ await page.locator('#applyPixelSocketFit').click();
+ const savedCrystal=await crystal();
+ const hardware=planHardware(savedCrystal.editableState.crystals,savedCrystal.parameters);
+ assert.equal(hardware.sockets.length,2);
+ assert.equal(hardware.mounts.length,2);
+ assert.equal(hardware.tabHoles.length,2);
+ assert(hardware.wirePlan.ready,hardware.wirePlan.messages.join(' '));
+ assert(hardware.sockets.some(socket=>Math.abs(socket.diameter-5.4)<.001));
+ await page.locator('#smsProjectTitle').fill('WT-021 Crystal manufacturing journey');
+ await page.locator('#smsProjectTitle').press('Tab');
+ await page.locator('#smsLibrary').click();
+ await page.locator('#smsSaveProject').click();
+ await page.locator('#smsSavedProjects').getByRole('heading',{name:'WT-021 Crystal manufacturing journey',exact:true}).waitFor();
+ const [backup]=await Promise.all([page.waitForEvent('download'),page.locator('#smsBackup').click()]);
+ const backupModel=JSON.parse(await readFile(await backup.path(),'utf8')).project.models.find(model=>model.id===savedCrystal.id);
+ assert.deepEqual(backupModel.parameters.manualPixelHoles,savedCrystal.parameters.manualPixelHoles);
+ await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+ await page.reload();
+ await page.waitForFunction(id=>window.__sensoryStudio?.currentModel?.id===id,savedCrystal.id);
+ const restored=await crystal();
+ for(const key of ['manualPixelHoles','manualMountHoles','manualEdgeTabs','pixelClearanceByProfile'])
+  assert.deepEqual(restored.parameters[key],savedCrystal.parameters[key]);
+ await page.locator('.sms-workspace-nav [data-tab=build]').click();
+ await page.getByRole('button',{name:'Render actual model',exact:true}).click();
+ await inspector.getByText('Prepared manufacturing mesh').waitFor({timeout:120000});
+ await inspector.getByLabel('Cut section').check();
+ await inspector.getByRole('button',{name:'Close inspection'}).click();
+ await page.locator('.sms-workspace-nav [data-tab=print]').click();
+ const crystalJob=page.locator('#smsJobs article').filter({hasText:'WT021 full Crystal'});
+ await crystalJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+ const getFile=async selector=>{
+  const [file]=await Promise.all([page.waitForEvent('download'),crystalJob.locator(selector).click()]);
+  return {name:file.suggestedFilename(),bytes:await readFile(await file.path())};
+ };
+ const crystalSTL=await getFile('[data-job-stl]'),crystal3MF=await getFile('[data-job-3mf]');
+ const cura=await getFile('[data-job-cura]'),zip=await getFile('[data-job-export]');
+ assert(cura.name.endsWith('.curaprofile')&&zip.name.endsWith('.zip'));
+ const xml3MF=modelXml(crystal3MF.bytes);
+ const points=[...xml3MF.matchAll(/<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"/g)].flatMap(match=>match.slice(1).map(Number));
+ const indices=[...xml3MF.matchAll(/<triangle v1="(\d+)" v2="(\d+)" v3="(\d+)"/g)].flatMap(match=>match.slice(1).map(Number));
+ const indexed=new THREE.BufferGeometry();
+ indexed.setAttribute('position',new THREE.Float32BufferAttribute(points,3));
+ indexed.setIndex(indices);
+ for(const [format,geometry] of [['STL',new STLLoader().parse(Uint8Array.from(crystalSTL.bytes).buffer)],['3MF',indexed]]){
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(geometry,material);
+  const hit=(origin,direction)=>new THREE.Raycaster(new THREE.Vector3(...origin),new THREE.Vector3(...direction)).intersectObject(mesh)[0]?.point;
+  const calibrated=hardware.sockets.find(socket=>Math.abs(socket.diameter-5.4)<.001);
+  const bore=[calibrated.x,-calibrated.z,4];
+  const left=hit(bore,[0,-1,0]),right=hit(bore,[0,1,0]);
+  assert(left&&right&&Math.abs(left.distanceTo(right)-5.4)<.04,format+' calibrated Crystal bore');
+  const route=[0,0,1];
+  const startWall=hit(route,[0,-1,0]),endWall=hit(route,[0,1,0]);
+  assert(startWall&&endWall&&Math.abs(startWall.distanceTo(endWall)-3.2)<.04,format+' routed width survives the fit change');
+  for(const hole of [...hardware.mounts,...hardware.tabHoles])
+   assert.equal(hit([hole.x,-hole.z,-1],[0,0,1]),undefined,format+' Crystal through-holes are open');
+  for(const hole of hardware.tabHoles){
+   const tabTop=hit([hole.x+2.5,-hole.z,7],[0,0,-1]);
+   assert(tabTop&&Math.abs(tabTop.z-5)<.01,format+' 5 mm positive Crystal tab stock');
+  }
+  material.dispose();geometry.dispose();
+ }
+ console.log('WT-021 full Crystal manufacturing journey verified');
 }finally{await browser.close();}

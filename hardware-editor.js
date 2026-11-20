@@ -559,7 +559,9 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
   else return false;
   const next=planHardware(getCrystals(),{...s,mountPlacement:'manual',manualMountHoles:holes,
    mount:s.mount==='None'?'Custom dual holes':s.mount});
-  return !next.invalidManualMounts.some(p=>p.index===(replaceIndex===null?holes.length-1:replaceIndex));
+  const previous=getPlan();
+  return !next.invalidManualMounts.some(p=>p.index===(replaceIndex===null?holes.length-1:replaceIndex))&&
+   next.tabs.length>=previous.tabs.length&&(!previous.wirePlan?.enabled||!previous.wirePlan.ready||next.wirePlan.ready);
  }
  function findPoint(e){
   const rect=renderer.domElement.getBoundingClientRect();
@@ -631,6 +633,7 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
    s.pixelCount=s.manualPixelHoles.length;
   }else if(kind==='mount'){
    if(s.mount==='None')s.mount='Custom dual holes';
+   if(s.mount==='Edge fixing tabs')s.edgeManualMounts=true;
    if(s.mountPlacement!=='manual'){
     s.manualMountHoles=plan.mounts.map(p=>({id:p.id,x:+p.x.toFixed(1),z:+p.z.toFixed(1)}));
     s.mountPlacement='manual';

@@ -119,3 +119,15 @@
 
 - Base `eb58e32dd235706e6318e55595e4977a96b6900f`. Focused Chromium passed the gentle Wave width edit, two distinct socket normals, accepted drag, rejected convex seat and the complete routing/mounting/calibration/Library/Print sequence. Independent actual STL/3MF measured the 5.4 mm seat, 3.2 mm route, four open holes and 4 mm external tab thickness. E2E-W exact-head checks pending.
 - Next exercise Character and solid Pod backed layouts with a compact A–G profile.
+
+### 2026-11-20 - backed Character, Pod and rotary Cap journeys
+
+- Base `c2cf3d0fe39c495edc287611c16f742b1cac85db` passed static 44661415796, Chromium 44661415832 and fabrication 44661415876. E2E-G/T/W verified at that SHA.
+- Added the explicit Stationary display mode for rotary Caps. Initial manufacturing fixture proved that moving controls accepted fixed ears. The updated Manifold fixture refuses that state and accepts the stationary variant.
+- Focused and full unified Chromium passed Character, solid Pod and stationary rotary Cap through the actual workflow with mounted routed sockets. Both decoded formats measured 5.45 mm bore, 3.2 mm wire channel, four through-holes and 10 mm tabs. Exact-head checks for these three are pending.
+
+### 2026-11-20 - Crystal journey and UX-01
+
+- Added explicit manual Crystal through-holes alongside external tabs. Unit regression verifies existing saved mounts do not activate implicitly. The full Crystal Chromium fixture passes a real held drag, routing, two tabs and two mounts, calibration and rollback, reload, preparation/cutaway and four downloads. Independently decoded STL/3MF measure 5.4 mm bore, 3.2 mm track, four open holes and 5 mm tab stock.
+- Reused the Help dialog for Features. The local Chromium feature script verifies filters, seven picker destinations, real workspace navigation, accessible keyboard focus, no model edits, compact layout and both themes. Generated history and displayed version match CHANGELOG.md.
+- Next DIM-03/CAL-01 with successive independently measured physical profile cuts.

@@ -89,3 +89,15 @@ Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) co
 - Base was `eb58e32dd235706e6318e55595e4977a96b6900f`. Focused Chromium passed Design width editing, two curved sockets, accepted curved drag and rejected convex seating, followed by routing, two real tabs, two mounts, calibration, backup/reload and prepared cutaway.
 - Actual browser downloads included matching STL, Cura, production ZIP and independently decoded 3MF. Both models measured a 5.4 mm calibrated seat, 3.2 mm groove, four through-holes and 4 mm tab stock.
 - Next complete Character and solid Pod journeys on their backed underside, then Crystal and rotary Cap.
+
+### Backed Character, Pod and stationary rotary Cap journeys
+
+- Last exact-head green was `c2cf3d0fe39c495edc287611c16f742b1cac85db`. GitHub passed static run 44661415796, browser run 44661415832 and fabrication run 44661415876. That covers the independent Gear, Tile and Wave journeys.
+- Focused and full unified Chromium runs passed the layered Character, solid Beacon Pod and explicitly stationary rotary Cap cases. Each measured a 5.45 mm calibrated seat, 3.2 mm groove and four open fixing holes with 10 mm attached tabs in both model formats. Their standalone files matched the ZIP.
+- The moving rotary mode rejects fixed ears. Switch to Stationary display in Design only when the rotary body itself is fixed. Inspect a physically moving assembly separately.
+
+### Crystal journey and Features catalogue
+
+- Crystal can add independent manual through-holes while edge tabs are enabled. Its full local Chromium journey passed Design, fitting placement and held drag, rejected coordinate rollback, routing, two mounts, two tabs, calibration, Library backup/reload, prepared cutaway and real STL, 3MF, Cura and ZIP downloads. The model files measured a 5.4 mm seat, 3.2 mm groove, four through-holes and 5 mm tab stock.
+- The searchable Features tab links to all seven real family pickers and to Design, Build, Library and Print Centre without changing the model. Local Chromium passed keyboard, mobile, both themes and lazy graphics. Version and release notes are generated from CHANGELOG.md and checked for drift.
+- All seven independent browser journeys now have local evidence. Exact-head CI remains required. Next finish the calibrated flange, bore, retention and wire-dimension evidence, then remaining software acceptance rows. Cura slicing and physical prints remain under #10.
