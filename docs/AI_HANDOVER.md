@@ -1,5 +1,10 @@
 # AI handover — read immediately after AGENTS.md
 
+## Independent documentation and QA
+
+- [Coordination issue #105](https://github.com/connorturansky-svg/crystal-forge/issues/105) tracks live claims, review branches and exact-head evidence for Jordan's separate work.
+- The [Studio backup and recovery guide](BACKUP_RECOVERY.md) explains the existing WT-016 Library workflow. It changes no runtime behavior or saved formats. `tests/unified-studio-browser.test.mjs` covers review, cancel, merge, active-project preservation and a corrupt file in Chromium; private GitHub requests are mocked in `tests/studio-vault.test.mjs`.
+
 ## WT-020 review baseline
 
 - Main `7ad5326ea87020dc8e9ee7d3a9512ea157ee5617` includes WT-018 #80 and WT-019 #84. #84 preserves #82 and #83. #85 closed with its tested commit `e39755f` reachable from both WT-020 drafts.
