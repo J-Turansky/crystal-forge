@@ -35,6 +35,28 @@ try{
  await page.keyboard.press('Escape');
  assert.equal(await dialog.isVisible(),false);
  assert(await help.evaluate(el=>el===document.activeElement));
+ const checkContrast=async()=>{
+  for(const link of [report,dialog.getByRole('link',{name:'the backup and recovery guide'})]){
+   const ratio=await link.evaluate(el=>{
+    const luminance=color=>{
+     const [r,g,b]=color.match(/\d+/g).slice(0,3).map(v=>{
+      const channel=Number(v)/255;
+      return channel<=.04045?channel/12.92:((channel+.055)/1.055)**2.4;
+     });
+     return .2126*r+.7152*g+.0722*b;
+    };
+    const colors=[getComputedStyle(el).color,getComputedStyle(el.closest('.dialog')).backgroundColor].map(luminance);
+    return (Math.max(...colors)+.05)/(Math.min(...colors)+.05);
+   });
+   assert(ratio>=4.5,`Help link needs 4.5:1 contrast, measured ${ratio.toFixed(2)}:1`);
+  }
+ };
+ await help.press('Enter');
+ await checkContrast();
+ await page.keyboard.press('Escape');
+ await page.locator('#themeBtn').press('Enter');
+ await help.press('Enter');
+ await checkContrast();
  console.log('Help diagnostics reflects offline state, downloads only allowlisted checks and restores focus.');
 }finally{
  await browser.close();

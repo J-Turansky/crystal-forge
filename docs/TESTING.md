@@ -4,7 +4,7 @@
 
 With the same local server as `npm run test:browser`, run `node tests/exact-value-accessibility-browser.mjs` and `node tests/studio-tool-finder-browser.mjs`. Browser CI runs both before the existing suite. The finder test uses the real Studio model picker for all seven built-in families, verifies arrow navigation, Escape focus restoration, no-match feedback, and the Cura shortcut (keyboard and emulated touch). It renames and reopens the project in each case and checks that the active family survives reload. It samples light and dark at 390, 768 and 1440 px; screenshots are uploaded with browser CI. This checks shared navigation, not keyboard alternatives for editing 3D geometry.
 
-Run `node tests/studio-help-diagnostics-browser.mjs` to exercise the in-app Help checks, an offline refresh, and the exact fields in the downloaded JSON. This reports local browser capabilities; it does not fetch assets, prove autosave works, or recover from a failed startup. Browser CI also runs this test.
+Run `node tests/studio-help-diagnostics-browser.mjs` to exercise the in-app Help checks, an offline refresh, the exact fields in the downloaded JSON, and a 4.5:1 minimum contrast ratio for the report and recovery links in both themes. This reports local browser capabilities; it does not fetch assets, prove autosave works, or recover from a failed startup. Browser CI also runs this test.
 
 | Workflow | Before UX-02 | After UX-02 | Limits |
 | --- | --- | --- | --- |
