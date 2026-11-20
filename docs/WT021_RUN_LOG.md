@@ -284,3 +284,5 @@
 - Manifold and both export decoders measured retained conical sockets on all six native builders. The cone preserves its expected flange, retention throat, body width and apex. FAB-02 is verified.
 
 - All six native builders passed measured clearance, flange, depth and retention variations. Crystal Chromium verified the unchanged 5.3 mm bore and narrowed 4.9 mm throat. DIM-03 is verified. Native wire-width edits passed both formats without changing the selected socket dimensions.
+
+- Crystal Chromium verified a 4.5 mm wire edit survives reload, blocks stale output, and retains the 5.4 mm fitted bore in both fresh meshes. CAL-01 is verified.

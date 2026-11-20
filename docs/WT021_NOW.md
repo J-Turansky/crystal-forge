@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** CAL-01, compare Crystal’s independently edited wire width against the other fitted dimensions after reload.
+- **Target:** DIM-04, audit the remaining route dimension and exterior-aperture cases.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** DIM-03 passed on Crystal and the six native builders. Next retain one Crystal profile and fit while changing its track width, reload, and verify both exported meshes match the requested dimensions.
+- **Next test:** CAL-01 is verified. Next compare native width, depth, independently sampled length and exterior IN and OUT positions on representative routed models.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction
