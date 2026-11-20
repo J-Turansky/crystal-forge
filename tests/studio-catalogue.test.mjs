@@ -440,6 +440,16 @@ const calibratedCut=({clearance=.3,retentionLip=0,channelWidthMm=3.2,bodyHeight=
   profileId:'measured-sample',entryFace:'underside',diameter:8,clearance,socketProfile:{...measuredProfile,retentionLip,bodyHeight}}))
 });
 assert.throws(()=>prepareRecipe(THREE,wasm,calibratedCut({bodyHeight:4,retentionLip:.4})),/Cannot cut the selected retention lip/);
+const conicalStud={...flatBuild.pixelHoles[0],profileId:'measured-sample',entryFace:'underside',
+ diameter:8,clearance:.3,conical:true,socketProfile:{...measuredProfile,retentionLip:.4}};
+const conicalStock={...calibrationStock,bounds:{...calibrationStock.bounds,height:18},
+ positive:[{kind:'box',size:[70,18,40],position:[0,9,0]}]};
+const conicalRecipe=applyBuildModules(conicalStock,{pixelHoles:[conicalStud]});
+assert.throws(()=>applyBuildModules(calibrationStock,{pixelHoles:[conicalStud]}),/needs 15.9 mm of stock/);
+assert.throws(()=>applyBuildModules(conicalStock,{pixelHoles:[{...conicalStud,entryFace:'top',
+ surface:{y:18,normal:[0,1,0]}}]}),/level underside installation face/);
+const surfacedConical=applyBuildModules(calibrationStock,{pixelHoles:[{...conicalStud,surface:{y:0,normal:[0,-1,0]}}]});
+assert.throws(()=>prepareRecipe(THREE,wasm,surfacedConical),/continuous stock on its installation face/);
 const measuredReplica=makePixelReplicaRecipe(measuredProfile);
 const dimensionFixtures=new Map([
  [calibratedCut(),{name:'baseline',bore:8.3,flange:9.3,throat:8.3,width:3.2}],
@@ -479,7 +489,7 @@ for(const [fixture] of fixingFixtures){
  const interrupted={...fixture,negative:[...fixture.negative,{kind:'box',size:[1,2,2],position:[18.5,1,0]}]};
  assert.throws(()=>prepareRecipe(THREE,wasm,interrupted),/too close to another cut/);
 }
-for(const fixture of [...fixingFixtures.keys(),tabRecessRecipe,topRecessRecipe,vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
+for(const fixture of [...fixingFixtures.keys(),conicalRecipe,tabRecessRecipe,topRecessRecipe,vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -559,6 +569,13 @@ for(const fixture of [...fixingFixtures.keys(),tabRecessRecipe,topRecessRecipe,v
    assert(Math.abs(span([0,0,.8])-dimensions.width)<.02,format+' '+dimensions.name+' route width');
    const apex=hit([-15,0,-1],[0,0,1]);
    assert(apex&&Math.abs(apex.z-9)<.01,format+' shaped socket roof stays at the measured 9 mm body length');
+  }else if(fixture===conicalRecipe){
+   const apex=hit([-15,0,-1],[0,0,1]);
+   assert(apex&&Math.abs(apex.z-13.15)<.01,format+' conical ceiling adds 4.15 mm above the measured 9 mm body');
+   for(const [height,diameter] of [[.6,9.3],[2.8,7.5],[5,8.3],[10,6.3],[12,2.3]]){
+    const left=hit([-15,0,height],[0,-1,0]),right=hit([-15,0,height],[0,1,0]);
+    assert(left&&right&&Math.abs(left.distanceTo(right)-diameter)<.015,format+' conical seat at '+height+' mm');
+   }
   }else if(fixture===tabRecessRecipe){
    for(const [height,diameter] of [[1,5.1],[4,3.4]]){
     const left=hit([tabX,-tabZ,height],[-1,0,0]),right=hit([tabX,-tabZ,height],[1,0,0]);

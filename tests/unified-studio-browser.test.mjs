@@ -1764,6 +1764,11 @@ try{
   await page.mouse.up();
   await page.waitForFunction(x=>window.__sensoryStudio.currentModel.build.pixelHoles[0].x<x-2,seats[0].x);
   const beforeConvexFit=await getSeats();
+  assert.notDeepEqual(beforeConvexFit[0].surface,seats[0].surface,'The drag records its new physical installation pose');
+  await page.locator('#smsGlobalUndo').click();
+  assert.deepEqual(await getSeats(),seats,'Undo restores both sockets with their exact saved surface normals');
+  await page.locator('#smsGlobalRedo').click();
+  assert.deepEqual(await getSeats(),beforeConvexFit,'Redo restores the dragged socket with its surface normal');
   await page.getByRole('button',{name:'Place shaped socket in 3D'}).click();
   const curvedFailure=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(40,0,'top'));
   assert(curvedFailure);
@@ -2247,6 +2252,52 @@ try{
   await page.locator('#smsModelError').getByText(/needs continuous underside stock/).waitFor();
   assert.equal(await profile.inputValue(),'Through holes');
   assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),beforeFixing);
+ }
+ // FAB-02: conical native underside roofs preserve the measured bore and reject insufficient stock.
+ for(const thickness of [13,18]){
+  const name='Conical Gear '+thickness;
+  await page.evaluate(({name,thickness})=>window.__sensoryStudio.addModel('gears',{mode:'Decorative',
+   wheelStyle:'Rounded lobes',webStyle:'Solid',diameter:100,thickness,bore:0,reliefStyle:'None',dualMaterial:false},name),{name,thickness});
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  const palette=page.locator('.sms-palette');
+  await palette.locator('[data-fit-profile=seed]').click();
+  await page.locator('[data-view=bottom]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await palette.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+  const target=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(0,0,'underside'));
+  assert(target);await page.mouse.click(target.x,target.y);
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===1);
+  await page.keyboard.press('Escape');
+  const control=palette.getByLabel('Conical socket roof');
+  const before=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  await control.click();
+  if(thickness===13){
+   await page.locator('#smsModelError').getByText(/needs .* mm of stock for its socket and roof/).waitFor();
+   assert.equal(await control.isChecked(),false);
+   assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),before);
+   continue;
+  }
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].conical===true);
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  const job=page.locator('#smsJobs article').filter({hasText:name});
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const stl=await useDownload(job.locator('[data-job-stl]'));
+  const mf=await useDownload(job.locator('[data-job-3mf]'));
+  const {x,z,diameter,clearance,socketProfile}=before.build.pixelHoles[0];
+  const radius=(diameter+clearance)/2,material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(stl.bytes).buffer),
+   read3MFGeometry(zipEntries(mf.bytes).get('3D/3dmodel.model').toString())]){
+   const mesh=new THREE.Mesh(geometry,material);
+   const ray=(height,dy,dz)=>new THREE.Raycaster(new THREE.Vector3(x,-z,height),
+    new THREE.Vector3(0,dy,dz)).intersectObject(mesh)[0];
+   const apex=ray(-1,0,1).point.z;
+   assert(Math.abs(apex-socketProfile.bodyHeight-radius)<.01);
+   assert(Math.abs(ray(6,1,0).distance+ray(6,-1,0).distance-2*radius)<.01);
+   assert(Math.abs(ray(10,1,0).distance+ray(10,-1,0).distance-2*(radius-1))<.01);
+   geometry.dispose();
+  }
+  material.dispose();
  }
  assert.deepEqual(errors,[]);
  console.log('Unified Home, Design, Build, Library and Quick Print screenshots captured.');

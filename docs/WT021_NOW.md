@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** PAR-02, verify direct manipulation undo and redo across a routed native fitting.
+- **Target:** FAB-02, validate the native conical roof on additional supported family fixtures.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** The full unified Chromium suite passed native cutaway/export range comparisons. Focused Chromium passed stale Gear cutaway withdrawal and disabled downloads. The rendered Gear cutaway matches both exports at three heights through its countersink and pilot. The rendered Wave channel measures 3.2 mm and matches both downloaded walls at the same plane. Next drag a shaped fitting, undo and redo it, reload, and verify stale and fresh manufacturing output.
+- **Next test:** The full unified Chromium suite passed native cutaway/export range comparisons. Focused Chromium passed stale Gear cutaway withdrawal and disabled downloads. The rendered Gear cutaway matches both exports at three heights through its countersink and pilot. The rendered Wave channel measures 3.2 mm and matches both downloaded walls at the same plane. The Wave drag/undo/redo journey passed with the installation normal preserved. The Gear conical roof passed stock refusal and STL/3MF checks. Next measure representative additional native family cone sections and verify the positive envelope with the optional retention disabled.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

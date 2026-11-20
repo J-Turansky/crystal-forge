@@ -163,8 +163,9 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{},inspectFittin
  const positionSeat=(solid,seat,rotation=0)=>placeNativeSocketSolid(THREE,wasm,hold,solid,seat,rotation);
  const socket=part=>{
   const {profile}=part;
-  const bore=putSocket(wasm,hold,{x:0,z:0},part.radius,profile.bodyHeight+3,-3,profile,
-    {includeLocalWireRelief:part.includeLocalWireRelief});
+  const roofRise=part.conical?Math.max(.8,part.radius):0;
+  const bore=putSocket(wasm,hold,{x:0,z:0},part.radius,profile.bodyHeight+roofRise+3,-3,profile,
+    {includeLocalWireRelief:part.includeLocalWireRelief,conical:part.conical});
   return {...bore,solid:positionSeat(bore.solid,part,90-part.pixelRotation)};
  };
  const convert=part=>{
@@ -202,7 +203,7 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{},inspectFittin
   for(const seat of seats){
    const warnings=[];
    const warn=message=>{if(!inspectFittings)throw Error(message);warnings.push(message);};
-   const {profile}=seat,stockHeight=profile.bodyHeight+2.8;
+   const {profile}=seat,stockHeight=profile.bodyHeight+(seat.conical?Math.max(.8,seat.radius):0)+2.8;
    const stockRadius=Math.max(profile.maxDiameter/2+1,seat.includeLocalWireRelief?profile.boreDiameter*.675+4.8:0);
    const stock=hold(wasm.Manifold.cylinder(stockHeight,stockRadius,stockRadius,32));
    const envelope=positionSeat(hold(stock.rotate([-90,0,0])),seat);

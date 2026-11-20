@@ -188,3 +188,7 @@
 ### 2026-11-20 - prepared Wave channel and Gear undo
 
 - Full unified Chromium passed. The rendered Wave cross-section and both exports agree on the 3.2 mm channel and both wall positions. Focused Chromium confirmed undo and redo restore the exact Gear tab depths and do not revive stale downloads.
+
+### 2026-11-20 - native conical ceiling and Wave drag undo
+
+- The full unified Chromium suite passed Wave direct-manipulation undo and redo. Added native conical socket roofs on level underside faces with a shared production cutter and real stock validation. Focused Chromium passed thin Gear refusal and both Gear exports, and the catalogue fixture independently confirms flange, retention, straight bore and cone slope in STL and 3MF.

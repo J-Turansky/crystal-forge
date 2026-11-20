@@ -45,7 +45,12 @@ export function addPixelHoleCuts(recipe,holes=[],{routed=false}={}){
     profile.flangeDiameter<0||profile.flangeDiameter>38||profile.flangeHeight<0||profile.flangeHeight+profile.capHeight>=profile.bodyHeight||
     profile.wireWidth<0||profile.wireWidth>12||profile.wireDepth<0||profile.wireDepth>8||profile.retentionLip<0||profile.retentionLip>.7)
     throw Error(label+' has invalid measured socket dimensions.');
-   if(!hole.surface&&height<profile.bodyHeight+2.8)throw Error(label+' needs '+(profile.bodyHeight+2.8).toFixed(1)+' mm of stock for its socket and roof.');
+   const conical=hole.conical===true;
+   if(conical&&((hole.surface&&!(hole.surface.normal?.[1]<=-.9999))||(!hole.surface&&hole.entryFace!=='underside')))
+    throw Error(label+' needs a level underside installation face for its conical roof.');
+   const roofHeight=profile.bodyHeight+(conical?Math.max(.8,bore):0)+2.8;
+   if(!hole.surface&&height<roofHeight)throw Error(label+' needs '+roofHeight.toFixed(1)+' mm of stock for its socket and roof.');
+   cut.conical=conical;
    cut.kind='pixel-seat';
    cut.surface=hole.surface;
    cut.includeLocalWireRelief=!routed;

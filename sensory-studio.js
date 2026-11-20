@@ -1557,7 +1557,9 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    '<p role="status" data-pixel-status>'+esc(pixelMessages.get(model.id)||'Click a marker to select. Hold then drag to move. Arrow keys nudge 1 mm, or 5 mm with Shift.')+'</p>'+
    (selected<0?'':pixelHoleMarkup(holes[selected],selected,esc,disabled,profiles)+
     '<label><input type="checkbox" data-shaped-socket'+(hole.socketProfile?' checked':'')+disabled+'> Shape a socket on the selected face from the measured profile</label>'+
-    (hole.socketProfile?'<label>Retention lip (mm)<input type="number" data-seat-retention min="0" max=".7" step=".05" value="'+esc(hole.socketProfile.retentionLip)+'"'+disabled+'></label>':'')+
+    (hole.socketProfile?'<label>Retention lip (mm)<input type="number" data-seat-retention min="0" max=".7" step=".05" value="'+esc(hole.socketProfile.retentionLip)+'"'+disabled+'></label>'+
+     (hole.conical||(hole.surface?hole.surface.normal?.[1]<=-.9999:hole.entryFace==='underside')?
+      '<label><input type="checkbox" data-seat-conical'+(hole.conical?' checked':'')+disabled+'> Conical socket roof</label>':''):'')+
     '<div class="sms-actions"><button type="button" data-pixel-previous'+(selected===0?' disabled':disabled)+'>Move earlier</button><button type="button" data-pixel-next'+(selected===holes.length-1?' disabled':disabled)+'>Move later</button><button type="button" data-duplicate-pixel'+noAdd+'>Duplicate fitting in 3D</button></div>')+
    '<section aria-label="Test print"><h3>Test print</h3><p>'+esc(fit.profileName)+' · '+fit.nominalDiameter+' mm nominal · '+fit.diameter+' mm body · '+fit.boreDiameter+' mm bore · '+fit.clearance+' mm clearance.</p>'+
    '<p>'+esc(fit.warning)+' Print flat with the intended material and nozzle. Test the actual pixel and record the bore that fits.</p>'+
@@ -1622,10 +1624,16 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     next.socketProfile={...fit.profile,retentionLip:0};
     next.surface=hole.hitSurface;
    }else{
-    delete next.socketProfile;
+    delete next.socketProfile;delete next.conical;
     delete next.surface;
    }
    if(!editPixel(model,selected,next))shaped.checked=!!hole.socketProfile;
+  };
+  const conical=root.querySelector('[data-seat-conical]');
+  if(conical)conical.onchange=()=>{
+   const next={...hole,conical:conical.checked};
+   conical.checked=!!hole.conical;
+   checkAndSaveSeat(model,holes.map((item,index)=>index===selected?next:item),next);
   };
   const lip=root.querySelector('[data-seat-retention]');
   if(lip)lip.onchange=()=>{
