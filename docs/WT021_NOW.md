@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** DIM-05 and PAR-01, independently measure fixing recess depths and mechanical stock after mounting and backing edits.
+- **Target:** DIM-05 and PAR-01, protect the actual remaining stock around native recessed fixings.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Use real Build controls to edit a recessed fixing in a production-family fixture. Independently measure the revised bore and remaining stock in STL and 3MF, check that the prior job becomes stale, and confirm an unsafe change cannot export.
+- **Next test:** Reproduce an automatic recessed fixing on inadequate or interrupted real stock. Validate the 3D seat and surrounding material before preparation can enable downloads, while preserving the tested solid Gear fixture.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

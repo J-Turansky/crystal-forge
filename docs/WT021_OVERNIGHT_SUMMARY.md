@@ -122,3 +122,8 @@ Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) co
 
 - Both STL and 3MF passed obstruction checks along the entire 71.786 mm pinned route, including both junctions and both exterior openings. The measured apertures were 3.2 mm wide. A separate shaped-socket specimen preserved uninterrupted clearance.
 - Both formats also measured paired 4 mm fastener bores, 6 mm counterbores with 1.4 mm recess depth, 8.6 mm of stock, and the countersink taper on rectangular stock. Next verify the same dimensions after a production-family Build edit.
+
+### Recessed fixing edits in Build
+
+- Chromium edited a solid Gear’s bore from 4 to 5.05 mm and measured both revisions in the downloaded STL and 3MF. The recess remained 1.4 mm deep with 8.6 mm of remaining stock. An out-of-range edit kept the preceding model revision and restored the displayed number. The accepted edit disabled both stale downloads.
+- Next validate the actual remaining stock for fixings on interrupted and thin bodies.

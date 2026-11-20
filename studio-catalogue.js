@@ -543,8 +543,8 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
  }
  const b=r.bounds;
  if(build.mounting&&capabilities.supportsMounting){
-  const spacing=Math.min(build.spacing||b.width*.55,b.width*.65),diameter=build.holeDiameter||3.4;
-  if(diameter<2||diameter>8||spacing<diameter*3)throw Error('Mounting hole spacing or diameter is unsafe.');
+  const spacing=Math.min(build.spacing??b.width*.55,b.width*.65),diameter=build.holeDiameter??3.4;
+  if(!Number.isFinite(spacing)||!Number.isFinite(diameter)||diameter<2||diameter>8||spacing<diameter*3)throw Error('Mounting hole spacing or diameter is unsafe.');
   const style=build.mountStyle||'Through holes';
   for(const x of [-spacing/2,spacing/2]){
    r.negative.push(cylinder(diameter/2,b.height+4,[x,b.height/2,0]));

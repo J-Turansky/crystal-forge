@@ -1930,7 +1930,22 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(coupon)coupon.onclick=()=>downloadPixelCoupon(model,
    pixelHoles(model).find(hole=>hole.id===selectedPixels.get(model.id))||newPixel(chosenProfile(model)),{},coupon);
   if($('smsPixelAdd'))bindPixelEditor(panel,model,pixelHoles(model),fittingProfiles());
-  panel.querySelectorAll('[data-build]').forEach(input=>input.onchange=()=>commit({build:{...model.build,[input.dataset.build]:input.type==='checkbox'?input.checked:input.tagName==='SELECT'?input.value:Number(input.value)}}));
+  panel.querySelectorAll('[data-build]').forEach(input=>{
+   const checkbox=input.type==='checkbox';
+   let accepted=checkbox?input.checked:input.value;
+   input.onchange=()=>{
+    const value=checkbox?input.checked:input.value;
+    const valid=input.type!=='number'||(Number.isFinite(input.valueAsNumber)&&
+     !input.validity.rangeUnderflow&&!input.validity.rangeOverflow);
+    if(!valid){
+     $('smsModelError').textContent=input.validationMessage||'Enter a number within the allowed range.';
+    }else if(commit({build:{...model.build,[input.dataset.build]:input.type==='number'?input.valueAsNumber:value}})){
+     accepted=value;
+     return;
+    }
+    if(checkbox)input.checked=accepted;else input.value=accepted;
+   };
+  });
   bindPartEditor(model);
   editors.refresh();renderPalette();
  }

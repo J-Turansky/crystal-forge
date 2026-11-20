@@ -1924,6 +1924,59 @@ try{
  assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),tileStateBefore,
   'Toggling Tile physical overlays must not mutate fittings, dimensions or saved model revision');
  await page.keyboard.press('Escape');
+ // Edit a real recessed fixing, download both revisions and check that stale exports are blocked.
+ {
+  const witness='Recessed fixing witness';
+  await page.evaluate(name=>window.__sensoryStudio.addModel('gears',{mode:'Decorative',wheelStyle:'Rounded lobes',
+   webStyle:'Solid',diameter:100,thickness:10,bore:0,reliefStyle:'None',dualMaterial:false},name),witness);
+  const buildTab=page.locator('.sms-workspace-nav [data-tab=build]');
+  const printTab=page.locator('.sms-workspace-nav [data-tab=print]');
+  await buildTab.click();
+  const enabled=page.locator('[data-build=mounting]');
+  await enabled.evaluate(node=>{for(let p=node.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS')p.open=true;});
+  await enabled.check();
+  await page.locator('[data-build=mountStyle]').selectOption('Underside counterbores');
+  const diameter=page.locator('[data-build=holeDiameter]');
+  await diameter.fill('4');await diameter.press('Tab');
+  const job=page.locator('#smsJobs article').filter({hasText:witness});
+  const measureFixing=async expected=>{
+   await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+   const stl=await useDownload(job.locator('[data-job-stl]'));
+   const mf=await useDownload(job.locator('[data-job-3mf]'));
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+   for(const geometry of [new STLLoader().parse(Uint8Array.from(stl.bytes).buffer),
+    read3MFGeometry(zipEntries(mf.bytes).get('3D/3dmodel.model').toString())]){
+    const mesh=new THREE.Mesh(geometry,material);
+    const hit=(x,y,z,dx,dy,dz)=>new THREE.Raycaster(new THREE.Vector3(x,y,z),new THREE.Vector3(dx,dy,dz)).intersectObject(mesh)[0];
+    for(const x of [-27.5,27.5]){
+     const span=z=>[-1,1].reduce((sum,sign)=>sum+hit(x,0,z,0,sign,0).distance,0);
+     assert(Math.abs(span(2)-expected)<.005);
+     assert(Math.abs(span(.4)-expected*1.5)<.005);
+     const shoulder=hit(x,expected*.625,-1,0,0,1).point.z;
+     const top=hit(x,expected*.625,11,0,0,-1).point.z;
+     assert(Math.abs(shoulder-1.4)<.005&&Math.abs(top-shoulder-8.6)<.005);
+    }
+    geometry.dispose();
+   }
+   material.dispose();
+  };
+  await printTab.click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  await measureFixing(4);
+  await buildTab.click();
+  await diameter.evaluate(node=>{for(let p=node.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS')p.open=true;});
+  const prior=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
+  await diameter.fill('9');await diameter.press('Tab');
+  assert.equal(Number(await diameter.inputValue()),4);
+  assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),prior);
+  await diameter.fill('5.05');await diameter.press('Tab');
+  await printTab.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  assert(await job.locator('[data-job-stl]').isDisabled());
+  assert(await job.locator('[data-job-3mf]').isDisabled());
+  await job.locator('[data-job-prepare]').click();
+  await measureFixing(5.05);
+ }
  assert.deepEqual(errors,[]);
  console.log('Unified Home, Design, Build, Library and Quick Print screenshots captured.');
 }catch(error){

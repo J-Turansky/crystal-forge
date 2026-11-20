@@ -151,3 +151,7 @@
 
 - The paired STL/3MF fixture checks a 71.786 mm routed span from aperture to aperture through both bores. Six rays per segment cover a 2.9 mm corridor at two depths. Opposite wall rays independently measure the two 3.2 mm exterior openings. The flanged shaped-socket fixture also passes corridor checks through both junctions.
 - DIM-05: both formats measured the parallel recess and tapered countersink, and verified 8.6 mm stock behind the parallel recess. Next verify revised geometry and stale downloads after a real Build edit.
+
+### 2026-11-20 - recessed fixing edit and stale output
+
+- Chromium and independent export probes passed for the Gear counterbore edit. Diameter 9 mm is refused without editing the model, and a valid 5.05 mm edit invalidates its previous job. The 1.4 mm recess and 8.6 mm residual stock remain measurable. The geometry planner rejects non-finite diameters and spacing.

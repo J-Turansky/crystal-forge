@@ -447,6 +447,9 @@ const dimensionFixtures=new Map([
  [calibratedCut({retentionLip:.4}),{name:'retention only',bore:8.3,flange:9.3,throat:7.5,width:3.2}],
  [calibratedCut({channelWidthMm:6}),{name:'wire width only',bore:8.3,flange:9.3,throat:8.3,width:6}]
 ]);
+for(const holeDiameter of [0,9,NaN])
+ assert.throws(()=>applyBuildModules(flatStock,{mounting:true,holeDiameter},{supportsMounting:true}),/spacing or diameter is unsafe/);
+assert.throws(()=>applyBuildModules(flatStock,{mounting:true,holeDiameter:4,spacing:NaN},{supportsMounting:true}),/spacing or diameter is unsafe/);
 const fixingFixtures=new Map(['Underside counterbores','Underside countersinks'].map(style=>[
  applyBuildModules(flatStock,{mounting:true,mountStyle:style,spacing:30,holeDiameter:4},{supportsMounting:true}),style
 ]));
