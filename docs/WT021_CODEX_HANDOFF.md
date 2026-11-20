@@ -6,6 +6,10 @@
 **Last code checkpoint with all three exact-head CI suites confirmed green:** `b132359a67090e3620e33ea51964ec624b644c83` (static + Chromium + Manifold).  
 **Subsequent test-only change:** `042ef97b412b8f63a261867113584b6296e1c304` adds Gear/Tile preview no-mutation browser assertions. **Check exact-head CI for the current branch before claiming this additional test passed.**
 
+## Fast continuation
+
+Read [current next task](WT021_NOW.md) and [fast start / test map](../prompts/active/WT021_FAST_START.md), then run `npm run wt021:status` to avoid replaying old prompts and checks. The original full approved brief remains binding.
+
 ## Overnight / limited-token execution protocol
 
 Read [`prompts/active/WT021_OVERNIGHT_RUNBOOK.md`](../prompts/active/WT021_OVERNIGHT_RUNBOOK.md) **before** implementation and [`docs/WT021_RUN_LOG.md`](WT021_RUN_LOG.md) before resuming an interrupted session. Batch unavoidable permission/access questions at the start, continue the approved software queue without routine check-ins, commit/push and append exact-head evidence after each tested milestone, and preserve the next executable task for quota-based restart. This does not bypass a required platform approval or guarantee automatic resume.

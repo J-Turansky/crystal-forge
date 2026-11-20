@@ -1,0 +1,23 @@
+# WT-021 — Current actionable state (overwrite the pointer, preserve the log)
+
+**Read this first on each Codex restart.** Keep ≤45 lines; this is an initial snapshot, not a live status service. Actual head and CI must be fetched.
+
+- **Only authorised destination:** `wt021/integrated-release`, existing open draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102); never open a new PR, merge, deploy or modify `main`.
+- **Last confirmed all-three-workflow-green checkpoint:** `38b58e5001023f89689c8dc810aa3fedb8bd5071` (static, Chromium, Manifold). **Historic only**; run `npm run wt021:status` and inspect latest actual head.
+- **Acceptance:** 23 required rows PARTIAL; zero complete VERIFIED. Crystal underside, Gear top and Tile underside have tested physical positive/negative previews; the remaining families and complete E2E are not accepted.
+- **Authoritative documents:** [completion register](WT021_COMPLETION_REGISTER.md), [approved full WT-021 brief](../prompts/021-complete-seven-builder-manufacturing-parity.md) and [engineering handover](WT021_CODEX_HANDOFF.md).
+- **Owner constraints:** owner controls final merge/deploy, not routine commits; GitHub development branch is not review-protected. Real Cura and physical proof are tracked under #10, software parity under #79.
+
+## Next executable step
+
+- **Target:** FIT-02 P0, real collision/breakthrough with previously routed cuts and adjacent socket cutters, not just original model stock.
+- **Start here:** `studio-geometry.js` → `nativeFittingPreviews` / `placeNativeSocketSolid`; `sensory-studio.js` → `refreshNativeFittingPreview`; `studio-native-routing.js` → physical route planning.
+- **First test to write:** in `tests/studio-catalogue.test.mjs`, make an existing route intersect a positive gumdrop and another socket; require genuine Manifold rejection/interference while allowing a valid Gear/Tile case. In `tests/unified-studio-browser.test.mjs`, reject an invalid move while preserving the last valid saved state.
+- **Run after adding fixture:** `node tests/studio-catalogue.test.mjs` (red first), then focused native Chromium test with local server; later full exact-head CI.
+- **Acceptance:** actual production cutter/positive pose, routed + adjacent collision, visible invalid feedback, retained state and dimensional export parity—not a stock-only visual warning.
+- **Then:** Wave/Cap/Character/Pod positive+cutter acceptance, arbitrary-face drag, side/curved continuous physical wiring, seven independent browser-to-STL/3MF journeys as listed in register.
+- **Unblockers:** Codex checks *its own* repository push/Node/Manifold/Chromium access at session start. No known owner review gate to ongoing development; original Cura discrepancy needs separate owner evidence but does not block digital work.
+
+## Resume instruction
+
+Check branch, working tree, actual remote HEAD and relevant exact-head CI. If this task was completed, move to the next unverified dependency instead of rerunning it. Before interruption **overwrite this pointer** with current tested state/one next command, append a terse `WT021_RUN_LOG.md` checkpoint, and push coherent changes to #102.

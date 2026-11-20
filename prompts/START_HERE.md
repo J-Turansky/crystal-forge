@@ -4,16 +4,14 @@
 **Repository:** `connorturansky-svg/crystal-forge`. **Only working PR:** [#102](https://github.com/connorturansky-svg/crystal-forge/pull/102), **draft**, branch `wt021/integrated-release`.  
 **Prompt archive provenance:** exact numbered briefs and companion documents copied from `planning/prompts`, source commit `f16d4cc8aff3fab95330f330145f67951a1c2bc7`. Original source branch unchanged.
 
-## Codex reading order (do not skip)
+## Codex reading order — fast, but complete
 
-1. [Active execution instruction](active/WT021_EXECUTION.md) — concise ready-to-copy continuation, including the overnight operating protocol.
-2. [Overnight autonomous execution / access preflight / quota recovery](active/WT021_OVERNIGHT_RUNBOOK.md) — front-load essential permissions, continue without ordinary questions, checkpoint after each milestone.
-3. [Durable run log](../docs/WT021_RUN_LOG.md) — read before resuming any interrupted Codex session.
-4. [Original owner-authorised WT-021 specification](021-complete-seven-builder-manufacturing-parity.md) — **full 65 KB contract**; do not substitute a summary.
-5. [Codex engineering handover](../docs/WT021_CODEX_HANDOFF.md) — last tested head, diagnosed geometry defects and implementation map.
-6. [23-row acceptance register](../docs/WT021_COMPLETION_REGISTER.md) — **authoritative status**; each row is PARTIAL until all independent gates pass.
-7. [Independent audit](../docs/WT021_INDEPENDENT_AUDIT.md), [AGENTS.md](../AGENTS.md), [project AI handover](../docs/AI_HANDOVER.md), [testing guide](../docs/TESTING.md).
-6. Check the **current exact PR head, open issues, workflow logs and source** before editing. Older SHA claims and dated orchestration snapshots are historical, not current proof.
+1. [Fast start, targeted test matrix and CI batching](active/WT021_FAST_START.md), then the [single live next action](../docs/WT021_NOW.md). Run `npm run wt021:status`.
+2. [Active implementation instruction](active/WT021_EXECUTION.md) and [overnight runbook](active/WT021_OVERNIGHT_RUNBOOK.md), including one-time access checks and recovery.
+3. [Original full WT-021 approved specification](021-complete-seven-builder-manufacturing-parity.md) — initially read in full; subsequently consult only relevant sections without replacing requirements with a summary.
+4. [23-row acceptance register](../docs/WT021_COMPLETION_REGISTER.md), [engineering handover](../docs/WT021_CODEX_HANDOFF.md) and [independent source audit](../docs/WT021_INDEPENDENT_AUDIT.md).
+5. [AGENTS.md](../AGENTS.md) and [testing guide](../docs/TESTING.md) for standing guardrails. Read the **latest relevant** [durable log](../docs/WT021_RUN_LOG.md) checkpoint rather than replaying its entire history.
+6. Confirm exact current head and checks, then implement the next unverified P0/P1 acceptance task without routine approval requests.
 
 **Boundaries:** No new PR, no merge, no deployment, no changes to `main`, no work on #90, no unsupported physical-fit claims. Keep unfinished software under [#79](https://github.com/connorturansky-svg/crystal-forge/issues/79) and original STL/Cura/printed verification under [#10](https://github.com/connorturansky-svg/crystal-forge/issues/10). A green existing test suite does not mean the missing seven independent user journeys exist.
 

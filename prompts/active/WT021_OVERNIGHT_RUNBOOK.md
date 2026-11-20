@@ -23,6 +23,14 @@
 - Owner sign-off is reserved for **final review, merging and deployment**, none of which is in scope for the unattended software run. Ignore branch governance text that assumes every new phase requires a newly approved PR; the owner already approved continuation in #102.
 - Re-check current rules before acting if the repository protection changes. This is a **GitHub configuration finding**, not proof that the specific Codex session has valid push credentials. If Codex gets an actual `403`, authentication prompt or push rejection on #102, log the exact error, request necessary access once at the start, and continue independent tasks rather than pretending credentials or approvals are available.
 
+## Token and CI efficiency — don't spend quota replaying known work
+
+Start with [fast start](WT021_FAST_START.md) and the [one next action](../../docs/WT021_NOW.md). Read the full owner-approved specification on initial orientation, but do not repeatedly reload the entire prompt archive or accumulated run log after each small task. Consult original requirements for the specific work.
+
+The static/Chromium/Manifold GitHub workflows use **`cancel-in-progress: true`** per PR. Each push can cancel expensive ongoing checks. Commit coherent progress locally, run targeted tests while iterating, then **batch one tested milestone + register + NOW + log** into a remote push. Exception: push the best recoverable checkpoint immediately if session limits approach. Run full independent CI before acceptance; targeted checks don't certify completion. Do not tight-poll CI or repeatedly fetch full success logs.
+
+If the same failure produces no new evidence after a focused reproduction and correction, record the exact repro and advance a safe independent task rather than looping. Keep NOW ≤45 lines; append the run log only after meaningful milestones. See the [specific test commands](WT021_FAST_START.md).
+
 ## Stage 1 — Unattended execution loop (repeat until software acceptance is genuinely complete or the session ends)
 
 **Do not stop at the end of a phase, at a green CI run, or simply to ask "what next?"** Follow the ordered [active execution tasks](WT021_EXECUTION.md), moving from the next unverified register item to the next. Resolve ordinary design/implementation ambiguities using accepted requirements, measured fixtures and prior tests, and document the choice.

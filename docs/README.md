@@ -7,6 +7,8 @@ This index groups existing documents by purpose **without moving their original 
 | Document | Purpose |
 | --- | --- |
 | [WT-021 handover](WT021_CODEX_HANDOFF.md) | Last verified engineering checkpoint, source pointers and ranked next steps for Codex. |
+| [Current next task](WT021_NOW.md) | Small live pointer for resuming after usage cutoff. |
+| [Fast Codex workflow](../prompts/active/WT021_FAST_START.md) | Token-efficient test selection and CI batching. |
 | [WT-021 completion register](WT021_COMPLETION_REGISTER.md) | Authoritative 23-row dimension/fit/fabrication/seven-family acceptance matrix. |
 | [WT-021 independent audit](WT021_INDEPENDENT_AUDIT.md) | Original source/test findings, known limits and corrections. |
 | [Active prompt / complete source library](../prompts/START_HERE.md) | Full original milestone prompts and one copyable WT-021 execution instruction. |
