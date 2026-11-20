@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** CAL-02, verify Crystal profile updates versus locally fitted copies across imports.
+- **Target:** PAR-02, verify exact keyboard and numeric movement on shaped native sockets.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Native saved project snapshots reproduced their captured clearances in STL and 3MF. Next import a revised Crystal profile and compare the following and locally captured fitting geometry across preparations.
+- **Next test:** Native snapshot and Crystal imported/local calibration checks passed. Next verify numeric X/Z edits and keyboard nudges keep the current installation face and correct normal, and refuse moves that leave solid stock.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

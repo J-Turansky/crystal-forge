@@ -220,3 +220,7 @@
 ### 2026-11-20 - native project snapshot calibration
 
 - Chromium reopened the earlier and later snapshots. Downloaded files measured 4.85 mm for both in the earlier snapshot and 5.10 mm following/4.85 mm local in the later snapshot. A reopened project clears the undo history of the project it replaces.
+
+### 2026-11-20 - Crystal measured fit imports
+
+- Both Crystal profile selectors initialise newly selected measured profiles from their tested nominal bore and preserve existing local values. Import keeps the model’s stored profile data. The full Crystal dimensional browser test passed, including 5.60 mm on the imported copy and 5.30 mm on the locally adjusted original in both downloaded formats. CAL-02 is verified.

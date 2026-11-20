@@ -146,6 +146,17 @@ function syncShapeControls(){
  $('multiplePixelsRow').classList.toggle('show',multi);
  for(const e of document.querySelectorAll('[data-state="pixelCount"]'))e.disabled=!multi;
 }
+function applyCrystalPixelProfile(id){
+ mergePixelLibrary();
+ const profile=allPixelProfiles(s).find(item=>item.id===id);
+ if(!profile)return false;
+ s.pixelProfileId=id;s.pixelDiameter=profile.bodyDiameter;
+ if(profile.measuredFit&&!Object.hasOwn(s.pixelClearanceByProfile||{},id)){
+  const {printedBoreDiameter,bodyDiameter}=profile.measuredFit;
+  s.pixelClearanceByProfile={...s.pixelClearanceByProfile,[id]:Math.round((printedBoreDiameter-bodyDiameter)*100)/100};
+ }
+ return true;
+}
 function refreshPixelProfileOptions(){
  const select=$('pixelProfileSelect');if(!select)return;
  const profiles=allPixelProfiles(s);
@@ -808,8 +819,7 @@ document.querySelectorAll('[data-state]').forEach(e=>{
   if(key==='familyMix')$('familyWeightsControls').hidden=value!=='Mixed';
   if(key==='pixelFit'&&s.fitCalibration){s.fitCalibration=null;syncFitCalibration()}
    if(key==='pixelProfileId'){
-    const profile=allPixelProfiles(s).find(p=>p.id===value);
-    if(profile)s.pixelDiameter=profile.bodyDiameter;
+    applyCrystalPixelProfile(value);
     syncForm();
    }
   if(key==='mount'){$('edgeTabSettings').hidden=value!=='Edge fixing tabs';$('detachablePlateSettings').hidden=value!=='Detachable plate'}
@@ -1755,9 +1765,7 @@ if(studioBootstrap&&!new URLSearchParams(location.search).has('legacy'))studioBr
  openPixelProfileEditor,
  activeCrystalPixelProfile:()=>s.pixelProfileId,
  selectCrystalPixelProfile:id=>{
-  const profiles=readPixelFitProfiles(),profile=allPixelProfiles({pixelProfiles:profiles}).find(p=>p.id===id);
-  if(!profile)return;
-  s.pixelProfiles=profiles;s.pixelProfileId=id;s.pixelDiameter=profile.bodyDiameter;
+  if(!applyCrystalPixelProfile(id))return;
   syncForm();rebuild();snapshot();
  },
  exportPixelProfiles:()=>download(new Blob([JSON.stringify({version:1,pixelProfiles:readPixelFitProfiles()},null,2)],
@@ -1776,7 +1784,7 @@ if(studioBootstrap&&!new URLSearchParams(location.search).has('legacy'))studioBr
   }
   if(next.length>30)throw Error('Import would exceed 30 custom profiles. Existing profiles were preserved.');
   localStorage.setItem(pixelLibraryKey,JSON.stringify(next));
-  s.pixelProfiles=next;syncForm();setStatus('Pixel profile library imported. Conflicting profiles were saved as copies.');
+  mergePixelLibrary();syncForm();setStatus('Pixel profile library imported. Conflicting profiles were saved as copies.');
  },
  pixelFitProfiles:()=>readPixelFitProfiles(),
  savePixelFitProfile:profile=>{

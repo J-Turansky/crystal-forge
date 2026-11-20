@@ -1,9 +1,10 @@
 # WT-021 overnight checkpoint
 
-[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `bd8b08016614c6fc4de4d022d7e7aea3f8c584f4`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
+[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `52d38c7ad05f798d387e766fac7bed8af5007ff5`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
 
 ## Latest checkpoint
 
+- Crystal Chromium tests verified measured profile imports and preserved local overrides. The revised import produced a 5.60 mm bore in both formats, while the original retained its locally adjusted 5.30 mm bore.
 - Original and revised native project snapshots reopened and prepared independently. Their decoded exports preserve the original 4.85 mm and revised 5.10 mm following fit, while the local fit remains 4.85 mm.
 - Focused Chromium measured a flanged Gear before and after independent clearance and retention edits. STL and 3MF agree on the flange, bore, throat and 9 mm depth. The full Chromium rerun passed, including rollback of an oversized conical diameter. The existing calibration journeys wait for production validation before making the next edit.
 - A 6 mm native vault initially narrowed at its junction with an 8.3 mm socket. The cutter now reaches the first bore chord wide enough to accept it. Manifold and both export formats confirm the full lower corridor, upper clearance, taper and both exterior openings. Focused Chromium verified a 6 mm Tile width edit after reload, withheld stale downloads and measured both fresh files.
@@ -19,7 +20,7 @@
 
 ## Current acceptance
 
-- The register has 8 VERIFIED and 16 PARTIAL rows. All seven model families have browser journey evidence and UX-01 was verified at `8083c547b76b5b1df4b547ffccc3ceb6b5765439`.
+- The register has 9 VERIFIED and 15 PARTIAL rows. All seven model families have browser journey evidence and UX-01 was verified at `8083c547b76b5b1df4b547ffccc3ceb6b5765439`.
 - Recess editing applies to supported native mounts and external tabs. Planar top recesses were verified on Gear. Crystal retains its existing mounting workflow. Moving Rotary Caps require Stationary display before adding external tabs.
 - [Next software check](WT021_NOW.md) and [full acceptance register](WT021_COMPLETION_REGISTER.md). Physical Cura and printed fit still require owner validation under [#10](https://github.com/connorturansky-svg/crystal-forge/issues/10).
 

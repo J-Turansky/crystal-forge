@@ -244,4 +244,63 @@ try{
   material.dispose();geometry.dispose();
  }
  console.log('WT-021 full Crystal manufacturing journey verified');
+ {
+  const importedName='Crystal imported fit witness';
+  await page.evaluate(name=>window.__sensoryStudio.addModel('crystals',{count:5,baseHeight:22,width:96,depth:82,
+   cutSockets:true,pixelFit:.15,wireChannels:false,lightingMode:'single'},name),importedName);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  const palette=page.locator('.sms-palette'),libraryInput=palette.getByLabel('Import pixel profiles');
+  const profileId='custom-wt021-crystal-fit-import';
+  const measured={id:profileId,name:'Imported Crystal 5 mm fit',kind:'seed',bodyDiameter:5,bodyHeight:9,
+   flangeDiameter:5,flangeHeight:0,capHeight:1,wireWidth:2,wireDepth:1.5,
+   measuredFit:{bodyDiameter:5,printedBoreDiameter:5.25}};
+  const importProfile=async custom=>libraryInput.setInputFiles({name:'pixel-library.json',mimeType:'application/json',
+   buffer:Buffer.from(JSON.stringify({version:1,pixelProfiles:[custom]}))});
+  await importProfile(measured);
+  const selection=palette.getByLabel('Active Pixel Profile');
+  await selection.getByRole('option',{name:measured.name,exact:true}).waitFor({state:'attached'});
+  await selection.selectOption(profileId);
+  await page.waitForFunction(id=>window.__sensoryStudio.currentModel.parameters.pixelClearanceByProfile?.[id]===.25,profileId);
+  const fit=await reveal(page.locator('[data-state=pixelFit]'));
+  await fit.press('ArrowRight');
+  await page.waitForFunction(id=>window.__sensoryStudio.currentModel.parameters.pixelClearanceByProfile[id]===.3,profileId);
+  await importProfile({...measured,measuredFit:{bodyDiameter:5,printedBoreDiameter:5.6}});
+  const copy=selection.getByRole('option',{name:measured.name+' (imported copy)',exact:true});
+  await copy.waitFor({state:'attached'});
+  const revisedId=await copy.getAttribute('value');
+  assert.notEqual(revisedId,profileId);
+  const importJob=page.locator('#smsJobs article').filter({hasText:importedName});
+  const measureImported=async(id,diameter)=>{
+   await page.locator('.sms-workspace-nav [data-tab=build]').click();
+   await selection.selectOption(id);
+   await page.waitForFunction(id=>window.__sensoryStudio.currentModel.parameters.pixelProfileId===id,id);
+   const model=await crystal(),[socket]=planHardware(model.editableState.crystals,model.parameters).sockets;
+   assert(socket&&Math.abs(socket.diameter-diameter)<.001);
+   await page.locator('.sms-workspace-nav [data-tab=print]').click();
+   if(await importJob.count())await importJob.locator('[data-job-prepare]').click();
+   else await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+   await importJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+   for(const format of ['stl','3mf']){
+    const [file]=await Promise.all([page.waitForEvent('download'),importJob.locator('[data-job-'+format+']').click()]);
+    const bytes=await readFile(await file.path());
+    const geometry=new THREE.BufferGeometry();
+    if(format==='stl')geometry.copy(new STLLoader().parse(Uint8Array.from(bytes).buffer));
+    else{
+     const xml=modelXml(bytes);
+     const points=[...xml.matchAll(/<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"/g)].flatMap(match=>match.slice(1).map(Number));
+     const indices=[...xml.matchAll(/<triangle v1="([^"]+)" v2="([^"]+)" v3="([^"]+)"/g)].flatMap(match=>match.slice(1).map(Number));
+     geometry.setAttribute('position',new THREE.Float32BufferAttribute(points,3));
+     geometry.setIndex(indices);
+    }
+    const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),mesh=new THREE.Mesh(geometry,material);
+    const width=[-1,1].reduce((sum,sign)=>sum+new THREE.Raycaster(
+     new THREE.Vector3(socket.x,-socket.z,4),new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0].distance,0);
+    assert(Math.abs(width-diameter)<.04,format+' imported Crystal clearance '+width);
+    geometry.dispose();material.dispose();
+   }
+  };
+  await measureImported(revisedId,5.6);
+  await measureImported(profileId,5.3);
+  console.log('WT-021 Crystal imported measured default and local fit verified');
+ }
 }finally{await browser.close();}
