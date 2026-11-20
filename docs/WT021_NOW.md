@@ -10,15 +10,11 @@
 
 ## Next executable step
 
-- **Target:** FIT-02 P0, real collision/breakthrough with previously routed cuts and adjacent socket cutters, not just original model stock.
-- **Start here:** `studio-geometry.js` → `nativeFittingPreviews` / `placeNativeSocketSolid`; `sensory-studio.js` → `refreshNativeFittingPreview`; `studio-native-routing.js` → physical route planning.
-- **First test to write:** in `tests/studio-catalogue.test.mjs`, make an existing route intersect a positive gumdrop and another socket; require genuine Manifold rejection/interference while allowing a valid Gear/Tile case. In `tests/unified-studio-browser.test.mjs`, reject an invalid move while preserving the last valid saved state.
-- **Run after adding fixture:** `node tests/studio-catalogue.test.mjs` (red first), then focused native Chromium test with local server; later full exact-head CI.
-- **Acceptance:** actual production cutter/positive pose, routed + adjacent collision, visible invalid feedback, retained state and dimensional export parity—not a stock-only visual warning.
-- **Then:** Wave/Cap/Character/Pod positive+cutter acceptance, arbitrary-face drag, side/curved continuous physical wiring, seven independent browser-to-STL/3MF journeys as listed in register.
-- **Additional owner-approved P1:** UX-01 visual Features & What's New catalogue, graphics, category descriptions and safe click-through per [brief](WT021_FEATURE_CATALOGUE_BRIEF.md); finish P0 first.
-- **Reporting:** update [morning summary](WT021_OVERNIGHT_SUMMARY.md) and `CHANGELOG.md` during tested milestones; push and PR-comment the summary before cutoff.
-- **Unblockers:** Codex checks *its own* repository push/Node/Manifold/Chromium access at session start. No known owner review gate to ongoing development; original Cura discrepancy needs separate owner evidence but does not block digital work.
+- **Target:** FIT-02 P0, prove invalid native fitting edits preserve prior state in Chromium and verify route clearance outside intentional socket within surrounding stock.
+- **Checkpoint:** shared Manifold preview now shows insertion approach, stock and adjacent-cut warnings from fabrication checks and measures wire/positive overlap. Gear/Tile injected cut-solid cases pass. Wire overlap alone is informational because contact with the intended relief is normal.
+- **Next test:** extend the native Gear-top workflow in tests/unified-studio-browser.test.mjs with a rejected move toward an existing socket or mount, then reload and confirm the original pose. In studio-geometry.js and studio-native-routing.js, verify the actual routed cutter sections against surviving stock beyond intended junctions and exits.
+- **Then:** add Wave/Cap/Character/Pod physical previews and manufacturing proof, arbitrary-face drag, side/curved continuous routing and seven independent browser-to-STL/3MF journeys.
+- **UX-01:** implement the approved catalogue after P0 work. Keep #10 for Cura and printed proof.
 
 ## Resume instruction
 

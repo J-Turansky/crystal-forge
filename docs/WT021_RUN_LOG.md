@@ -36,3 +36,10 @@
 - **Can the next session resume without owner input?** yes/no; if no, state required permission precisely.
 
 **Do not overwrite prior checkpoint history.** Append a new entry and keep the most recent actionable one at the bottom.
+
+### 2026-11-20 - FIT-02 native fabrication diagnostics
+
+- Base: 1518a289f421ee5635c749d4fbb8b46f3c222187 on draft #102.
+- Native preview and preparation share insertion opening, stock and adjacent-cut checks. Preview reports measured wire cut overlap separately.
+- The Gear/Tile test injects physical wire and mounting cuts; both preview warning and manufacturing rejection are exercised for the mounting conflict.
+- FIT-02 remains PARTIAL. Next action is the invalid-pose Chromium case and actual routed wall verification in NOW.

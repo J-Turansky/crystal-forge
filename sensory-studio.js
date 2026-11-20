@@ -513,7 +513,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     for(const [index,fit] of results.entries()){
      for(const [kind,shape,color,opacity] of [
       ['negative',fit.negative,0x46beff,.16],
-      ['positive',fit.positive,fit.collisionVolume>.01?0xff6161:0xffdc58,.42]
+      ['positive',fit.positive,(fit.collisionVolume>.01||fit.warnings.length)?0xff6161:0xffdc58,.42]
      ]){
       const overlay=new THREE.Mesh(nativeFitMesh(shape),new THREE.MeshBasicMaterial({
        color,opacity,transparent:true,depthTest:false,depthWrite:false,side:THREE.DoubleSide

@@ -1,28 +1,15 @@
-# WT-021 — Overnight owner summary
+# WT-021 overnight checkpoint
 
-**Status: PREPARED (the new Codex overnight session has not yet run).** This file is the durable owner-facing briefing; Codex must update it **during** development and commit it before possible usage cutoff.
+Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) continues from `1518a289f421ee5635c749d4fbb8b46f3c222187`. The commit containing this report records the implementation checkpoint. See the [checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks) for its exact head and CI results.
 
-- **Project / PR:** Pixel Model Maker, existing [draft PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102), branch `wt021/integrated-release`; do not merge/deploy/new PR.
-- **Session start / latest progress time:** not started.
-- **Latest pushed HEAD / last exact-head all-green SHA:** check live GitHub; do not claim old checks are current.
-- **Original acceptance:** 23 PARTIAL. **Additional UX-01:** MISSING. Total tracked: 24.
-- **User-visible features completed this session:** none recorded yet.
-- **Manufacturing/dimensional tests completed this session:** none recorded yet.
-- **Changelog additions:** none recorded for new session yet.
-- **Current blocker / exact next task:** see [NOW](WT021_NOW.md), [register](WT021_COMPLETION_REGISTER.md) and [technical log](WT021_RUN_LOG.md).
+## Implemented
 
-## What was actually implemented overnight
+- Native Build fitting inspection shares the production Manifold checks for blocked insertion, insufficient stock and nearby cut interference. It reports measured wire-cut overlap independently, since contact with a wire relief can be intentional.
+- Gear-top and Tile-underside fabrication fixtures exercise actual Boolean wire overlap and confirm that an interfering mounting cut is shown in the preview and rejected by preparation.
+- Updated the unreleased changelog, in-app release notes and FIT-02 acceptance evidence.
 
-*Codex: replace this with 3–8 short, evidence-based bullets, feature locations and relevant commit/test links. Never claim planned work is completed.*
+## Evidence and next action
 
-## Still incomplete, and why
-
-*Codex: name critical P0 tasks, UX-01 progress, genuine access blockers and physical-only Cura tests (#10).*
-
-## One exact next action
-
-*Codex: state the next source/test/action from NOW and whether all commits have been pushed.*
-
-## Required end-of-session communication
-
-At each tested milestone, **update this brief live file** (roughly 30–60 lines), in the same coherent push as code, register, NOW and log. Before a predictable quota/context cutoff or normal end, push it, then **post one concise PR #102 comment linking this report and the tested HEAD**; give the same summary in the Codex chat if possible. If abruptly interrupted, the last pushed report remains the authoritative owner-readable record. Do not pretend automatic continuation or ask routine questions.
+- The targeted catalogue/manufacturing test passed locally. Added Chromium assertions for the new diagnostic readout. Exact-head CI is reported on the PR.
+- The register remains at 23 PARTIAL and one MISSING. Remaining limitations include routed stock protection, browser state preservation for rejected edits, side/curved-face fabrication, the remaining builder journeys and UX-01.
+- Resume with [the exact FIT-02 task](WT021_NOW.md), then continue through the [acceptance register](WT021_COMPLETION_REGISTER.md). Keep Cura and printed proof in #10.

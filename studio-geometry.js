@@ -145,45 +145,21 @@ export function placeNativeSocketSolid(THREE,wasm,hold,solid,seat,rotation=0){
 // The Build preview uses the profile-shaped positive replica and the EXACT
 // production socket cutter. It does not replace the prepared manufacturing mesh.
 export function nativeFittingPreviews(THREE,wasm,recipe){
- const seats=(recipe.negative||[]).filter(part=>part.kind==='pixel-seat');
- if(!seats.length)return [];
+ if(!(recipe.negative||[]).some(part=>part.kind==='pixel-seat'))return [];
  if(recipe.dualMaterial||recipe.partitioned)throw Error('Shaped fitting preview requires single-material stock.');
- const owned=[],hold=solid=>(owned.push(solid),solid);
- try{
-  // Compare against the original unsliced stock, rather than triangles of
-  // the viewport's visual solids. Other cuts/routed interference is not yet
-  // included in this preview; preparation remains authoritative.
-  const stockRecipe={...recipe,negative:[],nativeRouting:null,dualMaterial:false,partitioned:false};
-  const stockMesh=prepareRecipe(THREE,wasm,stockRecipe).bodies[0].mesh;
-  const stock=hold(new wasm.Manifold(stockMesh));
-  return seats.map(seat=>{
-   const profile=seat.profile;
-   const replica=prepareRecipe(THREE,wasm,makePixelReplicaRecipe(profile)).bodies[0].mesh;
-   const positive=placeNativeSocketSolid(THREE,wasm,hold,hold(new wasm.Manifold(replica)),seat,90-seat.pixelRotation);
-   const bore=putSocket(wasm,hold,{x:0,z:0},seat.radius,profile.bodyHeight+3,-3,profile,{
-    includeLocalWireRelief:seat.includeLocalWireRelief
-   });
-   const negative=placeNativeSocketSolid(THREE,wasm,hold,bore.solid,seat,90-seat.pixelRotation);
-   const exposed=hold(positive.subtract(stock));
-   const collision=hold(hold(positive.intersect(stock)).subtract(negative));
-   if(positive.status()!=='NoError'||negative.status()!=='NoError')throw Error('Invalid physical fitting preview.');
-   return {pixelId:seat.pixelId,
-    positive:positive.getMesh(),negative:negative.getMesh(),
-    insertionDepth:bore.usableBodyDepth,nominalRoofAllowance:bore.remainingWall,
-    exposedVolume:exposed.volume(),collisionVolume:collision.volume()};
-  });
- }finally{owned.reverse().forEach(solid=>{try{solid.delete();}catch{}});}
+ return prepareRecipe(THREE,wasm,recipe,{inspectFittings:true});
 }
-export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
+export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{},inspectFittings=false}={}){
  const owned=[];const hold=solid=>(owned.push(solid),solid);
  const positionSeat=(solid,seat,rotation=0)=>placeNativeSocketSolid(THREE,wasm,hold,solid,seat,rotation);
- const convert=part=>{
-  if(part.kind==='pixel-seat'){
-   const {profile}=part;
-   const bore=putSocket(wasm,hold,{x:0,z:0},part.radius,profile.bodyHeight+3,-3,profile,
+ const socket=part=>{
+  const {profile}=part;
+  const bore=putSocket(wasm,hold,{x:0,z:0},part.radius,profile.bodyHeight+3,-3,profile,
     {includeLocalWireRelief:part.includeLocalWireRelief});
-   return positionSeat(bore.solid,part,90-part.pixelRotation);
-  }
+  return {...bore,solid:positionSeat(bore.solid,part,90-part.pixelRotation)};
+ };
+ const convert=part=>{
+  if(part.kind==='pixel-seat')return socket(part).solid;
   if(part.kind==='extrude'){
    // Fabricate from the planar contours rather than welding the display triangulation.
    const contours=[part.outline,...(part.holes||[])].map(loop=>loop.map(([x,z])=>[x,-z]));
@@ -211,7 +187,12 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
   onProgress('Joining physical bodies');let total=union(recipe.positive);
   if(recipe.secondary?.length&&!recipe.partitioned)total=hold(total.add(union(recipe.secondary)));
   const seats=(recipe.negative||[]).filter(part=>part.kind==='pixel-seat');
+  const previews=[];
+  const wireCuts=inspectFittings?(recipe.negative||[]).filter(part=>part.wireChannel).map(convert):[];
+  const wireSolid=wireCuts.length?hold(wasm.Manifold.union(wireCuts)):null;
   for(const seat of seats){
+   const warnings=[];
+   const warn=message=>{if(!inspectFittings)throw Error(message);warnings.push(message);};
    const {profile}=seat,stockHeight=profile.bodyHeight+2.8;
    const stockRadius=Math.max(profile.maxDiameter/2+1,seat.includeLocalWireRelief?profile.boreDiameter*.675+4.8:0);
    const stock=hold(wasm.Manifold.cylinder(stockHeight,stockRadius,stockRadius,32));
@@ -221,16 +202,28 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
     const approach=hold(wasm.Manifold.cylinder(2.7,radius,radius,32));
     const opening=positionSeat(hold(hold(approach.rotate([-90,0,0])).translate([0,-3,0])),seat);
     if(hold(total.intersect(opening)).volume()>.05)
-     throw Error(seat.pixelHole+' has an obstructed insertion opening. Choose an exposed face.');
+     warn(seat.pixelHole+' has an obstructed insertion opening. Choose an exposed face.');
    }
    if(envelope.volume()-hold(total.intersect(envelope)).volume()>.05)
-    throw Error(seat.pixelHole+' needs '+(seat.surface?'continuous stock on its installation face':'continuous underside stock')+', including a 2.8 mm roof beyond the socket. Increase thickness or move the fitting.');
+    warn(seat.pixelHole+' needs '+(seat.surface?'continuous stock on its installation face':'continuous underside stock')+', including a 2.8 mm roof beyond the socket. Increase thickness or move the fitting.');
+   if(inspectFittings){
+    const bore=socket(seat),negative=bore.solid;
+    const replica=prepareRecipe(THREE,wasm,makePixelReplicaRecipe(profile)).bodies[0].mesh;
+    const positive=positionSeat(hold(new wasm.Manifold(replica)),seat,90-seat.pixelRotation);
+    if(positive.status()!=='NoError'||negative.status()!=='NoError')throw Error('Invalid physical fitting preview.');
+    const wireOverlap=wireSolid?hold(positive.intersect(wireSolid)).volume():0;
+    previews.push({wireOverlap,pixelId:seat.pixelId,positive:positive.getMesh(),negative:negative.getMesh(),
+     insertionDepth:bore.usableBodyDepth,nominalRoofAllowance:bore.remainingWall,
+     exposedVolume:hold(positive.subtract(total)).volume(),
+     collisionVolume:hold(hold(positive.intersect(total)).subtract(negative)).volume(),warnings});
+   }
    for(const other of recipe.negative||[]){
     if(other===seat||other.wireChannel)continue;
     if(hold(envelope.intersect(convert(other))).volume()>.05)
-     throw Error(seat.pixelHole+' lacks clearance from another cut. Move the fitting and check the roof.');
+     warn(seat.pixelHole+' lacks clearance from another cut. Move the fitting and check the roof.');
    }
   }
+  if(inspectFittings)return previews;
   if(recipe.nativeRouting?.ready){
    onProgress('Cutting serial LED channels');
    // Collapse Boolean slivers below the precision of a printable channel.

@@ -229,6 +229,14 @@ for(const id of ['knob','selector']){
   const preview=previews[0];
   assert.equal(preview.pixelId,'physical-preview');
   assert.equal(preview.insertionDepth,fixture.profile.bodyHeight);
+  assert.deepEqual(preview.warnings,[]);
+  assert.equal(preview.wireOverlap,0);
+  const cutPosition=[0,fixture.face?fixture.face.y-4:4,0];
+  const routed={...recipe,negative:[...recipe.negative,{kind:'box',size:[4,4,4],position:cutPosition,wireChannel:'test channel'}]};
+  assert(nativeFittingPreviews(THREE,wasm,routed)[0].wireOverlap>1);
+  const conflicted={...recipe,negative:[...recipe.negative,{kind:'box',size:[4,4,4],position:cutPosition,mountHole:'test adjacent cut'}]};
+  assert(nativeFittingPreviews(THREE,wasm,conflicted)[0].warnings.some(warning=>warning.includes('clearance from another cut')));
+  assert.throws(()=>prepareRecipe(THREE,wasm,conflicted),/clearance from another cut/);
   assert(preview.positive.triVerts.length>0&&preview.negative.triVerts.length>0);
   assert([preview.exposedVolume,preview.collisionVolume,preview.nominalRoofAllowance].every(Number.isFinite));
   const stock=prepareRecipe(THREE,wasm,{...recipe,negative:[],nativeRouting:null});

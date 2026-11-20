@@ -4,7 +4,8 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
-- Introduced physical positive profile and real negative Manifold cutter previews in Crystal and targeted Gear-top / Tile-underside workflows, with exact cutter-envelope tests. **Other families, routed-cut collision and arbitrary-face routing remain incomplete.**
+- Build fitting previews now show insertion obstruction and insufficient surrounding stock from manufacturing checks, warn about nearby cut conflicts, and report overlap between the measured pixel and wire cuts.
+- Introduced physical positive profile and real negative Manifold cutter previews in Crystal and targeted Gear-top / Tile-underside workflows, with exact cutter-envelope tests. **Other families, route stock protection and arbitrary-face routing remain incomplete.**
 - Rebuilt the socket cutter as a connected profile after finding a measured 0.62463 mm³ positive-envelope mismatch; added stricter fail-closed export mesh checks.
 - Improved route-roof and independent physical-wire-width versus bore-fit acceptance tests.
 - Archived original Codex briefs and added a token-efficient overnight execution protocol, acceptance register, progress log and recovery pointer in PR #102.
