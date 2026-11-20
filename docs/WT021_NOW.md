@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** DIM-03, verify independent body, flange and fit dimensions on representative edited fittings across builders.
+- **Target:** CAL-01, compare Crystal’s independently edited wire width against the other fitted dimensions after reload.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** All six retained-cone fixtures passed both file formats and FAB-02 is verified. Next exercise profile and clearance changes separately and compare the results across builder families.
+- **Next test:** DIM-03 passed on Crystal and the six native builders. Next retain one Crystal profile and fit while changing its track width, reload, and verify both exported meshes match the requested dimensions.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

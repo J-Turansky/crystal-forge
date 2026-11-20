@@ -494,6 +494,7 @@ const conicalCoupon=makeRoutedSocketSpecimen(measuredProfile,{clearance:.3,reten
 assert.equal(conicalCoupon.nativeRouting.links.length,3);
 const familyConeFixtures=new Map();
 const familyRetainedConeFixtures=new Map();
+const familyWireFitFixtures=new Map();
 const familyTabFixtures=new Map();
 const familyPocketFixtures=new Map();
 for(const [family,parameters] of [
@@ -516,11 +517,27 @@ for(const [family,parameters] of [
   assert(exposed.volume()<.02,family.typeId+' conical cutter encloses the full measured housing');
  }finally{exposed.delete();negative.delete();positive.delete();}
  familyConeFixtures.set(fixture,family.typeId);
- const retainedProfile={...shortConeProfile,bodyDiameter:3.3,bodyHeight:5.4,flangeDiameter:4,retentionLip:.15};
- const retained=applyBuildModules(source,{pixelBacking:true,pixelBackingThickness:10,pixelHoles:[{
-  ...conicalStud,diameter:3.3,clearance:.3,x:0,z:0,socketProfile:retainedProfile
- }]},family.capabilities);
- familyRetainedConeFixtures.set(retained,family.typeId);
+ for(const width of [3.2,4]){
+  const profile={...shortConeProfile,bodyHeight:7,retentionLip:.15};
+  const recipe=applyBuildModules(source,{pixelBuilderVersion:1,pixelBacking:true,pixelBackingThickness:10,
+   pixelHoles:[-15,15].map((x,i)=>({...checked('wire-fixture-'+i,x),entryFace:'underside',socketProfile:profile})),
+   serialRouting:{...serial,channelWidthMm:width}},family.capabilities);
+  familyWireFitFixtures.set(recipe,{name:family.typeId,width});
+ }
+ const variants=[
+  {label:'baseline',clearance:.2,flange:4,retentionLip:.15,sections:[4.2,3.2,3.5,2.3],apex:7.15},
+  {label:'clearance edit',clearance:.3,flange:4,retentionLip:.15,sections:[4.3,3.3,3.6,2.4],apex:7.2},
+  {label:'retention edit',clearance:.2,flange:4,retentionLip:.25,sections:[4.2,3,3.5,2.3],apex:7.15},
+  {label:'flange edit',clearance:.2,flange:4.3,retentionLip:.15,sections:[4.5,3.2,3.5,2.3],apex:7.15},
+  {label:'body depth edit',clearance:.2,flange:4,retentionLip:.15,bodyHeight:5.45,sections:[4.2,3.2,3.5,2.4],apex:7.2}
+ ];
+ for(const {label,clearance,flange,retentionLip,bodyHeight=5.4,sections,apex} of variants){
+  const retainedProfile={...shortConeProfile,bodyDiameter:3.3,bodyHeight,flangeDiameter:flange,retentionLip};
+  const retained=applyBuildModules(source,{pixelBacking:true,pixelBackingThickness:10,pixelHoles:[{
+   ...conicalStud,diameter:3.3,clearance,x:0,z:0,socketProfile:retainedProfile
+  }]},family.capabilities);
+  familyRetainedConeFixtures.set(retained,{name:family.typeId+' '+label,sections,apex});
+ }
  for(const [profile,diameter,depth] of [['Magnet pocket',6.2,3],['Threaded insert pilot',4.1,5]]){
   const pocket=applyBuildModules(source,{pixelBacking:true,pixelBackingThickness:10,
    manualMountHoles:[{id:'blind',x:0,z:0,diameter:3.4,entryFace:'underside',profile,recessDiameter:diameter,recessDepth:depth}]
@@ -574,7 +591,7 @@ for(const [fixture] of fixingFixtures){
  const interrupted={...fixture,negative:[...fixture.negative,{kind:'box',size:[1,2,2],position:[18.5,1,0]}]};
  assert.throws(()=>prepareRecipe(THREE,wasm,interrupted),/too close to another cut/);
 }
-for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),...familyRetainedConeFixtures.keys(),conicalRecipe,conicalCoupon,...familyTabFixtures.keys(),...familyPocketFixtures.keys(),tabRecessRecipe,topRecessRecipe,wideVault,vaultedStock,pinnedVault,topRouted,sideRouted,rearRouted,...perpendicularRoutes,curvedSeatOnly,curvedWaveRoute,biaxialRoute,biaxialPinned,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
+for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),...familyRetainedConeFixtures.keys(),...familyWireFitFixtures.keys(),conicalRecipe,conicalCoupon,...familyTabFixtures.keys(),...familyPocketFixtures.keys(),tabRecessRecipe,topRecessRecipe,wideVault,vaultedStock,pinnedVault,topRouted,sideRouted,rearRouted,...perpendicularRoutes,curvedSeatOnly,curvedWaveRoute,biaxialRoute,biaxialPinned,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -660,11 +677,23 @@ for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),...f
    const left=hit([0,0,5],[0,-1,0]),right=hit([0,0,5],[0,1,0]);
    assert(apex&&Math.abs(apex.z-6.65)<.01,format+' '+name+' conical apex');
    assert(left&&right&&Math.abs(left.distanceTo(right)-3.3)<.01,format+' '+name+' conical slope');
+  }else if(familyWireFitFixtures.has(fixture)){
+   const {name,width}=familyWireFitFixtures.get(fixture);
+   const span=(x,height)=>{
+    const left=hit([x,0,height],[0,-1,0]),right=hit([x,0,height],[0,1,0]);
+    assert(left&&right,format+' '+name+' paired section');
+    return left.distanceTo(right);
+   };
+   assert(Math.abs(span(0,.9)-width)<.015,format+' '+name+' independent channel width');
+   for(const [height,expected] of [[.4,6.3],[2.8,5],[4.5,5.3]])
+    assert(Math.abs(span(-15,height)-expected)<.015,format+' '+name+' unchanged bore section at '+height);
+   const apex=hit([-15,0,-1],[0,0,1]);
+   assert(apex&&Math.abs(apex.z-7)<.01,format+' '+name+' unchanged insertion depth');
   }else if(familyRetainedConeFixtures.has(fixture)){
-   const name=familyRetainedConeFixtures.get(fixture);
+   const {name,sections,apex:expectedApex}=familyRetainedConeFixtures.get(fixture);
    const apex=hit([0,0,-1],[0,0,1]);
-   assert(apex&&Math.abs(apex.z-7.2)<.01,format+' '+name+' apex retains the full insertion length');
-   for(const [height,diameter] of [[.4,4.3],[2.8,3.3],[4.5,3.6],[6,2.4]]){
+   assert(apex&&Math.abs(apex.z-expectedApex)<.01,format+' '+name+' apex retains the full insertion length');
+   for(const [height,diameter] of [.4,2.8,4.5,6].map((height,i)=>[height,sections[i]])){
     const left=hit([0,0,height],[0,-1,0]),right=hit([0,0,height],[0,1,0]);
     assert(left&&right&&Math.abs(left.distanceTo(right)-diameter)<.015,format+' '+name+' retained cone diameter at '+height);
    }

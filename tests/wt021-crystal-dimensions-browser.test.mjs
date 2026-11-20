@@ -274,7 +274,7 @@ try{
   const revisedId=await copy.getAttribute('value');
   assert.notEqual(revisedId,profileId);
   const importJob=page.locator('#smsJobs article').filter({hasText:importedName});
-  const measureImported=async(id,diameter)=>{
+  const measureImported=async(id,diameter,retention=0)=>{
    await page.locator('.sms-workspace-nav [data-tab=build]').click();
    await selection.selectOption(id);
    await page.waitForFunction(id=>window.__sensoryStudio.currentModel.parameters.pixelProfileId===id,id);
@@ -300,11 +300,20 @@ try{
     const width=[-1,1].reduce((sum,sign)=>sum+new THREE.Raycaster(
      new THREE.Vector3(socket.x,-socket.z,4),new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0].distance,0);
     assert(Math.abs(width-diameter)<.04,format+' imported Crystal clearance '+width);
+    const throat=[-1,1].reduce((sum,sign)=>sum+new THREE.Raycaster(
+     new THREE.Vector3(socket.x,-socket.z,2.5),new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0].distance,0);
+    assert(Math.abs(throat-(diameter-2*retention))<.04,format+' Crystal retention and bore remain independent');
     geometry.dispose();material.dispose();
    }
   };
   await measureImported(revisedId,5.6);
   await measureImported(profileId,5.3);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await page.locator('#advancedBtn').click();
+  const retention=await reveal(page.locator('[data-state=pixelRetentionLip]'));
+  for(let i=0;i<4;i++)await retention.press('ArrowRight');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.parameters.pixelRetentionLip===.2);
+  await measureImported(profileId,5.3,.2);
   console.log('WT-021 Crystal imported measured default and local fit verified');
  }
  {

@@ -282,3 +282,5 @@
 - All six native Chromium mounting journeys accepted keyboard nudges for both blind profiles and reproduced them after reload in STL and 3MF. PAR-01 is verified.
 
 - Manifold and both export decoders measured retained conical sockets on all six native builders. The cone preserves its expected flange, retention throat, body width and apex. FAB-02 is verified.
+
+- All six native builders passed measured clearance, flange, depth and retention variations. Crystal Chromium verified the unchanged 5.3 mm bore and narrowed 4.9 mm throat. DIM-03 is verified. Native wire-width edits passed both formats without changing the selected socket dimensions.

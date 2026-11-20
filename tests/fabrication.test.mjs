@@ -485,6 +485,14 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
   const apex=ceiling(socket.x,socket.z);
   assert(Math.abs(apex-socket.tipY)<.001,format+' full-model conical apex');
   assert(Math.abs(apex-ceiling(socket.x+2,socket.z)-2)<.001,format+' conical roof falls 2 mm over 2 mm');
+  const profile=resolvePixelProfile(installation);
+  const throatHeight=Math.max(1.9,profile.flangeHeight+.8)+.7;
+  for(const [height,width] of [[throatHeight,profile.boreDiameter-2*profile.retentionLip],[8,profile.boreDiameter]]){
+   const origin=new THREE.Vector3(socket.x,-socket.z,height);
+   const walls=[-1,1].map(sign=>new THREE.Raycaster(origin,new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0]);
+   assert(walls.every(Boolean),format+' Crystal retained section has both walls');
+   assert(Math.abs(walls[0].distance+walls[1].distance-width)<.055,format+' Crystal measured section at '+height);
+  }
   }
   for(const {a,b,kind} of routes){
    const span=Math.hypot(b.x-a.x,b.z-a.z);
