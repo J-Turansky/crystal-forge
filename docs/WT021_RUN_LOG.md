@@ -192,3 +192,7 @@
 ### 2026-11-20 - native conical ceiling and Wave drag undo
 
 - The full unified Chromium suite passed Wave direct-manipulation undo and redo. Added native conical socket roofs on level underside faces with a shared production cutter and real stock validation. Focused Chromium passed thin Gear refusal and both Gear exports, and the catalogue fixture independently confirms flange, retention, straight bore and cone slope in STL and 3MF.
+
+### 2026-11-20 - native conical fixture coverage
+
+- Six native family fixtures passed the conical cutter and positive-housing containment test. Decoded STL and 3MF confirm the expected 6.65 mm apex and 3.3 mm section diameter at 5 mm for every fixture. Native conical coupon parity is next.

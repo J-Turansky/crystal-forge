@@ -450,6 +450,29 @@ assert.throws(()=>applyBuildModules(conicalStock,{pixelHoles:[{...conicalStud,en
  surface:{y:18,normal:[0,1,0]}}]}),/level underside installation face/);
 const surfacedConical=applyBuildModules(calibrationStock,{pixelHoles:[{...conicalStud,surface:{y:0,normal:[0,-1,0]}}]});
 assert.throws(()=>prepareRecipe(THREE,wasm,surfacedConical),/continuous stock on its installation face/);
+const shortConeProfile={...measuredProfile,bodyDiameter:5,bodyHeight:4,capHeight:1,flangeDiameter:6,flangeHeight:.5};
+const familyConeFixtures=new Map();
+for(const [family,parameters] of [
+ [gearGenerator,{mode:'Decorative',wheelStyle:'Rounded lobes',webStyle:'Solid',diameter:80,bore:0,reliefStyle:'None'}],
+ [tileGenerator,{pattern:'terraces',width:80,depth:80,thickness:14}],
+ [waveGenerator,{flowStyle:'Parallel'}],
+ [capGenerator,{controlStyle:'Pushbutton',shaft:0}],
+ [characterGenerator,{character:'Cloud',construction:'Classic'}],
+ [pebbleGenerator,{shellForm:'Beacon',illuminated:false}]
+]){
+ const source=family.recipe({...parameters,dualMaterial:false});
+ const fixture=applyBuildModules(source,{pixelBacking:true,pixelBackingThickness:10,pixelHoles:[{
+  ...conicalStud,diameter:5,clearance:.3,x:0,z:0,socketProfile:shortConeProfile
+ }]},family.capabilities);
+ const [preview]=nativeFittingPreviews(THREE,wasm,fixture);
+ assert.deepEqual(preview.warnings,[],family.typeId+' conical roof has enough actual stock');
+ const positive=new wasm.Manifold(preview.positive),negative=new wasm.Manifold(preview.negative);
+ const exposed=positive.subtract(negative);
+ try{
+  assert(exposed.volume()<.02,family.typeId+' conical cutter encloses the full measured housing');
+ }finally{exposed.delete();negative.delete();positive.delete();}
+ familyConeFixtures.set(fixture,family.typeId);
+}
 const measuredReplica=makePixelReplicaRecipe(measuredProfile);
 const dimensionFixtures=new Map([
  [calibratedCut(),{name:'baseline',bore:8.3,flange:9.3,throat:8.3,width:3.2}],
@@ -489,7 +512,7 @@ for(const [fixture] of fixingFixtures){
  const interrupted={...fixture,negative:[...fixture.negative,{kind:'box',size:[1,2,2],position:[18.5,1,0]}]};
  assert.throws(()=>prepareRecipe(THREE,wasm,interrupted),/too close to another cut/);
 }
-for(const fixture of [...fixingFixtures.keys(),conicalRecipe,tabRecessRecipe,topRecessRecipe,vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
+for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),conicalRecipe,tabRecessRecipe,topRecessRecipe,vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -569,6 +592,12 @@ for(const fixture of [...fixingFixtures.keys(),conicalRecipe,tabRecessRecipe,top
    assert(Math.abs(span([0,0,.8])-dimensions.width)<.02,format+' '+dimensions.name+' route width');
    const apex=hit([-15,0,-1],[0,0,1]);
    assert(apex&&Math.abs(apex.z-9)<.01,format+' shaped socket roof stays at the measured 9 mm body length');
+  }else if(familyConeFixtures.has(fixture)){
+   const name=familyConeFixtures.get(fixture);
+   const apex=hit([0,0,-1],[0,0,1]);
+   const left=hit([0,0,5],[0,-1,0]),right=hit([0,0,5],[0,1,0]);
+   assert(apex&&Math.abs(apex.z-6.65)<.01,format+' '+name+' conical apex');
+   assert(left&&right&&Math.abs(left.distanceTo(right)-3.3)<.01,format+' '+name+' conical slope');
   }else if(fixture===conicalRecipe){
    const apex=hit([-15,0,-1],[0,0,1]);
    assert(apex&&Math.abs(apex.z-13.15)<.01,format+' conical ceiling adds 4.15 mm above the measured 9 mm body');
@@ -741,7 +770,8 @@ for(const fixture of [...fixingFixtures.keys(),conicalRecipe,tabRecessRecipe,top
   console.log('WT-021 routed Gear STL/3MF: 3.4 mm mounting through-hole and 8.7 mm web to the route');
   continue;
  }
- console.log('WT-021 native STL/3MF sections: 3.2 mm width, surrounding stock and open apertures ('+(fixture===curvedWaveRoute?'curved Wave':fixture===sideRouted?'front':fixture===topRouted?'top':fixture===pinnedVault?'curved underside':'straight underside')+')');
+ if(familyConeFixtures.has(fixture))console.log('WT-021 conical socket STL/3MF: '+familyConeFixtures.get(fixture)+' apex, slope and positive envelope passed.');
+ if([vaultedStock,pinnedVault,topRouted,sideRouted,curvedWaveRoute].includes(fixture))console.log('WT-021 native STL/3MF sections: 3.2 mm width, surrounding stock and open apertures ('+(fixture===curvedWaveRoute?'curved Wave':fixture===sideRouted?'front':fixture===topRouted?'top':fixture===pinnedVault?'curved underside':'straight underside')+')');
 }
 const shallowActualStock={...vaultedStock,positive:[{kind:'box',size:[70,4,40],position:[0,2,0]}]};
 assert.throws(()=>prepareRecipe(THREE,wasm,shallowActualStock),/lacks continuous material above the channel/);

@@ -1,9 +1,10 @@
 # WT-021 overnight checkpoint
 
-[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `20f0744811fd46490d18479d93199edccab79c7a`. GitHub static checks passed on that commit. Its Chromium and fabrication workflows were still running. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
+[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `db9b7eae0187d7b4db33207c12d7fce8b5cd05cf`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
 
 ## Latest checkpoint
 
+- All six native families passed Manifold containment for a backed underside conical socket, and both exported formats matched the apex and slope for each family. Native conical test coupons still need parity with the installed socket.
 - Native shaped pixel sockets offer conical roofs on level underside faces. Chromium rejects a 13 mm Gear without changing its model and exports the eligible 18 mm Gear. Manifold and both formats verify bore, taper, flange and retention. The Wave direct-drag journey also passed exact position and normal restoration with undo and redo.
 - The full unified Chromium suite passed with a 3.2 mm curved Wave route measured at the same cutaway plane in the viewport, STL and 3MF. Focused Chromium verified exact undo and redo of a Gear tab-depth edit and disabled downloads from the old revision.
 - Native journey tests compare prepared X and Z section ranges with fresh STL and 3MF coordinates. Moving the section slider on the revised linked Gear leaves the saved model untouched. A valid recess edit hides the previous cutaway and disables both prior downloads until preparation. At the same clipping plane, the rendered Gear pilot and countersink agree with the STL and 3MF mesh walls at three heights.
