@@ -232,3 +232,7 @@
 ### 2026-11-20 - rotation with routed stock validation
 
 - The production worker now validates shaped socket rotation on an enabled route. Focused Chromium refused 90°, reproduced the accepted job, then approved 179°, invalidated both previous exports and prepared matching fresh 3.2 mm channels.
+
+### 2026-11-20 - native cable order and reversal
+
+- An enabled native route validates sequence edits before saving. Reversal changes pixel order and direction and swaps the saved perimeter pins and tail budgets. Focused Wave and Tile browser fixtures passed rejected reorder, fresh reversed Wave STL/3MF, and pinned Tile lead swaps.

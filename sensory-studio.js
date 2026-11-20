@@ -822,12 +822,20 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   refreshPixelMarkers(model);
   renderPalette();
  }
- function savePixels(model,holes,id,focus){
-  if(!commit({build:{...model.build,pixelHoles:holes,pixelBuilderVersion:1}}))return false;
+ function savePixels(model,holes,id,focus,serialRouting=model.build.serialRouting){
+  const build={...model.build,pixelHoles:holes,pixelBuilderVersion:1,...(serialRouting?{serialRouting}:{})};
+  if(!commit({build}))return false;
   selectedPixels.set(model.id,id);
   pixelMessages.delete(model.id);
   redrawPixelEditor(focus);
   return true;
+ }
+ function reorderPixels(model,holes,id,serialRouting=model.build.serialRouting){
+  const save=()=>savePixels(model,holes,id,undefined,serialRouting);
+  if(serialRouting?.enabled){
+   checkFittingBuild(model,{...model.build,pixelHoles:holes,pixelBuilderVersion:1,serialRouting},save,
+    {pending:'Checking the new cable order and openings…'});
+  }else save();
  }
  function editPixel(model,index,hole,focus,onSaved){
   const holes=pixelHoles(model),previous=holes[index];
@@ -1370,6 +1378,17 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   block.append(note);
   block.insertAdjacentHTML('beforeend','<label><input type="checkbox" data-native-route'+(settings.enabled?' checked':'')+
    (model.link||(!settings.enabled&&plan.reason)?' disabled':'')+'> Cut serial channels</label>');
+  if(pixelHoles(model).length>1){
+   const reverse=document.createElement('button');
+   reverse.type='button';reverse.textContent='Reverse pixel order and wiring';reverse.disabled=!!model.link;
+   reverse.onclick=()=>{
+    const holes=pixelHoles(model).reverse().map(hole=>({...hole,rotation:(hole.rotation+180)%360}));
+    const serialRouting={...settings,inTail:settings.outTail,outTail:settings.inTail,
+     inEdgePercent:settings.outEdgePercent??null,outEdgePercent:settings.inEdgePercent??null};
+    reorderPixels(model,holes,selectedPixels.get(model.id),serialRouting);
+   };
+   block.append(reverse);
+  }
   block.querySelector('[data-native-route]').onchange=event=>{
    const input=event.target,enabled=input.checked;
    input.checked=!!settings.enabled;
@@ -1720,7 +1739,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    const control=root.querySelector(button);
    if(control)control.onclick=()=>{
     const next=holes.slice();[next[selected+step],next[selected]]=[next[selected],next[selected+step]];
-    savePixels(model,next,holes[selected].id);
+    reorderPixels(model,next,holes[selected].id);
    };
   }
   const print=root.querySelector('[data-fit-print]');

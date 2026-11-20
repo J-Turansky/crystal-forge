@@ -4,6 +4,8 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
+- Native serial wiring can reverse pixel order, fitting directions, pinned openings and tail limits together. Build rejects an unsafe reordering before saving.
+
 - Rotating a shaped fitting on an enabled cable route checks the resulting geometry before saving.
 
 - Numeric movement and keyboard nudges for shaped fittings recheck the installation surface and preserve the last accepted position if stock is missing.

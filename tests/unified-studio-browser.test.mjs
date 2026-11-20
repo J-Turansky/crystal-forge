@@ -1942,6 +1942,35 @@ try{
    assert(Math.abs(width-3.2)<.08);
    geometry.dispose();material.dispose();
   }
+  await rotationBuild.click();
+  await wavePalette.getByRole('button',{name:'P2',exact:true}).click();
+  const sequence=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  await wavePalette.getByRole('button',{name:'Move earlier',exact:true}).click();
+  await page.locator('#smsModelError').getByText(/No safe tangent|Chosen IN edge|approaches an edge/i).waitFor();
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),sequence);
+  await rotationPrint.click();
+  await job.getByText('Prepared',{exact:true}).waitFor();
+  await rotationBuild.click();
+  await waveSerial.getByRole('button',{name:'Reverse pixel order and wiring'}).click();
+  await page.waitForFunction(id=>window.__sensoryStudio.currentModel.build.pixelHoles[0].id===id,b.id);
+  const reversed=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
+  assert.deepEqual(reversed.map(({id,rotation})=>({id,rotation})),[{id:b.id,rotation:0},{id:a.id,rotation:359}]);
+  await rotationPrint.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  assert(await job.locator('[data-job-stl]').isDisabled());
+  assert(await job.locator('[data-job-3mf]').isDisabled());
+  await job.locator('[data-job-prepare]').click();
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const reversedSTL=await useDownload(job.locator('[data-job-stl]'));
+  const reversedMF=await useDownload(job.locator('[data-job-3mf]'));
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(reversedSTL.bytes).buffer),
+   read3MFGeometry(zipEntries(reversedMF.bytes).get('3D/3dmodel.model').toString())]){
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),mesh=new THREE.Mesh(geometry,material);
+   const width=[-1,1].reduce((sum,sign)=>sum+new THREE.Raycaster(routePoint,new THREE.Vector3(0,sign,0))
+    .intersectObject(mesh)[0].distance,0);
+   assert(Math.abs(width-3.2)<.08);
+   geometry.dispose();material.dispose();
+  }
  }
  // Independent stationary backed journeys. Each uses its own model, placement, calibration and actual files.
  const backedFamilies=[
@@ -2461,6 +2490,18 @@ try{
   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.serialRouting.channelWidthMm===4);
   const validEdge=offset+.3;
   await edge.fill(String(validEdge));await edge.press('Tab');
+  await page.waitForFunction(value=>window.__sensoryStudio.currentModel.build.serialRouting.inEdgePercent===value,validEdge);
+  const tail=serial.getByLabel('IN tail limit (mm)');
+  await tail.fill('150');await tail.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.serialRouting.inTail===150);
+  const reverse=serial.getByRole('button',{name:'Reverse pixel order and wiring'});
+  await reverse.click();
+  await page.waitForFunction(value=>window.__sensoryStudio.currentModel.build.serialRouting.outEdgePercent===value,validEdge);
+  const reversedRoute=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.serialRouting);
+  assert.equal(reversedRoute.inEdgePercent,null);
+  assert.equal(reversedRoute.inTail,200);
+  assert.equal(reversedRoute.outTail,150);
+  await reverse.click();
   await page.waitForFunction(value=>window.__sensoryStudio.currentModel.build.serialRouting.inEdgePercent===value,validEdge);
   await page.locator('.sms-workspace-nav [data-tab=print]').click();
   await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
