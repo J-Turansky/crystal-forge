@@ -259,7 +259,9 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
    return pixels.some(p=>!ends.includes(p.id)&&gap(point,p)<p.radius+radius+1.25);
   });
   const obstructingMount=mounts.find(mount=>mountConflicts(mount,path));
-  let reason=obstructingMount?'Channel is too close to '+obstructingMount.mountHole+'. Move the mounting hole or the route.'
+  const needsLift=front?.backingHeight&&dense.some(point=>point.z<front.backingHeight+(radius+routeSideStock)/.9);
+  let reason=needsLift?'Move the route above the fitting backing so the channel and its exits stay open.'
+   :obstructingMount?'Channel is too close to '+obstructingMount.mountHole+'. Move the mounting hole or the route.'
    :invalid?'Channel approaches an edge or unrelated bore.':measure>budget+1e-6?'Cable budget exceeded.':'';
   if(!reason&&plan.links.some(other=>{
    const shared=pixels.filter(p=>ends.includes(p.id)&&other.ends?.includes(p.id));

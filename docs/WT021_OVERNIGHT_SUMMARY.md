@@ -77,3 +77,9 @@ Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) co
 - Base was `6030de31553a49b289514212297f667df32b7e6f`. The focused Gear Chromium case now covers Design editing, two top sockets, accepted and rejected drags, serial channels, two manual holes, two edited external tabs, calibration, Library snapshot and backup, reload and actual prepared cutaway.
 - Real downloads included standalone STL and Cura profiles byte-matched to the ZIP, plus 3MF. The independently decoded model files measured the 12.5 mm calibrated bore and 3.2 mm channel, and confirmed through-holes and 4 mm printed material on both tabs.
 - Adding external-tab backing now preserves the original Gear top routing footprint. Exact-head CI gates completion. Next preserve eligible Tile front routing with backing, then complete the Tile journey.
+
+### Tile design-to-download acceptance journey
+
+- Base was `0b57821548d17823fccb3e869019faa376198a26`. External-tab backing now preserves a square Tile’s front wall route where the channel clears the backing. The browser rejected a conflicting backing thickness while retaining the model revision.
+- Focused Chromium passed the full Tile sequence with two shaped sockets, two manual mounts, two edited external tabs, calibrated fit, Library snapshot and backup, inspection and four Print Centre downloads. Independent STL and 3MF sections measured a 5.5 mm socket, 3.2 mm route, four through-holes and 4 mm tab stock.
+- Next complete the gentle Wave browser sequence and its independent export measurements.

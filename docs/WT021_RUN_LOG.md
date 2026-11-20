@@ -108,3 +108,9 @@
 - Base `6030de31553a49b289514212297f667df32b7e6f`. A failing real-Manifold routed Gear with backing and two tabs now passes. Upper-route eligibility, perimeter and stock remain tied to the original face.
 - Focused Chromium passed all recorded Gear actions and independent STL/3MF measurements. Both tab fixing bores and manual mount bores pass through; calibrated bore measures 12.5 mm and cable width 3.2 mm. STL and Cura standalone outputs match the production ZIP. E2E-G exact-head CI is pending.
 - Next preserve eligible Tile front routing with backing and exercise the same full browser/export gate on the Tile.
+
+### 2026-11-20 - independent Tile acceptance journey
+
+- Base `0b57821548d17823fccb3e869019faa376198a26`. Restored front routing with external-tab backing and verified an unsafe backing edit is refused. Both real Manifold and focused Chromium passed.
+- Both parsed app downloads retained the 5.5 mm calibrated seat, 3.2 mm routed width, two manual through-holes and two 4 mm external tabs with through-holes. Standalone STL/Cura bytes match the ZIP. E2E-T exact-head checks remain pending.
+- Next complete the gentle Wave journey with curved drag, mounting, calibration and matched downloads.

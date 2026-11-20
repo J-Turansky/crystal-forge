@@ -462,7 +462,8 @@ export const tileGenerator={...tactileTileGenerator,
  recipe(input){
   const r=generateTile(input),{outline,width,depth,thickness,dualMaterial}=r.parameters;
   const boreOutline=r.bodies[0].mesh.boreOutline;
-  const front=outline==='square'?{z:depth/2,thickness:depth,outline:[[-width/2,0],[width/2,0],[width/2,thickness],[-width/2,thickness]]}:null;
+  const front=outline==='square'?{z:depth/2,thickness:depth,wallHeight:thickness,modelOutline:boreOutline,
+   outline:[[-width/2,0],[width/2,0],[width/2,thickness],[-width/2,thickness]]}:null;
   return {serialSupport:{outline:boreOutline,thickness,front},pixelBoreSupport:{outline:boreOutline,minThickness:thickness},
    positive:[{kind:'mesh',mesh:r.bodies[0].mesh}],partitioned:dualMaterial,secondary:dualMaterial?[{kind:'mesh',mesh:r.bodies[1].mesh}]:[],
    negative:[],dualMaterial,bounds:this.estimateBounds(input),warnings:['Tactile feel, cleanability and edge comfort require a printed sample.']};
@@ -501,7 +502,8 @@ function addBackingTabs(recipe,build,routing){
  for(const tab of plan.tabs){
   if(stockHoles.some(h=>Math.hypot(h.x-tab.x,h.z-tab.z)<tab.radius+h.radius+2))
    throw Error('Tab '+(tab.index+1)+' intersects a fitting or mounting hole. Move it along the backing edge.');
-  if(routing.enabled&&routing.links.some(link=>link.path.some(p=>Math.hypot(p.x-tab.x,p.z-tab.z)<tab.radius+6)))
+  // Front routes with backing are already checked above the entire tab height.
+  if(routing.enabled&&routing.face!=='front'&&routing.links.some(link=>link.path.some(p=>Math.hypot(p.x-tab.x,p.z-tab.z)<tab.radius+6)))
    throw Error('Tab '+(tab.index+1)+' is too close to a cut cable route. Move the tab away from the cable exit.');
   recipe.positive.push(cylinder(tab.radius,tab.thickness,[tab.x,tab.thickness/2,tab.z]));
  }
@@ -570,6 +572,7 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
    r.serialSupport.topOutline=upper.outline;
    r.serialSupport.topThickness=upper.thickness;
   }
+  if(upper?.front)r.serialSupport.front={...upper.front,backingHeight:thickness};
   r.bounds={...b,width:b.width+spread*2,depth:b.depth+spread*2,height:Math.max(b.height,thickness)};
   r.warnings.push('Expanded fitting backing was explicitly enabled. Inspect underside openings, material joins and support requirements in Cura and on a printed sample.');
  }

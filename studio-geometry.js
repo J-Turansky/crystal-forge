@@ -240,8 +240,8 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{},inspectFittin
    const tolerance=.0001,cuts=[];
    total=hold(total.setTolerance(tolerance));
    const {roofStock,front,surfaceY}=recipe.nativeRouting;
-   const routeFootprint=roofStock?convert({kind:'extrude',outline:front?recipe.serialSupport.outline:roofStock.outline,
-    height:front?recipe.serialSupport.thickness:surfaceY??(total.boundingBox().max[1]+1)}):null;
+   const routeFootprint=roofStock?convert({kind:'extrude',outline:front?.modelOutline??roofStock.outline,
+    height:front?.wallHeight??surfaceY??(total.boundingBox().max[1]+1)}):null;
    for(const part of recipe.negative){
     const cut=hold(convert(part).setTolerance(tolerance));
     if(hold(total.intersect(cut)).volume()<.1)

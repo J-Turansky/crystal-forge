@@ -385,6 +385,13 @@ const sideRouteBuild={...topRouteBuild,pixelHoles:topRouteBuild.pixelHoles.map(h
 const sideRouted=applyBuildModules(sideRouteStock,sideRouteBuild,tileGenerator.capabilities);
 assert.equal(sideRouted.nativeRouting.face,'front');
 assert.equal(sideRouted.nativeRouting.links.length,3);
+const backedTileSide=applyBuildModules(sideRouteStock,{...sideRouteBuild,pixelBacking:true,backingTabs:[{u:.125},{u:.75}]},tileGenerator.capabilities);
+assert.equal(backedTileSide.nativeRouting.face,'front');
+assert.equal(backedTileSide.negative.filter(part=>part.tabHole).length,2);
+assert.equal(prepareRecipe(THREE,wasm,backedTileSide).bodies.length,1);
+const seatsNearBacking=sideRouteBuild.pixelHoles.map(hole=>({...hole,surface:{...hole.surface,y:5}}));
+assert.throws(()=>applyBuildModules(sideRouteStock,{...sideRouteBuild,pixelBacking:true,pixelHoles:seatsNearBacking},tileGenerator.capabilities),
+ /above the fitting backing/);
 assert.equal(prepareRecipe(THREE,wasm,sideRouted).bodies.length,1);
 const sideRouteConflict={...sideRouted,negative:[...sideRouted.negative,{kind:'box',size:[2,.3,1],position:[0,11.8,24.2]}]};
 assert.throws(()=>prepareRecipe(THREE,wasm,sideRouteConflict),/intersects another cut beside the channel/);

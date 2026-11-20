@@ -4,7 +4,7 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
-- Adding fitting backing for external tabs preserves eligible Gear top routes on their original perimeter.
+- External-tab backing preserves eligible Gear top and Tile front routes. Tile backing changes that would obstruct a front channel are rejected.
 - Native wiring and manual through-mounts can share a model when the holes clear the channels. Build refuses conflicting mount edits and preserves the saved route.
 - Gentle parallel Waves support an open serial groove that follows the measured surface between shaped sockets and out to the perimeter.
 - Square Tactile Tiles can cut a flat serial groove between shaped fittings on the front wall. Preparation checks the remaining wall and rejects intersecting cuts.
