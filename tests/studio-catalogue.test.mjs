@@ -356,6 +356,13 @@ const pinned=applyBuildModules(flatStock,pinnedBuild);
 assert.equal(pinned.nativeRouting.cutters.length,3,'Pinned openings retain both exterior cutters');
 assert(pinned.nativeRouting.links[0].path.length>2,'Offset IN is a smooth curved path');
 assert(prepareRecipe(THREE,wasm,pinned).bodies[0].volume>0);
+const vaultedStock=applyBuildModules(flatStock,{...flatBuild,serialRouting:{...serial,vaulted:true}});
+assert(prepareRecipe(THREE,wasm,vaultedStock).bodies[0].volume>0);
+const shallowActualStock={...vaultedStock,positive:[{kind:'box',size:[70,4,40],position:[0,2,0]}]};
+assert.throws(()=>prepareRecipe(THREE,wasm,shallowActualStock),/lacks continuous material above the channel/);
+const roofObstruction={...vaultedStock,negative:[...vaultedStock.negative,
+ {kind:'box',size:[3,2,3],position:[0,5,0]}]};
+assert.throws(()=>prepareRecipe(THREE,wasm,roofObstruction),/intersects another cut above the channel/);
 assert.throws(()=>applyBuildModules(flatStock,{...pinnedBuild,serialRouting:{...serial,inEdgePercent:100}}),/Chosen IN edge/);
 const guideBuild={...curveBuild,serialRouting:{...serial,enabled:false}};
 const guideRecipe=applyBuildModules(tileRoute,guideBuild,{},{preview:true});

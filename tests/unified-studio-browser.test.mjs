@@ -1205,7 +1205,7 @@ try{
  // Direct placement validates with the same worker as Print Centre before saving.
  for(const thickness of [25,3]){
   await page.evaluate(thickness=>window.__sensoryStudio.addModel('gears',{
-   diameter:80,bore:0,thickness,wheelStyle:'Cam',dualMaterial:false
+   diameter:120,bore:0,thickness,wheelStyle:'Cam',dualMaterial:false
   },'Direct socket '+thickness),thickness);
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
   await page.locator('[data-view=top]').click();
@@ -1248,6 +1248,34 @@ try{
    await page.waitForFunction(()=>window.__sensoryStudio?.currentModel?.build.pixelHoles?.length===1);
    assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles),[socket],
     'The original fitting and installation normal must survive reload after a rejected placement');
+   await page.locator('.sms-workspace-nav [data-tab=build]').click();
+   await page.locator('[data-view=top]').click();
+   await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+   await page.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+   const safePoint=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(33,0,'top'));
+   assert(safePoint);
+   await page.mouse.click(safePoint.x,safePoint.y);
+   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===2);
+   await page.keyboard.press('Escape');
+   const prior=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
+   const second=prior[1];
+   const [start,end]=await page.evaluate(id=>[
+    window.__sensoryStudio.pixelMarkerScreen(id),
+    window.__sensoryStudio.fittingPointScreen(5,0,'top')
+   ],second.id);
+   assert(start&&end);
+   await page.mouse.click(start.x,start.y);
+   await page.mouse.move(start.x,start.y);
+   await page.mouse.down();
+   await page.waitForTimeout(225);
+   await page.mouse.move(end.x,end.y,{steps:6});
+   await page.mouse.up();
+   await page.locator('[data-pixel-status]').filter({hasText:/lacks clearance from another cut/}).waitFor();
+   assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles),prior);
+   await page.reload();
+   await page.waitForFunction(()=>window.__sensoryStudio?.currentModel?.build.pixelHoles?.length===2);
+   assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles),prior,
+    'Rejected drag preserves both fitted poses, orientations and installation normals after reload');
   }else{
    await page.locator('[data-pixel-status]').filter({hasText:/continuous stock/}).waitFor();
    assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length??0),0);

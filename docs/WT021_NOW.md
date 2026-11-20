@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** FIT-02 / FIT-03 P0, verify route clearance outside intended socket reliefs against surrounding stock and add rejected-drag state preservation.
+- **Target:** FIT-02 / FIT-03 P0, verify routed side walls and exterior apertures, then extend shaped sockets and routing to eligible side and curved faces.
 - **Checkpoint:** shared Manifold preview now shows insertion approach, stock and adjacent-cut warnings from fabrication checks and measures wire/positive overlap. Gear/Tile and four additional compact backed-underside Manifold fixtures pass. Chromium proves adjacent Gear socket placement is rejected and the original fitting survives reload. Tile backing now has an editable thickness and reset; the test measures 8 mm in both downloaded formats. Wire overlap alone is informational because contact with the intended relief is normal.
-- **Next test:** extend the adjacent Gear-top workflow in tests/unified-studio-browser.test.mjs to drag a second, separately accepted socket toward the first and verify rollback through reload. In studio-geometry.js and studio-native-routing.js, verify the actual routed cutter sections against surviving stock beyond intended junctions and exits.
+- **Next test:** Gear rejected-drag rollback passed locally. Native preparation now verifies the roof against actual stock and other cuts. Extend fabrication tests to measure surviving side walls and apertures from both exported formats.
 - **Then:** add Wave/Cap/Character/Pod interactive preview and export proof, arbitrary-face drag, side/curved continuous routing and seven independent browser-to-STL/3MF journeys.
 - **UX-01:** implement the approved catalogue after P0 work. Keep #10 for Cura and printed proof.
 

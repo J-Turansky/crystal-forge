@@ -230,10 +230,26 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{},inspectFittin
    // STL still checks every exported triangle after this bounded simplification.
    const tolerance=.0001,cuts=[];
    total=hold(total.setTolerance(tolerance));
+   const roofStock=recipe.nativeRouting.roofStock;
+   const routeFootprint=roofStock?convert({kind:'extrude',outline:roofStock.outline,height:total.boundingBox().max[1]+1}):null;
    for(const part of recipe.negative){
     const cut=hold(convert(part).setTolerance(tolerance));
     if(hold(total.intersect(cut)).volume()<.1)
      throw Error((part.pixelHole||part.mountHole||part.tabHole||part.wireChannel||'Cut')+' does not cut the model.');
+    if(routeFootprint&&part.wireChannel&&part.junctionIds){
+     const raised=hold(cut.translate([0,roofStock.thickness,0]));
+     let guard=hold(hold(raised.subtract(cut)).intersect(routeFootprint));
+     for(const other of recipe.negative){
+      if(part.junctionIds.includes(other.pixelId))guard=hold(guard.subtract(convert(other)));
+     }
+     for(const other of recipe.negative){
+      if(other===part||part.junctionIds.includes(other.pixelId))continue;
+      if(hold(guard.intersect(convert(other))).volume()>.05)
+       throw Error(part.wireChannel+' intersects another cut above the channel. Move the route or the conflicting feature.');
+     }
+     if(guard.volume()-hold(total.intersect(guard)).volume()>.05)
+      throw Error(part.wireChannel+' lacks continuous material above the channel. Increase fitting backing or move the route.');
+    }
     cuts.push(cut);
    }
    const originalVolume=total.volume();

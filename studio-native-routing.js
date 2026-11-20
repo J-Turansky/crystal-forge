@@ -207,8 +207,9 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
   const points=link.path.slice();
   if(i===0)points.unshift(add(entry.point,entry.outward,4));
   if(i===plan.links.length-1)points.push(add(exit.point,exit.outward,4));
-  return cutter(points,link.label,radius,depth,settings.vaulted===true);
+  return {...cutter(points,link.label,radius,depth,settings.vaulted===true),junctionIds:link.ends};
  });
+ if(plan.ready&&plan.enabled)plan.roofStock={outline:recipe.serialSupport.outline,thickness:roof};
  for(const link of plan.links){delete link.dense;delete link.ends;}
  return plan;
 }
