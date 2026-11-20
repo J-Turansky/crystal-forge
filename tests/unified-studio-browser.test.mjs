@@ -2631,26 +2631,31 @@ try{
   await job.locator('[data-job-prepare]').click();
   await measure([9.6,7.8,8.6]);
  }
- // FIT-01/FIT-03: place and route directly on the opposite planar Tile wall.
- {
-  const name='Rear wall Tile';
+ // FIT-01/FIT-03: place and route directly on planar Tile walls.
+ for(const [view,axis,sign,distance,halfSpan] of [['back',1,1,40,50],['left',0,-1,50,40],['right',0,1,50,40]]){
+  const name='Routed Tile '+view;
   await page.evaluate(name=>window.__sensoryStudio.addModel('tactile-tiles',{width:100,depth:80,thickness:20,
    outline:'square',relief:2,pattern:'terraces',dualMaterial:false},name),name);
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
-  await page.locator('[data-view=back]').click();
+  await page.locator('[data-view='+view+']').click();
   await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
   const palette=page.locator('.sms-palette');
   await palette.locator('[data-fit-profile=seed]').click();
   await palette.getByRole('button',{name:'Place shaped socket in 3D'}).click();
   const canvas=await page.locator('#viewport canvas').boundingBox();
-  for(const [i,offset] of [-65,65].entries()){
-   await page.mouse.click(canvas.x+canvas.width/2+offset,canvas.y+canvas.height/2+28);
+  const {camera,target}=await page.evaluate(()=>window.__crystalForgeViewMetrics());
+  const projection=new THREE.PerspectiveCamera(46,canvas.width/canvas.height,.1,5000);
+  projection.position.fromArray(camera);projection.lookAt(new THREE.Vector3(...target));projection.updateMatrixWorld();
+  for(const [i,along] of [-15,15].entries()){
+   const point=new THREE.Vector3(...(axis===1?[-along,10,-distance]:[sign*distance,10,-sign*along])).project(projection);
+   await page.mouse.click(canvas.x+(point.x+1)*canvas.width/2,canvas.y+(1-point.y)*canvas.height/2);
    await page.waitForFunction(count=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===count,i+1);
   }
   await page.keyboard.press('Escape');
   const holes=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
-  assert(holes[0].x>holes[1].x);
-  assert(holes.every(hole=>Math.abs(hole.z+40)<.01&&Math.abs(hole.surface.normal[2]+1)<.00001),JSON.stringify(holes));
+  const modelAxis=axis===1?'z':'x',modelSign=axis===1?-1:sign,normalIndex=axis===1?2:0;
+  assert(holes.every(hole=>Math.abs(hole[modelAxis]-modelSign*distance)<.01&&
+   Math.abs(hole.surface.normal[normalIndex]-modelSign)<.00001),JSON.stringify(holes));
   const serial=palette.getByRole('group',{name:'Serial LED string'});
   await serial.getByLabel('Cut serial channels').check();
   await serial.getByText('Channels ready for preparation.').waitFor();
@@ -2666,13 +2671,16 @@ try{
    const mesh=new THREE.Mesh(geometry,material);
    const hit=(origin,direction,far=Infinity)=>new THREE.Raycaster(
     new THREE.Vector3(...origin),new THREE.Vector3(...direction),0,far).intersectObject(mesh)[0]?.point;
-   for(const x of [-45,0,45]){
-    const bottom=hit([x,39,height],[0,0,-1]),top=hit([x,39,height],[0,0,1]);
-    assert(bottom&&top&&Math.abs(top.z-bottom.z-3.2)<.02,JSON.stringify({x,bottom,top,height}));
-    const floor=hit([x,41,height],[0,-1,0]);
-    assert(floor&&Math.abs(floor.y-38.2)<.02);
+   const point=(along,outward)=>axis===0?[sign*(distance+outward),along,height]:[along,sign*(distance+outward),height];
+   const inward=axis===0?[-sign,0,0]:[0,-sign,0];
+   for(const along of [5-halfSpan,0,halfSpan-5]){
+    const middle=point(along,-1);
+    const bottom=hit(middle,[0,0,-1]),top=hit(middle,[0,0,1]);
+    assert(bottom&&top&&Math.abs(top.z-bottom.z-3.2)<.02,JSON.stringify({view,along,bottom,top,height}));
+    const floor=hit(point(along,1),inward);
+    assert(floor&&Math.abs(floor.getComponent(axis)-sign*(distance-1.8))<.02);
    }
-   assert.equal(hit([-51,39,height],[1,0,0],102),undefined);
+   assert.equal(hit(point(-halfSpan-1,-1),axis===0?[0,1,0]:[1,0,0],2*halfSpan+2),undefined);
    geometry.dispose();
   }
   material.dispose();

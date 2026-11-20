@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** FIT-03 and FIT-01, extend the Tile wall routing frame to perpendicular planar walls.
+- **Target:** FIT-03 and FAB-01, clarify and validate the limits of curved Wave cable routing.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Rear Tile wall routing passed Manifold and Chromium. Next support a perpendicular wall using explicit horizontal/normal axes and verify stock checks and both real apertures.
+- **Next test:** All four planar Tile walls have real routing and measured exports. Next exercise a Wave with variation across both axes and locate the first unsupported manufacturing stage before extending eligibility.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

@@ -391,6 +391,16 @@ const rearHoles=sideRouteBuild.pixelHoles.map(hole=>({...hole,x:-hole.x,z:-hole.
 const rearRouted=applyBuildModules(sideRouteStock,{...sideRouteBuild,pixelHoles:rearHoles},tileGenerator.capabilities);
 assert.equal(rearRouted.nativeRouting.face,'rear');
 assert.equal(rearRouted.nativeRouting.links.length,3);
+const perpendicularRoutes=[-1,1].map(sign=>{
+ const pixelHoles=sideRouteBuild.pixelHoles.map(hole=>({...hole,x:sign*40,z:-sign*hole.x,
+  surface:{...hole.surface,normal:[sign,0,0]}}));
+ const routed=applyBuildModules(sideRouteStock,{...sideRouteBuild,pixelHoles},tileGenerator.capabilities);
+ assert.equal(routed.nativeRouting.face,sign>0?'right':'left');
+ assert.equal(routed.nativeRouting.links.length,3);
+ const interfering={...routed,negative:[...routed.negative,{kind:'box',size:[1,.3,2],position:[sign*39.2,11.8,0]}]};
+ assert.throws(()=>prepareRecipe(THREE,wasm,interfering),/intersects another cut beside the channel/);
+ return routed;
+});
 assert.throws(()=>applyBuildModules(sideRouteStock,{...sideRouteBuild,pixelHoles:[rearHoles[0],sideRouteBuild.pixelHoles[1]]},
  tileGenerator.capabilities),/same supported face/);
 const obstructedRear={...rearRouted,negative:[...rearRouted.negative,{kind:'box',size:[2,.3,1],position:[0,11.8,-24.2]}]};
@@ -524,7 +534,7 @@ for(const [fixture] of fixingFixtures){
  const interrupted={...fixture,negative:[...fixture.negative,{kind:'box',size:[1,2,2],position:[18.5,1,0]}]};
  assert.throws(()=>prepareRecipe(THREE,wasm,interrupted),/too close to another cut/);
 }
-for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),conicalRecipe,conicalCoupon,tabRecessRecipe,topRecessRecipe,wideVault,vaultedStock,pinnedVault,topRouted,sideRouted,rearRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
+for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),conicalRecipe,conicalCoupon,tabRecessRecipe,topRecessRecipe,wideVault,vaultedStock,pinnedVault,topRouted,sideRouted,rearRouted,...perpendicularRoutes,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -666,6 +676,17 @@ for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),coni
    }
    assert.equal(hit([-81,0,14.8],[1,0,0]),undefined,format+' continuous Wave route through both exterior apertures');
    assert.equal(hit([81,0,14.8],[-1,0,0]),undefined,format+' open Wave route outlet');
+  }else if(perpendicularRoutes.includes(fixture)){
+   const sign=fixture.nativeRouting.face==='right'?1:-1;
+   for(const y of [-23,-9,0,9,23]){
+    const origin=[sign*39.2,y,10];
+    const lower=hit(origin,[0,0,-1]),upper=hit(origin,[0,0,1]);
+    assert(lower&&upper&&Math.abs(upper.z-lower.z-3.2)<.005,format+' perpendicular route width at '+y);
+    const floor=hit([sign*41,y,10],[-sign,0,0]);
+    assert(floor&&Math.abs(floor.x-sign*38.2)<.005,format+' perpendicular route depth at '+y);
+   }
+   assert.equal(hit([sign*39.2,-26,10],[0,1,0]),undefined,format+' continuous perpendicular route through inlet and outlet');
+   assert.equal(hit([sign*39.2,26,10],[0,-1,0]),undefined,format+' open perpendicular outlet');
   }else if(fixture===sideRouted||fixture===rearRouted){
    const sign=fixture===sideRouted?1:-1;
    for(const x of [-38,-25,0,25,38]){

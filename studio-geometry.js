@@ -1,3 +1,4 @@
+import {tileWallPosition} from './studio-native-routing.js';
 import {putSocket} from './fabrication-v1.js';
 import {makePixelReplicaRecipe} from './pixel-replica.js';
 /* Shared solid recipes. Preview components may overlap; only prepareRecipe
@@ -125,7 +126,7 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
   if(link.path.length<2)continue;
   const guideY=(recipe.nativeRouting.surfaceY??0)+.15;
   const front=recipe.nativeRouting.front;
-  const points=[],point=p=>front?new THREE.Vector3(front.sign*p.x,p.z,front.z+front.sign*.15):new THREE.Vector3(p.x,p.y===undefined?guideY:p.y+.15,p.z);
+  const points=[],point=p=>front?new THREE.Vector3(...tileWallPosition(front,p.x,p.z,.15)):new THREE.Vector3(p.x,p.y===undefined?guideY:p.y+.15,p.z);
   for(let i=1;i<link.path.length;i++)points.push(point(link.path[i-1]),point(link.path[i]));
   const k=Math.floor((link.path.length-1)/2),a=point(link.path[k]),b=point(link.path[k+1]);
   const d=b.clone().sub(a).normalize(),tip=a.clone().lerp(b,.63),back=tip.clone().addScaledVector(d,-2.5);
@@ -276,7 +277,9 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{},inspectFittin
     if(routeFootprint&&part.wireChannel&&part.junctionIds){
      const top=['top','wave'].includes(recipe.nativeRouting.face);
      const thickness=roofStock.thickness;
-     const inward=hold(cut.translate(front?[0,0,-front.sign*thickness]:[0,top?-thickness:thickness,0]));
+     const stockOffset=[0,top?-thickness:thickness,0];
+     if(front){stockOffset[1]=0;stockOffset[front.axis]=-front.sign*thickness;}
+     const inward=hold(cut.translate(stockOffset));
      const stockChecks=[[inward,front?'behind':top?'below':'above']];
      if(part.sideStock)stockChecks.push([convert(part.sideStock),'beside']);
      for(const [envelope,direction] of stockChecks){

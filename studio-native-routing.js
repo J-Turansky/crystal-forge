@@ -157,21 +157,32 @@ function waveRouteSurface(recipe,holes){
 function frontRouteFace(recipe,holes){
  const front=recipe.serialSupport?.front;
  if(!front||!holes.length)return null;
- for(const sign of [1,-1]){
-  const z=front.z*sign;
-  if(holes.every(hole=>{
+ const width=front.outline[1][0]-front.outline[0][0],depth=front.thickness;
+ for(const [name,axis,sign,yaw] of [['front',2,1,0],['rear',2,-1,Math.PI],['right',0,1,Math.PI/2],['left',0,-1,-Math.PI/2]]){
+  const along=2-axis,distance=(axis===2?depth:width)/2,plane=sign*distance,tangentSign=axis===2?sign:-sign;
+  const normalField=axis===2?'z':'x',tangentField=axis===2?'x':'z';
+  if(!holes.every(hole=>{
    const normal=hole.surface?.normal;
-   return hole.socketProfile&&normal&&Number.isFinite(hole.surface.y)&&Math.abs(hole.z-z)<.01&&
-    Math.hypot(normal[0],normal[1],normal[2]-sign)<.00001;
-  }))return {...front,z,sign};
+   return hole.socketProfile&&normal&&Number.isFinite(hole.surface.y)&&Math.abs(hole[normalField]-plane)<.01&&
+    Math.hypot(normal[along],normal[1],normal[axis]-sign)<.00001;
+  }))continue;
+  const halfSpan=(axis===2?width:depth)/2,wallHeight=front.wallHeight;
+  return {...front,name,axis,along,sign,plane,tangentSign,tangentField,yaw,thickness:distance*2,
+   outline:[[-halfSpan,0],[halfSpan,0],[halfSpan,wallHeight],[-halfSpan,wallHeight]]};
  }
  return null;
 }
 
-// Route X/Z is along the face, and +Y is into the material.
+// Route X/Z is along the wall, and +Y is into stock.
+export function tileWallPosition(wall,x,height,offset){
+ const point=[0,height,0];
+ point[wall.along]=wall.tangentSign*x;
+ point[wall.axis]=wall.plane+wall.sign*offset;
+ return point;
+}
 function frontRouteExtrude(part,front){
  const [x,y,z]=part.position??[0,0,0];
- return {...part,rotation:[-Math.PI/2,front.sign<0?Math.PI:0,0],position:[front.sign*x,z,front.z-front.sign*y]};
+ return {...part,rotation:[-Math.PI/2,front.yaw,0],position:tileWallPosition(front,x,z,-y)};
 }
 
 export function nativeRouteEligibility(recipe,build){
@@ -226,9 +237,9 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
  }
  const topY=topRouteHeight(recipe,holes),front=frontRouteFace(recipe,holes),wave=waveRouteSurface(recipe,holes);
  if(topY!==null){plan.face='top';plan.surfaceY=topY;}
- if(front){plan.face=front.sign>0?'front':'rear';plan.front=front;}
+ if(front){plan.face=front.name;plan.front=front;}
  if(wave)plan.face='wave';
- const pixels=holes.map(p=>({...p,x:front?front.sign*p.x:p.x,z:front?p.surface.y:p.z,
+ const pixels=holes.map(p=>({...p,x:front?front.tangentSign*p[front.tangentField]:p.x,z:front?p.surface.y:p.z,
   radius:(p.diameter+p.clearance)/2,wireAngle:topY===null&&!wave?(p.rotation??0):180-(p.rotation??0)}));
  const upperOutline=topY!==null||wave?recipe.serialSupport.topOutline:null;
  const supportOutline=front?.outline??upperOutline??recipe.serialSupport.outline;
@@ -247,8 +258,8 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
   const clearance=Math.max(mount.radius,mount.topRadius??0)+radius+routeSideStock;
   if(front){
    // A through-hole spans all vertical positions on the front routing plane.
-   if(front.sign*z+Math.max(mount.radius,mount.topRadius??0)<Math.abs(front.z)-depth-roof)return false;
-   const localX=front.sign*x;
+   if(front.sign*mount.position[front.axis]+Math.max(mount.radius,mount.topRadius??0)<Math.abs(front.plane)-depth-roof)return false;
+   const localX=front.tangentSign*mount.position[front.along];
    return path.slice(1).some((point,i)=>{
     const a=path[i];
     return localX>=Math.min(a.x,point.x)-clearance&&localX<=Math.max(a.x,point.x)+clearance;

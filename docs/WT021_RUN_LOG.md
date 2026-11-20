@@ -240,3 +240,7 @@
 ### 2026-11-20 - rear Tile wall routing
 
 - Rear-wall Tile routes use mirrored socket coordinates, cutter transforms and stock checks. Chromium placed real sockets from the rear view and independently measured 3.2 mm width, 1.8 mm depth and an open path through both exterior apertures. Manifold rejects mixed faces and a cut that breaches the rear-route guard. Updated the older Gear journey to expect unsafe reorder rollback rather than preparation of an already invalid edit. The previous PR browser workflow failed on that assertion. The corrected full local Chromium suite passed.
+
+### 2026-11-20 - perpendicular Tile walls
+
+- Generalised the Tile wall routing frame to front, rear, left and right. Focused Chromium placed sockets on each new wall and downloaded both files. STL and 3MF preserve width, inward depth and open apertures. Manifold rejects a nearby cut on either perpendicular side.
