@@ -2821,11 +2821,16 @@ try{
   material.dispose();
  }
  // DIM-05: blind hardware pockets retain the stock behind each cut.
- {
-  const name='Blind hardware Tile';
-  await page.evaluate(name=>window.__sensoryStudio.addModel('tactile-tiles',{width:100,depth:80,thickness:6,
-   outline:'square',relief:1,pattern:'terraces',dualMaterial:false},name),name);
-  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+ for(const [type,parameters] of [
+  ['tactile-tiles',{width:100,depth:80,thickness:6,outline:'square',relief:1,pattern:'terraces',dualMaterial:false}],
+  ['gears',{mode:'Decorative',wheelStyle:'Rounded lobes',webStyle:'Solid',diameter:100,thickness:6,bore:0,
+   reliefStyle:'None',dualMaterial:false}]
+ ]){
+  const name='Blind hardware '+type;
+  await page.evaluate(({type,parameters,name})=>window.__sensoryStudio.addModel(type,parameters,name),{type,parameters,name});
+  await page.getByRole('searchbox',{name:'Find tools and downloads'}).fill('magnet');
+  await page.getByRole('button',{name:'Open mounting and attachments'}).click();
+  await page.waitForFunction(()=>document.activeElement?.matches('[data-new-mount-profile]'));
   await page.locator('[data-view=bottom]').click();
   await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
   const palette=page.locator('.sms-palette');

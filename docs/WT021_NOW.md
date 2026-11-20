@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** PAR-01, extend native blind mounting placement and mounting-tool discovery across families.
+- **Target:** PAR-01, extend direct blind mounting journeys to Wave, Character, Light Pod and Rotary Cap.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Tile Chromium passed both directly placed blind profiles, conflict rollback, saved state and export dimensions. Next verify another native builder and wire mounting profile discovery into the tool finder.
+- **Next test:** Tile and Gear directly placed both blind profiles from the tool finder. Next verify eligible backing on the remaining native families and test a conflict with an existing fitting.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

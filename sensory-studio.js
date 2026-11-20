@@ -141,7 +141,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    focusAfterNavigation(action==='pixels'?
     ['.sms-palette [data-pixel-profile-editor]','.sms-palette [data-fit-profile]','.sms-palette [data-fit-print]','#placePixelBtn']:
     action==='mounts'?
-    ['.sms-palette [data-place-mount]','.sms-palette [data-select-mount]','#mountType','#mountPlacement','[data-state="mount"]']:
+    ['.sms-palette [data-new-mount-profile]','.sms-palette [data-place-mount]','.sms-palette [data-select-mount]','#mountType','#mountPlacement','[data-state="mount"]']:
     ['#wireRouteStatus','.sms-palette [data-native-route]','#wireSpacingPreset']);
   };
   const finder=createToolFinder(chooseTool);
