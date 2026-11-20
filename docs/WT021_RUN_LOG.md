@@ -280,3 +280,5 @@
 - Crystal Chromium verified conversion of automatic tab positions, editing the populated list, deleting all entries and adding a new tab from the empty editor. Native precision settings distinguish the automatic screw pair from manual attachments.
 
 - All six native Chromium mounting journeys accepted keyboard nudges for both blind profiles and reproduced them after reload in STL and 3MF. PAR-01 is verified.
+
+- Manifold and both export decoders measured retained conical sockets on all six native builders. The cone preserves its expected flange, retention throat, body width and apex. FAB-02 is verified.

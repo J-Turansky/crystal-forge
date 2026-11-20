@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** FAB-02, reconcile the conical socket checklist and verify any remaining applicable software cases.
+- **Target:** DIM-03, verify independent body, flange and fit dimensions on representative edited fittings across builders.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** All six native mount nudges passed reload and paired exports, and Crystal tab conversion and recovery passed. Next audit and compare conical socket and routed coupon geometry, including retained bores.
+- **Next test:** All six retained-cone fixtures passed both file formats and FAB-02 is verified. Next exercise profile and clearance changes separately and compare the results across builder families.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction
