@@ -64,7 +64,7 @@ Only in the draft integration branch; **not a production release**. Owner approv
 - Help includes safe troubleshooting steps and a downloadable browser report that excludes projects and account details.
 - Invalid exact-value edits show the accepted range without changing the saved value or moving keyboard focus.
 - Precision editors use the selected builder's own controls when different model families share a setting name.
-- Library shows a keyboard-accessible file chooser for restoring a backup or older Crystal project.
+- Keyboard-accessible file choosers let you restore a backup or older Crystal project and import SVG, STL or OBJ models.
 
 ## v0.16.0-dev.35.17 — Keyboard tooltip accessibility
 

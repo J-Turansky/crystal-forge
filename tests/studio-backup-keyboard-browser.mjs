@@ -31,6 +31,23 @@ try{
  await page.getByRole('status').filter({hasText:'Could not read backup'}).waitFor();
  assert.equal(await snapshot(),accepted);
  console.log('Backup review opens with focus, Escape returns to the file field, and a corrupt backup leaves the project unchanged.');
+ await page.locator('#smsHome').press('Enter');
+ for(const [trigger,name,label] of [
+  ['Import SVG','Import SVG artwork','Local SVG file'],
+  ['Import 3D model','Import 3D model','Local mesh file']
+ ]){
+  await page.locator('#smsHomeNew').press('Enter');
+  await page.getByRole('button',{name:trigger,exact:true}).press('Enter');
+  const dialog=page.getByRole('dialog',{name,exact:true});
+  const file=dialog.getByLabel(label,{exact:true});
+  await file.waitFor({state:'visible'});
+  const [importChooser]=await Promise.all([page.waitForEvent('filechooser'),file.press('Enter')]);
+  assert.equal(await importChooser.element().getAttribute('type'),'file');
+  await dialog.getByRole('button',{name:'Cancel',exact:true}).press('Enter');
+  await dialog.waitFor({state:'hidden'});
+  assert.equal(await snapshot(),accepted);
+ }
+ console.log('SVG and STL/OBJ model import dialogs expose native file choosers to keyboard users.');
 }finally{
  await browser.close();
 }
