@@ -272,3 +272,7 @@
 ### 2026-11-20 - blind mounting workflow across six native families
 
 - Focused Chromium passed finder, direct placement, editing, conflicts, reload and geometry downloads in Wave, Character, Light Pod and Rotary Cap on fitting backing. The same test covers Tile and Gear.
+
+### 2026-11-20 - Crystal blind preset dimensions
+
+- Crystal Chromium changed the preset from magnet to insert and verified stale downloads. Paired STL/3MF probes measured both stations at 10.2 × 3.2 mm for magnets and 4.2 × 6 mm for inserts, including base stock behind each floor. DIM-05 is verified.

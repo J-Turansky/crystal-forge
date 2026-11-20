@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** DIM-05 and PAR-01, measure Crystal magnet and insert presets and residual stock in fresh downloads.
+- **Target:** PAR-01, verify attachment controls, real stock and saved edit rollback in the remaining mounting combinations.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** All six native families passed placement, edits, conflict rollback, reload and both exports for both blind profiles. Next compare the real Crystal preset geometry and published dimensions after switching between magnet and insert.
+- **Next test:** DIM-05 has native and Crystal geometry measurements. Next audit the shared mounting section for duplicate controls and verify Crystal automatic-to-manual tab conversion with populated editing and the zero-tabs Add affordance.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

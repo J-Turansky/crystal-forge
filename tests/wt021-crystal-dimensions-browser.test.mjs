@@ -303,4 +303,55 @@ try{
   await measureImported(profileId,5.3);
   console.log('WT-021 Crystal imported measured default and local fit verified');
  }
+ {
+  const name='Crystal blind hardware presets';
+  await page.evaluate(name=>window.__sensoryStudio.addModel('crystals',{
+   seed:42,count:5,width:95,baseType:'integrated',baseStyle:'Square',baseHeight:16,baseWidth:32,baseDome:0,
+   cutSockets:false,lightingMode:'none',wireChannels:false,mount:'None',mountPlacement:'auto',mountSpacing:34
+  },name),name);
+  const build=page.locator('.sms-workspace-nav [data-tab=build]'),print=page.locator('.sms-workspace-nav [data-tab=print]');
+  const preset=page.locator('[data-state=mount]'),job=page.locator('#smsJobs article').filter({hasText:name});
+  for(const [type,diameter,depth] of [['Magnet inserts',10.2,3.2],['Threaded insert M3',4.2,6]]){
+   await build.click();
+   await (await reveal(preset)).selectOption(type);
+   await page.waitForFunction(type=>window.__sensoryStudio.currentModel.parameters.mount===type,type);
+   const model=await crystal(),mounts=planHardware(model.editableState.crystals,model.parameters).mounts;
+   assert.equal(mounts.length,2);
+   await print.click();
+   if(await job.count()){
+    await job.getByText('Stale',{exact:true}).waitFor();
+    assert(await job.locator('[data-job-stl]').isDisabled());
+    assert(await job.locator('[data-job-3mf]').isDisabled());
+    await job.locator('[data-job-prepare]').click();
+   }else await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+   await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+   for(const format of ['stl','3mf']){
+    const [file]=await Promise.all([page.waitForEvent('download'),job.locator('[data-job-'+format+']').click()]);
+    const bytes=await readFile(await file.path());
+    let geometry;
+    if(format==='stl')geometry=new STLLoader().parse(Uint8Array.from(bytes).buffer);
+    else{
+     const xml=modelXml(bytes);
+     assert.match(xml,/<model unit="millimeter"/);
+     const positions=[...xml.matchAll(/<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"/g)].flatMap(match=>match.slice(1).map(Number));
+     const indices=[...xml.matchAll(/<triangle v1="([^"]+)" v2="([^"]+)" v3="([^"]+)"/g)].flatMap(match=>match.slice(1).map(Number));
+     geometry=new THREE.BufferGeometry();
+     geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+     geometry.setIndex(indices);
+    }
+    const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),mesh=new THREE.Mesh(geometry,material);
+    geometry.computeBoundingBox();
+    for(const {x,z} of mounts){
+     const hit=(height,dx,dz)=>new THREE.Raycaster(new THREE.Vector3(x,-z,height),
+      new THREE.Vector3(dx,0,dz)).intersectObject(mesh)[0];
+     assert(Math.abs(hit(1,-1,0).distance+hit(1,1,0).distance-diameter)<.02,format+' '+type+' diameter');
+     const floor=hit(-1,0,1).point.z,top=hit(geometry.boundingBox.max.z+1,0,-1).point.z;
+     assert(Math.abs(floor-depth)<.01,format+' '+type+' blind depth');
+     assert(top-floor>=16-depth-.02,format+' '+type+' leaves the measured base stock');
+    }
+    geometry.dispose();material.dispose();
+   }
+  }
+  console.log('WT-021 Crystal magnet and insert preset sections verified');
+ }
 }finally{await browser.close();}
