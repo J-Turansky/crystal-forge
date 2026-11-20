@@ -673,6 +673,44 @@ try{
   viewportMesh.setIndex(section.indices);
   return {sectionX,viewportMesh};
  }
+ async function verifyTabRemovalBounds(name,palette,{jobId,tab=2}={}){
+  const boundsJob=jobId?page.locator('[data-print-job="'+jobId+'"]'):page.locator('#smsJobs article').filter({hasText:name});
+  const boundsDisplay=page.locator('#smsModelDimensions');
+  const readBounds=async locator=>{
+   const match=(await locator.textContent()).match(/X × Y × Z: ([\d.]+) × ([\d.]+) × ([\d.]+) mm/);
+   assert(match,name+' displays bounds in export orientation');
+   return match.slice(1).map(Number);
+  };
+  const previousBounds=await readBounds(boundsDisplay);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await palette.getByRole('button',{name:'Remove T'+tab,exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('#smsModelDimensions').textContent.startsWith('Design preview'));
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await boundsJob.getByText('Stale',{exact:true}).waitFor();
+  for(const type of ['stl','3mf','export'])assert(await boundsJob.locator('[data-job-'+type+']').isDisabled());
+  await boundsJob.locator('[data-job-prepare]').click();
+  await boundsJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const updatedBounds=await readBounds(boundsDisplay);
+  assert(updatedBounds[1]<previousBounds[1]-1,name+' loses the removed tab protrusion');
+  const revisedSTL=await useDownload(boundsJob.locator('[data-job-stl]'));
+  const revisedMF=await useDownload(boundsJob.locator('[data-job-3mf]'));
+  const revisedPack=zipEntries((await useDownload(boundsJob.locator('[data-job-export]'))).bytes);
+  const dimensions=JSON.parse(revisedPack.get('print-job-manifest.json')).dimensionsMm;
+  const xml=zipEntries(revisedMF.bytes).get('3D/3dmodel.model').toString();
+  assert.match(xml,/<item objectid="[0-9]+" transform="1 0 0 0 1 0 0 0 1 0 0 0"/);
+  const stlGeometry=new STLLoader().parse(Uint8Array.from(revisedSTL.bytes).buffer);
+  const mfGeometry=read3MFGeometry(xml);
+  stlGeometry.computeBoundingBox();mfGeometry.computeBoundingBox();
+  for(const side of ['min','max'])
+   assert(stlGeometry.boundingBox[side].distanceTo(mfGeometry.boundingBox[side])<.001,name+' edited '+side+' agrees across files');
+  for(const geometry of [stlGeometry,mfGeometry]){
+   const actual=geometry.boundingBox.getSize(new THREE.Vector3()).toArray();
+   assert(actual.every((value,i)=>Math.abs(value-dimensions[i])<.001),name+' edited manifest matches export bounds');
+   assert.deepEqual(actual.map(value=>Number(value.toFixed(1))),updatedBounds);
+   geometry.dispose();
+  }
+  assert.deepEqual(await readBounds(boundsJob.getByText(/^Prepared X/)),updatedBounds);
+ }
  async function finishNativeJourney(name,{inspectCurvedRoute=false}={}){
 
   const {parameters,build}=await page.evaluate(()=>window.__sensoryStudio.currentModel);
@@ -1775,6 +1813,7 @@ try{
    }
    material.dispose();geometry.dispose();
   }
+  await verifyTabRemovalBounds('FIT-01 Tile side',sidePalette);
  }
  // FIT-01/FIT-03: confirmed curved Wave seats and a surface-following wired export.
  {
@@ -1974,6 +2013,7 @@ try{
    assert(Math.abs(width-3.2)<.08);
    geometry.dispose();material.dispose();
   }
+  await verifyTabRemovalBounds('FIT-03 gentle Wave',wavePalette);
  }
  // Independent stationary backed journeys. Each uses its own model, placement, calibration and actual files.
  const backedFamilies=[
@@ -2106,6 +2146,7 @@ try{
    }
    material.dispose();geometry.dispose();
   }
+  await verifyTabRemovalBounds(name,palette);
   console.log(name+' manufacturing journey verified');
  }
  // FIT-02: actual Gear and Tile profile/cutter overlay UI parity.
@@ -2371,6 +2412,13 @@ try{
   await position.press('ArrowRight');
   assert.deepEqual(await modelState(),inspected);
   await inspector.getByRole('button',{name:'Close inspection'}).click();
+  await page.locator('#model-tab-'+original.id).click();
+  await printTab.click();
+  const originalJobId=await page.evaluate(id=>window.__sensoryStudio.project.printJobs.find(item=>item.modelId===id).id,original.id);
+  const originalJob=page.locator('[data-print-job="'+originalJobId+'"]');
+  await originalJob.locator('[data-job-prepare]').click();
+  await originalJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  await verifyTabRemovalBounds(witness,palette,{jobId:originalJobId,tab:1});
  }
  {
   await page.evaluate(()=>window.__sensoryStudio.addModel('waves',{width:100,depth:70,thickness:2,amplitude:1,variation:0},'Thin fixing witness'));

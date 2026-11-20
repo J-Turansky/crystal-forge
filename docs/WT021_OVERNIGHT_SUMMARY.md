@@ -4,6 +4,7 @@
 
 ## Latest checkpoint
 
+- DIM-02 is verified. Removing a tab on six native builders invalidates the older downloads. Fresh STL and 3MF agree on the updated manufacturing bounds and match the viewport, Print Centre and ZIP manifest. Crystal has a separate browser and export dimensional trail.
 - A pinned two-axis Wave channel matches the planned three-dimensional span and passes sampled bend checks in both export formats. Chromium refused a 60 mm radius that could not fit and prepared both files after a valid 6 mm edit.
 - Gentle Wave routes now follow the triangulated surface in both horizontal directions. Chromium and Manifold verified real socket normals, open apertures and a 3.2 mm track in both export formats. A steep Wave is refused.
 - The left and right Tile walls now share the same stock and export checks as the front and rear. Focused Chromium placed sockets directly on each new wall, and Manifold plus independent STL/3MF probes verified 3.2 mm width, 1.8 mm depth and clear apertures.
@@ -27,7 +28,7 @@
 
 ## Current acceptance
 
-- The register has 9 VERIFIED and 15 PARTIAL rows. All seven model families have browser journey evidence and UX-01 was verified at `8083c547b76b5b1df4b547ffccc3ceb6b5765439`.
+- The register has 10 VERIFIED and 14 PARTIAL rows. All seven model families have browser journey evidence and UX-01 was verified at `8083c547b76b5b1df4b547ffccc3ceb6b5765439`.
 - Recess editing applies to supported native mounts and external tabs. Planar top recesses were verified on Gear. Crystal retains its existing mounting workflow. Moving Rotary Caps require Stationary display before adding external tabs.
 - [Next software check](WT021_NOW.md) and [full acceptance register](WT021_COMPLETION_REGISTER.md). Physical Cura and printed fit still require owner validation under [#10](https://github.com/connorturansky-svg/crystal-forge/issues/10).
 

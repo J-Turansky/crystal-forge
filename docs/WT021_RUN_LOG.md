@@ -252,3 +252,7 @@
 ### 2026-11-20 - two-axis Wave bend and measured length
 
 - The pinned two-axis Wave fixture measures an exported 3D centreline span within 0.05 mm of the plan and preserves the sampled bend radius within mesh tolerances. Build uses production validation for active bend-radius edits. Focused Chromium rejects 60 mm without a saved revision change and accepts 6 mm with fresh STL and 3MF.
+
+### 2026-11-20 - edited manufacturing bounds across all families
+
+- Browser tab removal in all six native families blocks the stale STL, 3MF and ZIP. The fresh files match the reduced displayed extents and manifest. Separate Crystal dimension and invalidation evidence covers the remaining family. DIM-02 is verified.
