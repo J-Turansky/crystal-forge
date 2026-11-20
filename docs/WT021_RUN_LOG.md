@@ -288,3 +288,5 @@
 - Crystal Chromium verified a 4.5 mm wire edit survives reload, blocks stale output, and retains the 5.4 mm fitted bore in both fresh meshes. CAL-01 is verified.
 
 - All six native families passed 6 mm width, 1.8 mm depth, clear socket joins and both apertures in both export formats. Crystal passed a separate 6 mm Build edit and reload with the bore unchanged. DIM-04 is verified.
+
+- Six native vaulted 6 mm routes passed independent roof slope, apex stock, upper passage and aperture measurements in both formats. Each refuses 4 mm backing. Together with Crystal’s asymmetric vaulted witness this verifies FAB-01.

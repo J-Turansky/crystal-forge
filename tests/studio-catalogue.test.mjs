@@ -519,10 +519,15 @@ for(const [family,parameters] of [
  }finally{exposed.delete();negative.delete();positive.delete();}
  familyConeFixtures.set(fixture,family.typeId);
  const wideProfile={...measuredProfile,bodyHeight:7};
- const wide=applyBuildModules(source,{pixelBuilderVersion:1,pixelBacking:true,pixelBackingThickness:10,
-  pixelHoles:[-15,15].map((x,i)=>({...checked('wide-route-'+i,x),diameter:8,entryFace:'underside',socketProfile:wideProfile})),
-  serialRouting:{...serial,channelWidthMm:6}},family.capabilities);
- familyWideRouteFixtures.set(wide,family.typeId);
+ for(const vaulted of [false,true]){
+  const build={pixelBuilderVersion:1,pixelBacking:true,pixelBackingThickness:10,
+   pixelHoles:[-15,15].map((x,i)=>({...checked('wide-route-'+i,x),diameter:8,entryFace:'underside',socketProfile:wideProfile})),
+   serialRouting:{...serial,channelWidthMm:6,vaulted}};
+  const wide=applyBuildModules(source,build,family.capabilities);
+  if(vaulted)assert.throws(()=>applyBuildModules(source,{...build,pixelBackingThickness:4},family.capabilities),
+   /solid backing for the groove and roof/);
+  familyWideRouteFixtures.set(wide,{name:family.typeId,vaulted});
+ }
  for(const width of [3.2,4]){
   const profile={...shortConeProfile,bodyHeight:7,retentionLip:.15};
   const recipe=applyBuildModules(source,{pixelBuilderVersion:1,pixelBacking:true,pixelBackingThickness:10,
@@ -684,7 +689,7 @@ for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),...f
    assert(apex&&Math.abs(apex.z-6.65)<.01,format+' '+name+' conical apex');
    assert(left&&right&&Math.abs(left.distanceTo(right)-3.3)<.01,format+' '+name+' conical slope');
   }else if(familyWideRouteFixtures.has(fixture)){
-   const name=familyWideRouteFixtures.get(fixture);
+   const {name,vaulted}=familyWideRouteFixtures.get(fixture);
    geometry.computeBoundingBox();
    const bounds=geometry.boundingBox;
    const inX=bounds.min.x,outX=bounds.max.x;
@@ -693,11 +698,19 @@ for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),...f
    assert(Math.abs(links[0].path[0].x-inX)<.01&&Math.abs(links[2].path.at(-1).x-outX)<.01,
     format+' '+name+' IN and OUT reach the exported perimeter');
    assertOpenRun({x:inX-.1,z:0},{x:outX+.1,z:0},2.85,name+' 6 mm route through both sockets and exterior walls');
+   if(vaulted)assertOpenRun({x:inX-.1,z:0},{x:outX+.1,z:0},.85,name+' upper vault',[2.4,3.5]);
    for(const x of [inX+.2,0,outX-.2]){
     const left=hit([x,0,1],[0,-1,0]),right=hit([x,0,1],[0,1,0]);
     const roof=hit([x,0,-1],[0,0,1]);
     assert(left&&right&&Math.abs(left.distanceTo(right)-6)<.01,format+' '+name+' 6 mm route width');
-    assert(roof&&Math.abs(roof.z-1.8)<.01,format+' '+name+' route depth');
+    const expectedRoof=vaulted?1.8+3/.9:1.8;
+    assert(roof&&Math.abs(roof.z-expectedRoof)<.01,format+' '+name+' route depth');
+    if(vaulted){
+     const u=hit([x,0,3.8],[0,-1,0]),v=hit([x,0,3.8],[0,1,0]);
+     assert(u&&v&&Math.abs(u.distanceTo(v)-2.4)<.01,format+' '+name+' roof taper');
+     const exterior=hit([x,0,bounds.max.z+1],[0,0,-1]);
+     assert(exterior&&exterior.z-roof.z>2,format+' '+name+' leaves stock above the apex');
+    }
    }
    const portAllowance=Math.abs(links[0].path.at(-1).x+15)+Math.abs(links[2].path[0].x-15);
    assert(Math.abs(links.reduce((sum,link)=>sum+link.measure,0)+portAllowance-(outX-inX))<.01,
