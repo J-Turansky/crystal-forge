@@ -654,10 +654,22 @@ try{
   assert.deepEqual(stl.bytes,[...production.entries()].find(([name])=>name.endsWith('.stl'))[1]);
   assert.deepEqual(cura.bytes,[...production.entries()].find(([name])=>name.endsWith('.curaprofile'))[1]);
   const threeMF=zipEntries((await useDownload(job.locator('[data-job-3mf]'))).bytes);
-  assert.equal(JSON.parse(production.get('print-job-manifest.json')).routing.channels.length,3);
+  const manifest=JSON.parse(production.get('print-job-manifest.json'));
+  assert.equal(manifest.routing.channels.length,3);
+  assert.equal(manifest.coordinateFrame,'Z-up');
+  assert.equal(manifest.units,'mm');
+  const xml=threeMF.get('3D/3dmodel.model').toString();
+  assert.match(xml,/<item objectid="[0-9]+" transform="1 0 0 0 1 0 0 0 1 0 0 0"/);
+  const stlGeometry=new STLLoader().parse(Uint8Array.from(stl.bytes).buffer);
+  const mfGeometry=read3MFGeometry(xml);
+  stlGeometry.computeBoundingBox();mfGeometry.computeBoundingBox();
+  for(const key of ['min','max'])
+   assert(stlGeometry.boundingBox[key].distanceTo(mfGeometry.boundingBox[key])<.001,name+' matching print-space '+key);
+  const measured=stlGeometry.boundingBox.getSize(new THREE.Vector3()).toArray();
+  assert.equal(manifest.dimensionsMm.length,3);
+  assert(measured.every((size,axis)=>Math.abs(size-manifest.dimensionsMm[axis])<.001),name+' production dimensions match the downloaded mesh');
   return {parameters,build,geometries:[
-   ['STL',new STLLoader().parse(Uint8Array.from(stl.bytes).buffer)],
-   ['3MF',read3MFGeometry(threeMF.get('3D/3dmodel.model').toString())]
+   ['STL',stlGeometry],['3MF',mfGeometry]
   ]};
  }
  const modelFile=await useDownload(tile.locator('[data-job-3mf]'));
@@ -1003,6 +1015,70 @@ try{
  assert.equal((await getHoles())[0].profileId,existingId,'Import leaves the installed fitting linked to its original profile');
  assert.equal((await getHoles())[0].clearance,.35);
  await shot('wt017-pixel-profile-build');
+ // CAL-02: independently measure linked and locally captured fits before and after a library edit.
+ const linkedModel=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+ await page.evaluate(()=>window.__sensoryStudio.addModel('waves',{flowStyle:'Parallel',dualMaterial:false},'Local clearance witness'));
+ await page.locator('.sms-workspace-nav [data-tab=build]').click();
+ await selector.selectOption({label:'Reusable 4.5 mm seed'});
+ await wavePalette.getByRole('button',{name:'Add pixel automatically',exact:true}).click();
+ await wavePalette.getByRole('button',{name:'P1',exact:true}).click();
+ await wavePalette.getByText('Record measured fit',{exact:true}).click();
+ const localFit=wavePalette.locator('[data-fit-calibration]');
+ await localFit.locator('[name=printedBoreDiameter]').fill('4.85');
+ await localFit.getByRole('button',{name:'Save measured fit'}).click();
+ const localModel=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+ assert.equal(localModel.build.pixelHoles[0].followProfileClearance,false);
+ const switchFitModel=async id=>{
+  await page.locator('[id="model-tab-'+id+'"]').click();
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+ };
+ const checkFitDownloads=async(model,diameter)=>{
+  await switchFitModel(model.id);
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  const job=page.locator('#smsJobs article').filter({hasText:model.name});
+  if(!await job.count())await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  else if(await job.getByText('Stale',{exact:true}).count())await job.locator('[data-job-prepare]').click();
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const stl=await useDownload(job.locator('[data-job-stl]'));
+  const mf=await useDownload(job.locator('[data-job-3mf]'));
+  const {x,z}=model.build.pixelHoles[0];
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(stl.bytes).buffer),
+   read3MFGeometry(zipEntries(mf.bytes).get('3D/3dmodel.model').toString())]){
+   const mesh=new THREE.Mesh(geometry,material);
+   const width=[-1,1].reduce((sum,sign)=>sum+new THREE.Raycaster(
+    new THREE.Vector3(x,-z,1),new THREE.Vector3(sign,0,0)).intersectObject(mesh)[0].distance,0);
+   assert(Math.abs(width-diameter)<.02,model.name+' exported '+width+' mm');
+   geometry.dispose();
+  }
+  material.dispose();
+ };
+ await checkFitDownloads(linkedModel,4.85);
+ await checkFitDownloads(localModel,4.85);
+ await switchFitModel(linkedModel.id);
+ await selector.selectOption({label:'Reusable 4.5 mm seed'});
+ await wavePalette.getByRole('button',{name:'Create / edit pixel profile'}).click();
+ await page.locator('#pixelSocketClearance').fill('.6');
+ await page.locator('#applyPixelSocketFit').click();
+ const savedFitModels=()=>page.evaluate(()=>window.__sensoryStudio.project.models);
+ const fits=await savedFitModels();
+ assert.equal(fits.find(model=>model.id===linkedModel.id).build.pixelHoles[0].clearance,.6);
+ assert.deepEqual(fits.find(model=>model.id===localModel.id).build,localModel.build);
+ await page.locator('.sms-workspace-nav [data-tab=print]').click();
+ const staleFitJob=page.locator('#smsJobs article').filter({hasText:linkedModel.name});
+ await staleFitJob.getByText('Stale',{exact:true}).waitFor();
+ assert(await staleFitJob.locator('[data-job-stl]').isDisabled());
+ assert(await staleFitJob.locator('[data-job-3mf]').isDisabled());
+ await checkFitDownloads(linkedModel,5.1);
+ await checkFitDownloads(localModel,4.85);
+ await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+ await page.reload();
+ await page.waitForFunction(()=>window.__sensoryStudio);
+ const reloadedFits=await savedFitModels();
+ assert.equal(reloadedFits.find(model=>model.id===linkedModel.id).build.pixelHoles[0].clearance,.6);
+ assert.deepEqual(reloadedFits.find(model=>model.id===localModel.id).build,localModel.build);
+ await switchFitModel(linkedModel.id);
+ await wavePalette.getByRole('button',{name:'P1',exact:true}).click();
  await checkNativeDoubleClick('waves',wavePalette,(await getHoles())[0]);
  const nativeFamilies=[
   ['tactile-tiles',{dualMaterial:false},false],

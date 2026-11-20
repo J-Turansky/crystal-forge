@@ -107,3 +107,8 @@ Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) co
 - Static, Chromium and Manifold passed at `8083c547b76b5b1df4b547ffccc3ceb6b5765439`. All seven independent browser journeys and the Features catalogue have exact-head evidence.
 - A four-variant Manifold fixture independently measured bore, flange, retention throat, roof depth and groove width in STL and 3MF. Build refuses retention where the body cannot support the lip.
 - Next verify linked and copied profile behaviour in exported files.
+
+### Linked profile and locally calibrated fit
+
+- Browser downloads independently measured a library-linked bore changing from 4.85 to 5.10 mm after a profile edit. A local 4.85 mm fit on another model retained its geometry, and the linked model’s stale STL and 3MF were disabled until preparation.
+- Next measure the actual bend radius and centreline length in the exported route.

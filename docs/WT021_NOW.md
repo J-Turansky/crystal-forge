@@ -10,10 +10,10 @@
 
 ## Next executable step
 
-- **Target:** CAL-02, linked and copied fitting profiles with exported measurements.
+- **Target:** DIM-04 and FIT-03, verify minimum bend radius and measured route length in exported geometry.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Prepare two otherwise identical fitted projects, one following a library clearance and one retaining its own fit. Change the linked profile, then compare independent STL and 3MF sections and check stale exports.
-- **Then:** verify linked/copy profile export behaviour, the remaining dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
+- **Next test:** Independently reconstruct the centreline in STL and 3MF at a pinned bend. Compare its radius and length with the route settings and confirm that an incompatible requested radius blocks fabrication.
+- **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction
 

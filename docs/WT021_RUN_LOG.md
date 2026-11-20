@@ -137,3 +137,8 @@
 - Exact-head static, Chromium and Manifold passed at `8083c547b76b5b1df4b547ffccc3ceb6b5765439`.
 - Export probes distinguish bore clearance, retention and wire width in four physical variants. Previously a requested lip could be omitted silently on a short body. Build now validates the production cut before saving.
 - Next CAL-02 linked/copy export evidence.
+
+### 2026-11-20 - linked and local calibration exports
+
+- Compared downloaded STL and 3MF before and after a library edit. The following fitting changed from 4.85 to 5.10 mm and invalidated its previous preparation. The local fit stayed 4.85 mm. CAL-02 remains partial across projects and Crystal.
+- Next measure bend radius and centreline length independently.
