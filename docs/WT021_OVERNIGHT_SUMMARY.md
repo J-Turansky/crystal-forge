@@ -1,10 +1,10 @@
 # WT-021 overnight checkpoint
 
-[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `6c23423b35c8ff7044e46cef0aea37b1c805e2d9`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
+[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `871873235fdc5e26372bea602646f6b67fb98504`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
 
 ## Latest checkpoint
 
-- A pinned Tile vault passed Chromium preparation and both downloads. STL and 3MF agree on upper clearance through the bent channel and both apertures, and on the tapered side walls. Build validates active vaults when switched on.
+- A pinned Tile vault passed Chromium preparation and both downloads. STL and 3MF agree on upper clearance through the bent channel and both apertures, and on the tapered side walls. Build validates active vaults when switched on and when route settings change. Focused Chromium verified width and edge rollback and measured 4 mm usable width in the edited exports.
 - All six native families passed Manifold containment for a backed underside conical socket, and both exported formats matched the apex and slope for each family. Routed native test coupons carry the selected fitting’s geometry and fit settings. Chromium confirmed matching apex in both coupon and full model files.
 - Native shaped pixel sockets offer conical roofs on level underside faces. Chromium rejects a 13 mm Gear without changing its model and exports the eligible 18 mm Gear. Manifold and both formats verify bore, taper, flange and retention. The Wave direct-drag journey also passed exact position and normal restoration with undo and redo.
 - The full unified Chromium suite passed with a 3.2 mm curved Wave route measured at the same cutaway plane in the viewport, STL and 3MF. Focused Chromium verified exact undo and redo of a Gear tab-depth edit and disabled downloads from the old revision.

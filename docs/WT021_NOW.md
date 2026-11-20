@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** FAB-01, verify vaulted route setting edits retain validated width, edge and roof geometry.
+- **Target:** DIM-04 and FAB-01, measure a valid 6 mm vaulted channel on a wider native fixture.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** On the pinned Tile witness, edit width and edge position with the vault enabled. Assert production rejection preserves the saved revision, then prepare valid edits and compare fresh STL and 3MF sections.
+- **Next test:** Build rejected unsafe Tile vault width and edge edits and exported valid 4 mm geometry. Next use suitably wide sockets and stock with a 6 mm vaulted channel. Measure usable width, slope, raised apex and both openings.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

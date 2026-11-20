@@ -2347,6 +2347,21 @@ try{
   await serial.getByLabel('Vault wire-track roofs for underside-down printing').click();
   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.serialRouting.vaulted===true);
   assert.equal(await serial.getByLabel('Vault wire-track roofs for underside-down printing').isChecked(),true);
+  const accepted=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  await edge.fill(String((offset+50)%100));await edge.press('Tab');
+  await page.locator('#smsModelError').getByText(/Chosen IN edge|Chosen OUT edge|Cable budget exceeded|No safe tangent|channel approaches/i).waitFor();
+  assert.equal(Number(await edge.inputValue()),offset);
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),accepted);
+  const width=serial.getByLabel('Requested wire-track width (mm)');
+  await width.fill('5');await width.press('Tab');
+  await page.locator('#smsModelError').getByText(/Channels cross or leave insufficient web/).waitFor();
+  assert.equal(Number(await width.inputValue()),3.2);
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),accepted);
+  await width.fill('4');await width.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.serialRouting.channelWidthMm===4);
+  const validEdge=offset+.3;
+  await edge.fill(String(validEdge));await edge.press('Tab');
+  await page.waitForFunction(value=>window.__sensoryStudio.currentModel.build.serialRouting.inEdgePercent===value,validEdge);
   await page.locator('.sms-workspace-nav [data-tab=print]').click();
   await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
   const job=page.locator('#smsJobs article').filter({hasText:name});
@@ -2359,8 +2374,8 @@ try{
    const mesh=new THREE.Mesh(geometry,material);
    const section=height=>[-1,1].reduce((sum,sign)=>sum+new THREE.Raycaster(
     new THREE.Vector3(0,0,height),new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0].distance,0);
-   assert(Math.abs(section(1)-3.2)<.02);
-   assert(Math.abs(section(2.8)-1.4)<.02);
+   assert(Math.abs(section(1)-4)<.02);
+   assert(Math.abs(section(2.8)-2.2)<.02);
    geometry.dispose();
   }
   material.dispose();

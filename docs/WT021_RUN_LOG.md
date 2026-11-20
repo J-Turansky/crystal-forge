@@ -204,3 +204,7 @@
 ### 2026-11-20 - bent native vaulted channel
 
 - Decoded STL and 3MF passed sweep checks through the upper vault and both exterior openings plus tapered sections at 2.2 and 2.8 mm. Chromium successfully enabled a pinned Tile vault and measured the exported 3.2 mm usable width and 1.4 mm upper width. Build uses the fabrication worker before enabling an active vault.
+
+### 2026-11-20 - active vault route edits
+
+- Active vault changes use the fabrication worker before committing. Chromium rolled back an unsafe perimeter opening and a 5 mm width that left insufficient web on the Tile fixture. A valid 4 mm width and adjusted opening prepared successfully. STL and 3MF measure 4 mm usable width and 2.2 mm at 2.8 mm height.

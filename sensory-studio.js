@@ -1321,7 +1321,16 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const settings={version:1,enabled:false,pitch:50,inTail:200,outTail:200,...model.build.serialRouting};
   const disabled=model.link?' disabled':'';
   const change=fields=>{
-   if(commit({build:{...model.build,serialRouting:{...settings,...fields}}}))redrawPixelEditor();
+   const serialRouting={...settings,...fields},build={...model.build,serialRouting};
+   const apply=()=>{
+    if(!commit({build}))return false;
+    redrawPixelEditor();return true;
+   };
+   if(serialRouting.enabled&&serialRouting.vaulted){
+    checkFittingBuild(model,build,apply,{pending:'Checking the vaulted channel clearance and roof stock…'});
+    return false;
+   }
+   return apply();
   };
   const note=document.createElement('p');
   note.setAttribute('role','status');
@@ -1329,24 +1338,17 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   block.append(note);
   block.insertAdjacentHTML('beforeend','<label><input type="checkbox" data-native-route'+(settings.enabled?' checked':'')+
    (model.link||(!settings.enabled&&plan.reason)?' disabled':'')+'> Cut serial channels</label>');
-  const changeVault=fields=>{
-   const serialRouting={...settings,...fields};
-   if(!serialRouting.enabled||!serialRouting.vaulted){change(fields);return;}
-   checkFittingBuild(model,{...model.build,serialRouting},()=>change(fields),{
-    pending:'Checking the vaulted channel clearance and roof stock…'
-   });
-  };
   block.querySelector('[data-native-route]').onchange=event=>{
    const input=event.target,enabled=input.checked;
    input.checked=!!settings.enabled;
-   changeVault({enabled});
+   change({enabled});
   };
   block.insertAdjacentHTML('beforeend','<label><input type="checkbox" data-vaulted-route'+
    (settings.vaulted?' checked':'')+disabled+'> Vault wire-track roofs for underside-down printing</label>');
   block.querySelector('[data-vaulted-route]').onchange=event=>{
    const input=event.target,vaulted=input.checked;
    input.checked=!!settings.vaulted;
-   changeVault({vaulted});
+   change({vaulted});
   };
   const widthLabel=document.createElement('label'),widthInput=document.createElement('input');
   widthLabel.textContent='Requested wire-track width (mm) ';
@@ -1356,7 +1358,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   widthInput.dataset.nativeChannelWidth='';
   widthInput.onchange=()=>{
    if(!widthInput.checkValidity()){widthInput.reportValidity();widthInput.value=settings.channelWidthMm??3.2;return;}
-   change({channelWidthMm:widthInput.valueAsNumber});
+   if(!change({channelWidthMm:widthInput.valueAsNumber}))widthInput.value=settings.channelWidthMm??3.2;
   };
   widthLabel.append(widthInput);block.append(widthLabel);
   const widthNote=document.createElement('p');
@@ -1389,7 +1391,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    input.value=settings[key]??'';
    input.onchange=()=>{
     if(!input.checkValidity()){input.reportValidity();input.value=settings[key]??'';return;}
-    change({[key]:input.value===''?null:input.valueAsNumber});
+    if(!change({[key]:input.value===''?null:input.valueAsNumber}))input.value=settings[key]??'';
    };
    label.append(input);edgeControls.append(label);
    const resolved=plan.edgePositions?.[end];
@@ -1404,10 +1406,13 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   block.append(edgeControls);
   const pitch=block.querySelector('[data-native-pitch]');
   pitch.value=settings.customPitch||![25,50,100].includes(settings.pitch)?'custom':settings.pitch;
-  pitch.onchange=()=>change(pitch.value==='custom'?{customPitch:true}:{pitch:Number(pitch.value),customPitch:false});
+  pitch.onchange=()=>{
+   if(!change(pitch.value==='custom'?{customPitch:true}:{pitch:Number(pitch.value),customPitch:false}))
+    pitch.value=settings.customPitch||![25,50,100].includes(settings.pitch)?'custom':settings.pitch;
+  };
   const bindNumber=(input,key)=>input.onchange=()=>{
    if(!input.value||!input.checkValidity()){input.reportValidity();input.value=settings[key];return;}
-   change({[key]:input.valueAsNumber});
+   if(!change({[key]:input.valueAsNumber}))input.value=settings[key];
   };
   bindNumber(block.querySelector('[data-native-in-tail]'),'inTail');
   bindNumber(block.querySelector('[data-native-out-tail]'),'outTail');
@@ -1418,7 +1423,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   bendInput.value=settings.minBendRadius??5;bendInput.disabled=!!model.link;
   bendInput.onchange=()=>{
    if(!bendInput.value||!bendInput.checkValidity()){bendInput.reportValidity();bendInput.value=settings.minBendRadius??5;return;}
-   change({minBendRadius:bendInput.valueAsNumber});
+   if(!change({minBendRadius:bendInput.valueAsNumber}))bendInput.value=settings.minBendRadius??5;
   };
   bend.append(bendInput);block.append(bend);
   if(pitch.value==='custom'){

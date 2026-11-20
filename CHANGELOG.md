@@ -4,7 +4,7 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
-- Build checks vaulted channel clearance and supporting roof material before saving an enabled vault.
+- Build checks vaulted channel clearance and supporting roof material before enabling a vault or saving changes to its route settings.
 
 - Native shaped pixel sockets support a conical roof on level underside faces. Build validates the extra roof height before saving. The routed test coupon can use the selected socket’s measurements, clearance, retention and conical roof.
 
