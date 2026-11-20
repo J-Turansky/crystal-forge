@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** PAR-01, extend direct blind mounting journeys to Wave, Character, Light Pod and Rotary Cap.
+- **Target:** DIM-05 and PAR-01, measure Crystal magnet and insert presets and residual stock in fresh downloads.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Tile and Gear directly placed both blind profiles from the tool finder. Next verify eligible backing on the remaining native families and test a conflict with an existing fitting.
+- **Next test:** All six native families passed placement, edits, conflict rollback, reload and both exports for both blind profiles. Next compare the real Crystal preset geometry and published dimensions after switching between magnet and insert.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

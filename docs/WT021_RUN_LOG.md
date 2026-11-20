@@ -268,3 +268,7 @@
 ### 2026-11-20 - direct blind mount placement
 
 - Added the mounting profile picker before placement. Tile Chromium placed a magnet pocket and insert pilot directly, refused a conflicting placement, reloaded the accepted mounts and measured both exported cuts. The full unified Chromium suite passed. A follow-up verified the native finder focus and repeated the measured placement journey on Gear.
+
+### 2026-11-20 - blind mounting workflow across six native families
+
+- Focused Chromium passed finder, direct placement, editing, conflicts, reload and geometry downloads in Wave, Character, Light Pod and Rotary Cap on fitting backing. The same test covers Tile and Gear.

@@ -2821,10 +2821,14 @@ try{
   material.dispose();
  }
  // DIM-05: blind hardware pockets retain the stock behind each cut.
- for(const [type,parameters] of [
+ for(const [type,parameters,backing] of [
   ['tactile-tiles',{width:100,depth:80,thickness:6,outline:'square',relief:1,pattern:'terraces',dualMaterial:false}],
   ['gears',{mode:'Decorative',wheelStyle:'Rounded lobes',webStyle:'Solid',diameter:100,thickness:6,bore:0,
-   reliefStyle:'None',dualMaterial:false}]
+   reliefStyle:'None',dualMaterial:false}],
+  ['waves',{width:100,depth:80,thickness:8,amplitude:1,dualMaterial:false},true],
+  ['characters',{character:'Cloud',construction:'Layered',width:90,depth:8,dualMaterial:false},true],
+  ['light-pods',{shellForm:'Beacon',illuminated:false,width:80,depth:68,height:32,dualMaterial:false},true],
+  ['control-caps',{controlStyle:'Rotary knob',knobInstallation:'Stationary display',shaft:0,diameter:70,height:19,dualMaterial:false},true]
  ]){
   const name='Blind hardware '+type;
   await page.evaluate(({type,parameters,name})=>window.__sensoryStudio.addModel(type,parameters,name),{type,parameters,name});
@@ -2834,6 +2838,12 @@ try{
   await page.locator('[data-view=bottom]').click();
   await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
   const palette=page.locator('.sms-palette');
+  if(backing){
+   await palette.locator('[data-pixel-backing]').check();
+   const thickness=palette.getByLabel('Fitting backing thickness (mm)');
+   await thickness.fill('8');await thickness.press('Tab');
+   assert.equal(await thickness.inputValue(),'8');
+  }
   const placementProfile=palette.getByLabel('New mounting profile');
   const place=palette.getByRole('button',{name:'Place mounting hole in 3D'});
   for(const [i,x,kind] of [[0,-20,'Magnet pocket'],[1,20,'Threaded insert pilot']]){
@@ -2850,6 +2860,21 @@ try{
   await page.locator('#smsModelError').getByText(/overlaps|clearance from another/).waitFor();
   assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles.length),2);
   await page.keyboard.press('Escape');
+  if(backing){
+   await palette.locator('[data-fit-profile=seed]').click();
+   await palette.getByRole('button',{name:'Place LED fitting in 3D'}).click();
+   const led=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(0,0,'underside'));
+   assert(led);await page.mouse.click(led.x,led.y);
+   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===1);
+   await page.keyboard.press('Escape');
+   await placementProfile.selectOption('Magnet pocket');
+   await place.click();
+   const blocked=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(6,0,'underside'));
+   assert(blocked);await page.mouse.click(blocked.x,blocked.y);
+   await page.locator('#smsModelError').getByText(/another pixel/).waitFor();
+   assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles.length),2);
+   await page.keyboard.press('Escape');
+  }
   const diameter=palette.getByLabel('Pocket diameter (mm)');
   const depth=palette.getByLabel('Pocket depth (mm)');
   const model=()=>page.evaluate(()=>window.__sensoryStudio.currentModel);
@@ -2861,11 +2886,13 @@ try{
    if(index===0){
     await depth.fill('3');await depth.press('Tab');
     await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[0].recessDepth===3);
-    const accepted=await model();
-    await depth.fill('5.9');await depth.press('Tab');
-    await page.locator('#smsModelError').getByText(/M1 magnet pocket needs continuous underside stock/).waitFor();
-    assert.equal(Number(await depth.inputValue()),targetDepth);
-    assert.deepEqual(await model(),accepted);
+    if(!backing){
+     const accepted=await model();
+     await depth.fill('5.9');await depth.press('Tab');
+     await page.locator('#smsModelError').getByText(/M1 magnet pocket needs continuous underside stock/).waitFor();
+     assert.equal(Number(await depth.inputValue()),targetDepth);
+     assert.deepEqual(await model(),accepted);
+    }
    }
   }
   const {build}=await model();

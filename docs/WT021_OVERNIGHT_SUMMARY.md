@@ -1,10 +1,10 @@
 # WT-021 overnight checkpoint
 
-[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `cb54c156af2d87911b55e3b384d9c0158e48e46c`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
+[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `191ca41fab0d0445a9bf818cdcb8497343b0a1f9`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
 
 ## Latest checkpoint
 
-- Native Build accepts a mounting profile before 3D placement. The Tile browser witness placed both blind profiles directly, rejected an overlapping placement and preserved the settings after reload. Both files reproduced the saved diameters and blind floors. The same workflow passed on Gear. The tool finder focuses the mounting-profile picker when opening a native mounting result.
+- Native Build accepts a mounting profile before 3D placement. The Tile browser witness placed both blind profiles directly, rejected an overlapping placement and preserved the settings after reload. Both files reproduced the saved diameters and blind floors. The same workflow passed on Gear, Wave, Character, Light Pod and stationary Rotary Cap. The tool finder focuses the mounting-profile picker when opening a native mounting result.
 - Native manual mounts support blind magnet pockets and threaded insert pilots. All six families passed STL and 3MF diameter and floor checks. Chromium edited both profiles on a Tile and verified that excessive pocket depth rolled back.
 - All six native builders passed counterbore and countersink section measurements on backed tabs. Chromium measured the edited Character, Light Pod and Rotary Cap tab in fresh STL and 3MF and verified that stale downloads were disabled.
 - DIM-02 is verified. Removing a tab on six native builders invalidates the older downloads. Fresh STL and 3MF agree on the updated manufacturing bounds and match the viewport, Print Centre and ZIP manifest. Crystal has a separate browser and export dimensional trail.
