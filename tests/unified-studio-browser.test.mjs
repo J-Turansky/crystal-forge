@@ -1289,6 +1289,22 @@ try{
    assert(!(await cutSerial.isDisabled()),await gearSerial.innerText());
    await cutSerial.check();
    await gearSerial.getByText('Channels ready for preparation.').waitFor();
+   await page.locator('[data-view=top]').click();
+   await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+   await gearPalette.getByRole('button',{name:'Place mounting hole in 3D'}).click();
+   const mountPoint=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(16,15,'top'));
+   assert(mountPoint);
+   await page.mouse.click(mountPoint.x,mountPoint.y);
+   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.manualMountHoles?.length===1);
+   await page.keyboard.press('Escape');
+   const beforeConflict=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
+   await gearPalette.getByRole('button',{name:'M1',exact:true}).click();
+   const mountZ=gearPalette.locator('[data-mount-field=z]');
+   await mountZ.fill('0');
+   await mountZ.press('Tab');
+   await gearPalette.locator('[data-pixel-status]').filter({hasText:/too close to Mount hole 1/}).waitFor();
+   assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),beforeConflict,
+    'Rejecting a mount that meets the channel preserves the route, mount and revision');
    await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
    await page.reload();
    await page.waitForFunction(()=>window.__sensoryStudio?.currentModel?.build.serialRouting?.enabled);

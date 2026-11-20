@@ -345,6 +345,14 @@ for(const recipe of [tileRoute,gearRoute]){
  assert.equal(output.stls.length,1);
  assert(output.threeMF.length>100);
 }
+const routedMountBuild={pixelBuilderVersion:1,serialRouting:serial,pixelHoles:[checked('left',-15),checked('right',15)]};
+const separateMount={id:'route-mount',x:0,z:12,diameter:3.4,entryFace:'top'};
+const safelyMountedRoute=applyBuildModules(gearRoute,{...routedMountBuild,manualMountHoles:[separateMount]},gearGenerator.capabilities);
+assert.equal(safelyMountedRoute.nativeRouting.cutters.length,3);
+assert(safelyMountedRoute.negative.some(part=>part.mountId==='route-mount'));
+assert.equal(prepareRecipe(THREE,wasm,safelyMountedRoute).bodies.length,1);
+assert.throws(()=>applyBuildModules(gearRoute,{...routedMountBuild,manualMountHoles:[{...separateMount,z:0}]},gearGenerator.capabilities),
+ /too close to Mount hole 1/);
 const curveBuild={pixelHoles:[checked('left',-15),checked('right',15,2)],pixelBuilderVersion:1,serialRouting:serial};
 const curvePlan=applyBuildModules(tileRoute,curveBuild).nativeRouting;
 const flatStock={bounds:{width:70,depth:40,height:10},
@@ -410,7 +418,7 @@ assert(pinned.nativeRouting.links[0].path.length>2,'Offset IN is a smooth curved
 assert(prepareRecipe(THREE,wasm,pinned).bodies[0].volume>0);
 const vaultedStock=applyBuildModules(flatStock,{...flatBuild,serialRouting:{...serial,vaulted:true}});
 const pinnedVault=applyBuildModules(flatStock,{...pinnedBuild,serialRouting:{...pinnedBuild.serialRouting,vaulted:true}});
-for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute]){
+for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -443,7 +451,13 @@ for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOn
     assert(outer&&outer.distance-inner.distance>=.55,format+' retains at least 0.55 mm of continuous side stock at '+label);
    }
   };
-  if(fixture===curvedSeatOnly){
+  if(fixture===safelyMountedRoute){
+   assert.equal(hit([0,-12,-1],[0,0,1]),undefined,format+' mount remains a through-hole');
+   const left=hit([0,-12,4],[-1,0,0]),right=hit([0,-12,4],[1,0,0]);
+   assert(left&&right&&Math.abs(left.distanceTo(right)-3.4)<.005,format+' calibrated mounting-hole diameter');
+   const mountWall=hit([0,-12,1],[0,1,0]),routeWall=hit([0,0,1],[0,-1,0]);
+   assert(mountWall&&routeWall&&Math.abs(routeWall.y-mountWall.y-8.7)<.01,format+' continuous material between mounting hole and route');
+  }else if(fixture===curvedSeatOnly){
    const point=new THREE.Vector3(gentleSeat.x,-gentleSeat.z,gentleSeat.surface.y);
    const [nx,ny,nz]=gentleSeat.surface.normal;
    const axis=new THREE.Vector3(nx,-nz,ny);
@@ -533,6 +547,10 @@ for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOn
  }
  if(fixture===curvedSeatOnly){
   console.log('WT-021 curved Wave seat STL/3MF: 9 mm depth, 5.3 mm diameter, measured stock behind the seat');
+  continue;
+ }
+ if(fixture===safelyMountedRoute){
+  console.log('WT-021 routed Gear STL/3MF: 3.4 mm mounting through-hole and 8.7 mm web to the route');
   continue;
  }
  console.log('WT-021 native STL/3MF sections: 3.2 mm width, surrounding stock and open apertures ('+(fixture===curvedWaveRoute?'curved Wave':fixture===sideRouted?'front':fixture===topRouted?'top':fixture===pinnedVault?'curved underside':'straight underside')+')');

@@ -97,3 +97,8 @@
 - Base `c6655a30e33d9a2707e368ce38e32ba14e9f7e36`. Added a failing curved Wave route case, then a groove swept along the same sampled Wave mesh used for manufacturing. Real Manifold tests reject an unsupported convex seat, route wall interference and vaulting on the upward-facing groove.
 - Both formats independently prove a 9 mm long, 5.3 mm sized tilted seat and continuous 3.2 × 1.8 mm surface-following wiring across the Wave. Focused Chromium passed real curved placement, rotation, routing, preparation and downloads. FIT-01/FIT-03 remain PARTIAL.
 - Next combine validated manual mounts with routed placement, covering real conflicts and state rollback.
+
+### 2026-11-20 - manual mounts with native routes
+
+- Base `766daed9c1c2c3ddd07d90545d964ff2ee951eed`. The initially rejected separated through-hole now routes, prepares and exports alongside serial grooves. Both parsed formats measure 3.4 mm through and 8.7 mm material web.
+- Focused Chromium passed safe Gear mounting and refused an edit into the path before changing the saved revision. DIM-05 and PAR-01 remain PARTIAL. Next finish Gear calibration/inspection and independent browser-download measurements.

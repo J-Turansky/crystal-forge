@@ -66,3 +66,8 @@ Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) co
 - Base was `c6655a30e33d9a2707e368ce38e32ba14e9f7e36`. The focused Chromium Wave case placed two sockets with distinct normals and downloaded routed STL and 3MF. Full unified Chromium also passed the preceding Tile checkpoint.
 - The actual production Wave mesh supports flat, upward-opening grooves on gentle parallel profiles. Both exported formats show 3.2 mm width and 1.8 mm depth at seven sections and an open path between exterior ends. A sampled shaped seat had 9 mm installed-axis depth and 5.3 mm diameter. A convex location with inadequate stock and a cut in a route wall were rejected.
 - Next test concurrent routing and noninterfering manual mounts, then advance the full model-family journeys. Broad multi-axis curved routing, final acceptance and physical Cura/print checks remain open.
+
+### Manual mounting alongside serial wiring
+
+- Base was `766daed9c1c2c3ddd07d90545d964ff2ee951eed`. Native routing accepts validated manual through-holes with adequate channel clearance. Focused Chromium passed the separated Gear mount and rejected a move into the channel without editing the saved model.
+- Both formats independently measured a 3.4 mm through-hole and 8.7 mm of continuous material between its wall and the routed channel in the controlled Gear specimen. Next complete the Gear journey with fit calibration, Library/Print inspection and measurements of the browser downloads.

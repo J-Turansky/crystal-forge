@@ -191,7 +191,8 @@ export function nativeRouteEligibility(recipe,build){
  if((front?.thickness??recipe.serialSupport.thickness)<required)return 'Routing needs at least '+required.toFixed(1)+' mm of solid backing for the groove and roof.';
  const blocksBacking=part=>part.kind!=='box'||part.rotation||!Array.isArray(part.position)||
   part.position[1]+part.size[1]/2>0;
- const obstructed=recipe.serialSupport.explicitBacking?recipe.negative.some(blocksBacking):recipe.negative.length>0;
+ const otherCuts=recipe.negative.filter(part=>!part.mountHole);
+ const obstructed=recipe.serialSupport.explicitBacking?otherCuts.some(blocksBacking):otherCuts.length>0;
  if(obstructed||build.mounting||build.base||Object.values(build.partOffsets||{}).some(offset=>offset?.some?.(value=>value!==0)))
   return 'Existing cavities, mounting cuts, added bases or part offsets prevent safe routing.';
  return '';
@@ -229,6 +230,20 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
  if(nearEdge>=0){
   plan.reason='P'+(nearEdge+1)+' is too close to the backing edge. Move the fitting inward to clear its cable ports.';return plan;
  }
+ const mounts=recipe.negative.filter(part=>part.mountHole);
+ const mountConflicts=(mount,path)=>{
+  const [x,,z]=mount.position;
+  const clearance=mount.radius+radius+routeSideStock;
+  if(front){
+   // A through-hole spans all vertical positions on the front routing plane.
+   if(z+mount.radius<front.z-depth-roof)return false;
+   return path.slice(1).some((point,i)=>{
+    const a=path[i];
+    return x>=Math.min(a.x,point.x)-clearance&&x<=Math.max(a.x,point.x)+clearance;
+   });
+  }
+  return path.slice(1).some((point,i)=>distance({x,z},path[i],point)<clearance);
+ };
  const addLink=(label,path,ends,budget,edge=null,centreAllowance=0)=>{
   if(!path){plan.links.push({label,path:[],reason:'No safe tangent-compatible path.'});return;}
   const dense=samples(path);
@@ -241,7 +256,9 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
    if(boundary(point,outline)<radius+routeSideStock&&(!edge||gap(point,edge)>4))return true;
    return pixels.some(p=>!ends.includes(p.id)&&gap(point,p)<p.radius+radius+1.25);
   });
-  let reason=invalid?'Channel approaches an edge or unrelated bore.':measure>budget+1e-6?'Cable budget exceeded.':'';
+  const obstructingMount=mounts.find(mount=>mountConflicts(mount,path));
+  let reason=obstructingMount?'Channel is too close to '+obstructingMount.mountHole+'. Move the mounting hole or the route.'
+   :invalid?'Channel approaches an edge or unrelated bore.':measure>budget+1e-6?'Cable budget exceeded.':'';
   if(!reason&&plan.links.some(other=>{
    const shared=pixels.filter(p=>ends.includes(p.id)&&other.ends?.includes(p.id));
    return other.dense?.some(q=>dense.some(p=>gap(p,q)<2*radius+.5&&!shared.some(b=>gap(p,b)<b.radius&&gap(q,b)<b.radius)));
