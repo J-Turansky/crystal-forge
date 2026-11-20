@@ -447,7 +447,10 @@ const dimensionFixtures=new Map([
  [calibratedCut({retentionLip:.4}),{name:'retention only',bore:8.3,flange:9.3,throat:7.5,width:3.2}],
  [calibratedCut({channelWidthMm:6}),{name:'wire width only',bore:8.3,flange:9.3,throat:8.3,width:6}]
 ]);
-for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
+const fixingFixtures=new Map(['Underside counterbores','Underside countersinks'].map(style=>[
+ applyBuildModules(flatStock,{mounting:true,mountStyle:style,spacing:30,holeDiameter:4},{supportsMounting:true}),style
+]));
+for(const fixture of [...fixingFixtures.keys(),vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -472,6 +475,19 @@ for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOn
   const mesh=new THREE.Mesh(geometry,material);
   const intersections=(origin,direction)=>new THREE.Raycaster(new THREE.Vector3(...origin),new THREE.Vector3(...direction)).intersectObject(mesh);
   const hit=(origin,direction)=>intersections(origin,direction)[0]?.point;
+  const assertOpenRun=(a,b,lateral,label)=>{
+   const start=new THREE.Vector3(a.x,-a.z,0),end=new THREE.Vector3(b.x,-b.z,0);
+   const direction=end.clone().sub(start),length=direction.length();
+   direction.normalize();
+   const normal=new THREE.Vector3(-direction.y,direction.x,0);
+   for(const height of [.35,1.5])for(const width of [-lateral,0,lateral]){
+    const origin=start.clone().addScaledVector(normal,width);
+    origin.z=height;
+    const ray=new THREE.Raycaster(origin,direction,0,length+.0001);
+    assert.equal(ray.intersectObject(mesh).length,0,format+' unobstructed '+label+' at '+width+' mm, height '+height+' mm');
+   }
+   return length;
+  };
   const assertSideStock=(origin,normal,label)=>{
    for(const sign of [-1,1]){
     const hits=intersections(origin,[sign*normal.x,sign*normal.y,0]);
@@ -481,7 +497,29 @@ for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOn
    }
   };
   const dimensions=dimensionFixtures.get(fixture);
-  if(dimensions){
+  const fixingStyle=fixingFixtures.get(fixture);
+  if(fixingStyle){
+   const span=(x,height)=>{
+    const left=hit([x,0,height],[0,-1,0]),right=hit([x,0,height],[0,1,0]);
+    assert(left&&right,format+' fixing walls at '+x);
+    return right.y-left.y;
+   };
+   for(const x of [-15,15]){
+    assert.equal(hit([x,0,-1],[0,0,1]),undefined,format+' fastener bore passes through the body');
+    assert(Math.abs(span(x,2)-4)<.005,format+' 4 mm through-bore');
+    if(fixingStyle==='Underside counterbores'){
+     assert(Math.abs(span(x,.4)-6)<.005,format+' 6 mm parallel recess');
+     const shoulder=hit([x,2.5,-1],[0,0,1]);
+     assert(shoulder&&Math.abs(shoulder.z-1.4)<.005,format+' actual 1.4 mm recess depth');
+     const top=hit([x,2.5,11],[0,0,-1]);
+     assert(top&&Math.abs(top.z-shoulder.z-8.6)<.005,format+' actual 8.6 mm stock behind recess');
+    }else{
+     assert(Math.abs(span(x,.2)-5.5)<.005,format+' countersink tapers from the open face');
+     assert(Math.abs(span(x,1)-4.5)<.005,format+' countersink narrows towards the through-bore');
+    }
+   }
+  }else if(dimensions){
+   if(dimensions.name==='baseline')assertOpenRun({x:-35.1,z:0},{x:35.1,z:0},1.45,'straight route including both shaped-socket junctions');
    const span=(centre)=>{
     const left=hit(centre,[0,-1,0]),right=hit(centre,[0,1,0]);
     assert(left&&right,format+' cavity side walls exist');
@@ -565,6 +603,33 @@ for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOn
     assert(wall&&Math.abs(Math.abs(wall.x)-35)<.005,format+' stock remains beside the cable opening');
    }
   }else{
+   const links=fixture.nativeRouting.links;
+   const input=links[0].path[0],output=links.at(-1).path.at(-1);
+   const socketCentres=flatBuild.pixelHoles;
+   let verifiedLength=0;
+   for(const [i,link] of links.entries()){
+    const path=[...link.path];
+    if(i>0)path.unshift(socketCentres[i-1]);
+    if(i<socketCentres.length)path.push(socketCentres[i]);
+    const length=path.slice(1).reduce((total,point,j)=>total+assertOpenRun(path[j],point,1.45,link.label+' segment '+j),0);
+    // Tail budgets begin at the socket port. Internal budgets are already centre-to-centre.
+    const tailPort=i===0?link.path.at(-1):i===links.length-1?link.path[0]:null;
+    const tailSeat=i===0?socketCentres[0]:socketCentres.at(-1);
+    const allowance=tailPort?Math.hypot(tailPort.x-tailSeat.x,tailPort.z-tailSeat.z):0;
+    const expected=link.measure+allowance;
+    assert(Math.abs(length-expected)<.001,format+' open span agrees with cable length and socket allowances');
+    verifiedLength+=length;
+   }
+   assert(verifiedLength>70,format+' verifies the full bent route across the 70 mm stock');
+   console.log(format+' verified clear route through both sockets: '+verifiedLength.toFixed(3)+' mm');
+   for(const [aperture,sign] of [[input,-1],[output,1]]){
+    const y=-aperture.z;
+    assertOpenRun({x:aperture.x+sign*.1,z:aperture.z},{x:aperture.x-sign*.1,z:aperture.z},1.45,'exterior opening');
+    const left=hit([aperture.x-sign*.01,y,1],[0,-1,0]),right=hit([aperture.x-sign*.01,y,1],[0,1,0]);
+    assert(left&&right&&Math.abs(right.y-left.y-3.2)<.025,format+' full 3.2 mm aperture at exterior face');
+    const shoulder=hit([aperture.x+sign*.1,y+2,1],[-sign,0,0]);
+    assert(shoulder&&Math.abs(shoulder.x-aperture.x)<.005,format+' exterior stock remains next to the opening');
+   }
    const curvedLinks=[fixture.nativeRouting.links[0],fixture.nativeRouting.links.at(-1)];
    for(const link of curvedLinks){
     let sections=0;
@@ -607,7 +672,7 @@ for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOn
   geometry.dispose();
   material.dispose();
  }
- if(fixture===measuredReplica||dimensionFixtures.has(fixture))continue;
+ if(fixture===measuredReplica||dimensionFixtures.has(fixture)||fixingFixtures.has(fixture))continue;
  if(fixture===curvedSeatOnly){
   console.log('WT-021 curved Wave seat STL/3MF: 9 mm depth, 5.3 mm diameter, measured stock behind the seat');
   continue;

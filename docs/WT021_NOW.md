@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** DIM-04 and FIT-03, trace the exported channel through the fitting junctions and exterior apertures.
+- **Target:** DIM-05 and PAR-01, independently measure fixing recess depths and mechanical stock after mounting and backing edits.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Extend the pinned channel export test beyond the interior bend samples. Independently measure the complete usable path, its clearance at both seat junctions, and its exterior openings.
+- **Next test:** Use real Build controls to edit a recessed fixing in a production-family fixture. Independently measure the revised bore and remaining stock in STL and 3MF, check that the prior job becomes stale, and confirm an unsafe change cannot export.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

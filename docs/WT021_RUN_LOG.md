@@ -146,3 +146,8 @@
 ### 2026-11-20 - native bend constraints and export probes
 
 - Added the 1–60 mm bend control and used the setting for internal links and pinned tails. A 60 mm constraint fails the test fixture with tight pinned bends. STL and 3MF radius and sampled span-length probes passed. DIM-04 and FIT-03 remain partial.
+
+### 2026-11-20 - route continuity at apertures and junctions
+
+- The paired STL/3MF fixture checks a 71.786 mm routed span from aperture to aperture through both bores. Six rays per segment cover a 2.9 mm corridor at two depths. Opposite wall rays independently measure the two 3.2 mm exterior openings. The flanged shaped-socket fixture also passes corridor checks through both junctions.
+- DIM-05: both formats measured the parallel recess and tapered countersink, and verified 8.6 mm stock behind the parallel recess. Next verify revised geometry and stale downloads after a real Build edit.

@@ -117,3 +117,8 @@ Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) co
 
 - Build has an editable minimum bend radius, and incompatible pin and radius combinations are rejected during preparation. Independent STL and 3MF probes matched the sampled curved-span lengths within 0.06 mm and found radii of at least 4.75 mm for the 5 mm fixture.
 - Next measure the complete path through fitting junctions and apertures.
+
+### Whole cable path through the exported mesh
+
+- Both STL and 3MF passed obstruction checks along the entire 71.786 mm pinned route, including both junctions and both exterior openings. The measured apertures were 3.2 mm wide. A separate shaped-socket specimen preserved uninterrupted clearance.
+- Both formats also measured paired 4 mm fastener bores, 6 mm counterbores with 1.4 mm recess depth, 8.6 mm of stock, and the countersink taper on rectangular stock. Next verify the same dimensions after a production-family Build edit.

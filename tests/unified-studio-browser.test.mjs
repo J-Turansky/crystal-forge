@@ -1478,7 +1478,10 @@ try{
    await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].socketProfile.retentionLip===.2);
    const bendRadius=gearPalette.getByLabel('Minimum bend radius (mm)');
    await bendRadius.fill('5.5');await bendRadius.press('Tab');
+   const wireWidth=gearPalette.getByLabel('Requested wire-track width (mm)');
+   await wireWidth.fill('6');await wireWidth.press('Tab');
    const calibratedBuild=await page.evaluate(()=>window.__sensoryStudio.currentModel.build);
+   assert.equal(calibratedBuild.serialRouting.channelWidthMm,6);
    assert.equal(calibratedBuild.serialRouting.minBendRadius,5.5);
    assert.equal(calibratedBuild.pixelHoles[0].clearance,.5);
    await page.locator('#smsProjectTitle').fill('WT-021 Gear manufacturing journey');
@@ -1528,7 +1531,7 @@ try{
     const other=calibratedBuild.pixelHoles[1];
     const groove=[(fitting.x+other.x)/2,-(fitting.z+other.z)/2,fitting.surface.y-1];
     const grooveA=hit(groove,[0,-1,0]),grooveB=hit(groove,[0,1,0]);
-    assert(grooveA&&grooveB&&Math.abs(grooveA.distanceTo(grooveB)-3.2)<.04,format+' actual routed wire width is independent of fit calibration');
+    assert(grooveA&&grooveB&&Math.abs(grooveA.distanceTo(grooveB)-6)<.04,format+' actual routed wire width is independent of fit calibration');
     for(const mount of mounts){
      assert.equal(hit([mount.x,-mount.z,-1],[0,0,1]),undefined,format+' routed project retains the mounting through-hole');
     }
