@@ -10,6 +10,27 @@ try{
  const url=new URL(process.env.CRYSTAL_FORGE_URL||'http://127.0.0.1:4321');url.searchParams.set('layout','legacy');
  await page.goto(url.href,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__sensoryStudio,null,{timeout:60000});
+ {
+  const control=page.locator('#themeBtn');
+  const tooltip=page.getByRole('tooltip');
+  await control.evaluate(el=>{
+   const hint=document.createElement('span');
+   hint.id='tooltip-test-hint';hint.hidden=true;hint.textContent='Existing guidance.';
+   el.after(hint);el.setAttribute('aria-describedby',hint.id);
+  });
+  try{
+   await control.focus();
+   await tooltip.waitFor();
+   assert.equal(await control.getAttribute('aria-describedby'),'tooltip-test-hint controlTooltip');
+   await control.press('Escape');
+   await tooltip.waitFor({state:'hidden'});
+   assert.equal(await control.getAttribute('aria-describedby'),'tooltip-test-hint');
+   assert.equal(await control.evaluate(el=>el===document.activeElement),true,'Escape dismisses help without moving focus.');
+  }finally{
+   await control.evaluate(el=>{el.blur();el.removeAttribute('aria-describedby');document.getElementById('tooltip-test-hint').remove();});
+  }
+  console.log('Keyboard help preserves the control description before and after Escape.');
+ }
  assert.equal(await page.locator('.collapsible-section[open]').count(),0,'Sections start closed.');
  assert((await page.locator('.section-descriptor').first().innerText()).length>10);
  await page.locator('.left details.collapsible-section').first().locator('summary').first().click();
