@@ -237,11 +237,22 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{},inspectFittin
    if(!recess.fixingRecess)continue;
    const [x,y,z]=recess.position;
    // Protect 1 mm around the recess and 1.6 mm behind its shoulder.
-   const stockDepth=y+recess.height/2+1.6,stockRadius=recess.radius+1;
+   const top=recess.fixingTopEntry,surfaceY=recess.fixingSurfaceY??0;
+   const shoulder=y+(top?-1:1)*recess.height/2;
+   const stockDepth=Math.abs(shoulder-surfaceY)+1.6,stockRadius=Math.max(recess.radius,recess.topRadius??0)+1;
    const envelope=hold(hold(wasm.Manifold.cylinder(stockDepth,stockRadius,stockRadius,48))
-    .rotate([-90,0,0]).translate([x,0,z]));
+    .rotate([-90,0,0]).translate([x,top?surfaceY-stockDepth:surfaceY,z]));
    if(envelope.volume()-hold(total.intersect(envelope)).volume()>.05)
-    throw Error(recess.fixingRecess+' needs continuous underside stock, with 1 mm around the cut and 1.6 mm behind it.');
+    throw Error(recess.fixingRecess+(top?' needs continuous planar top stock':' needs continuous underside stock')+', with 1 mm around the cut and 1.6 mm behind it.');
+   if(top){
+    const obstructionHeight=total.boundingBox().max[1]-surfaceY;
+    if(obstructionHeight>0){
+     const approach=hold(hold(wasm.Manifold.cylinder(obstructionHeight,stockRadius-1,stockRadius-1,48))
+      .rotate([-90,0,0]).translate([x,surfaceY,z]));
+     if(hold(total.intersect(approach)).volume()>.05)
+      throw Error(recess.fixingRecess+' needs an unobstructed top opening.');
+    }
+   }
    for(const cut of recipe.negative){
     if(cut.fixingId===recess.fixingId)continue;
     if(hold(envelope.intersect(convert(cut))).volume()>.05)

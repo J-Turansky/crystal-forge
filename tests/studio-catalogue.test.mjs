@@ -457,16 +457,21 @@ const manualRecess={id:'manual-recess',x:-15,z:0,entryFace:'underside',diameter:
 const manualRecipe=applyBuildModules(flatStock,{manualMountHoles:[manualRecess]});
 assert.equal(manualRecipe.negative.find(cut=>cut.manualMountRecess).topRadius,2);
 assert.equal(prepareRecipe(THREE,wasm,manualRecipe).bodies.length,1);
-assert.throws(()=>applyBuildModules(flatStock,{manualMountHoles:[{...manualRecess,entryFace:'top'}]}),/solid underside face/);
+assert.throws(()=>applyBuildModules(flatStock,{manualMountHoles:[{...manualRecess,entryFace:'top'}]}),/supported planar top face/);
 assert.throws(()=>applyBuildModules(flatStock,{manualMountHoles:[{...manualRecess,recessDiameter:4}]}),/wider than the through-hole/);
 assert.throws(()=>prepareRecipe(THREE,wasm,{...manualRecipe,positive:[{kind:'box',size:[70,4,40],position:[0,2,0]}]}),/needs continuous underside stock/);
+const topRecessRecipe=applyBuildModules(topRouteStock,{manualMountHoles:[{...manualRecess,entryFace:'top'}]});
+assert.throws(()=>prepareRecipe(THREE,wasm,{...topRecessRecipe,
+ positive:[{kind:'box',size:[70,4,40],position:[0,8,0]}]}),/needs continuous planar top stock/);
+assert.throws(()=>prepareRecipe(THREE,wasm,{...topRecessRecipe,
+ positive:[{kind:'box',size:[70,12,40],position:[0,6,0]}]}),/needs an unobstructed top opening/);
 for(const [fixture] of fixingFixtures){
  const thin={...fixture,positive:[{kind:'box',size:[70,2.8,40],position:[0,1.4,0]}]};
  assert.throws(()=>prepareRecipe(THREE,wasm,thin),/needs continuous underside stock/);
  const interrupted={...fixture,negative:[...fixture.negative,{kind:'box',size:[1,2,2],position:[18.5,1,0]}]};
  assert.throws(()=>prepareRecipe(THREE,wasm,interrupted),/too close to another cut/);
 }
-for(const fixture of [...fixingFixtures.keys(),vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
+for(const fixture of [...fixingFixtures.keys(),topRecessRecipe,vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -546,6 +551,13 @@ for(const fixture of [...fixingFixtures.keys(),vaultedStock,pinnedVault,topRoute
    assert(Math.abs(span([0,0,.8])-dimensions.width)<.02,format+' '+dimensions.name+' route width');
    const apex=hit([-15,0,-1],[0,0,1]);
    assert(apex&&Math.abs(apex.z-9)<.01,format+' shaped socket roof stays at the measured 9 mm body length');
+  }else if(fixture===topRecessRecipe){
+   for(const [height,diameter] of [[9.9,6.9],[8,5],[6,4]]){
+    const left=hit([-15,0,height],[0,-1,0]),right=hit([-15,0,height],[0,1,0]);
+    assert(left&&right&&Math.abs(left.distanceTo(right)-diameter)<.01,format+' top countersink section at '+height+' mm');
+   }
+   const taper=hit([-15,2.5,5],[0,0,1]);
+   assert(taper&&Math.abs(taper.z-8)<.01,format+' measured taper depth and residual stock');
   }else if(fixture===measuredReplica){
    const apex=hit([0,0,12],[0,0,-1]);
    const flange=hit([0,8,.7],[0,-1,0]),shaft=hit([0,8,4.5],[0,-1,0]);

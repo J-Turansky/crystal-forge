@@ -164,3 +164,7 @@
 ### 2026-11-20 - manual underside recessed fixings
 
 - Added counterbore and countersink profiles to individual underside mounts. Chromium measured the 5.1 mm recess, 3.4 mm pilot and 3 mm depth in both downloads and verified invalid depth rollback. Catalogue tests passed manual countersink stock and input guards. Other faces and tab recesses remain open.
+
+### 2026-11-20 - planar top recessed fixings
+
+- Manual planar Gear top recesses use the production stock envelope, which rejects thin stock and blocked entry. Focused Chromium and independent STL/3MF sections confirm the countersink and pilot with an underside counterbore on the same model. External tab recesses remain open.

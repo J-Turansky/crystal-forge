@@ -1425,14 +1425,14 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const mount=mounts[selected],profile=mount?.profile??mountProfiles[0];
   const block=document.createElement('fieldset');block.setAttribute('aria-label','Mounting holes');
   block.innerHTML='<legend>Mounting &amp; attachments</legend>'+
-   '<p>Place vertical 2–8 mm through-holes on a solid top or underside. Select an underside mount to add a counterbore or countersink.</p>'+
+   '<p>Place vertical 2–8 mm through-holes on a solid top or underside. Add a counterbore or countersink to an underside or supported planar top mount.</p>'+
    '<div class="sms-actions"><button type="button" data-place-mount'+(locked||mounts.length>=16?' disabled':'')+'>Place mounting hole in 3D</button>'+
    (mountingModel===model.id?'<button type="button" data-done-mount>Done placing mounts</button>':'')+'</div>'+
    '<div class="sms-actions" aria-label="Select mount">'+mounts.map((mount,i)=>'<button type="button" data-select-mount="'+i+'" aria-pressed="'+(i===selected)+'">M'+(i+1)+'</button>').join('')+'</div>'+
    (selected<0?'':('<fieldset><legend>M'+(selected+1)+' · '+esc(profile)+'</legend>'+
     [['x','X (mm)','-200','200'],['z','Z (mm)','-200','200'],['diameter','Hole diameter (mm)','2','8']].map(([field,label,min,max])=>
      '<label>'+label+'<input type="number" data-mount-field="'+field+'" min="'+min+'" max="'+max+'" step=".1" value="'+esc(mounts[selected][field])+'"'+disabled+'></label>').join('')+
-    (mount.entryFace==='underside'?'<label>Mount profile<select data-mount-profile'+disabled+'>'+mountProfiles.map(option=>
+    (mount.entryFace==='underside'||profile!==mountProfiles[0]||Number.isFinite(family.recipe(model.parameters).serialSupport?.topY)?'<label>Mount profile<select data-mount-profile'+disabled+'>'+mountProfiles.map(option=>
      '<option'+(option===profile?' selected':'')+'>'+option+'</option>').join('')+'</select></label>':'')+
     (profile!==mountProfiles[0]?[['recessDiameter','Recess diameter (mm)',12],['recessDepth','Recess depth (mm)',8]].map(([key,label,max])=>
      '<label>'+label+'<input type="number" required min=".5" max="'+max+'" step="any" data-mount-recess="'+key+

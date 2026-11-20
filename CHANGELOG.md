@@ -4,7 +4,7 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
-- Individually placed underside mounts support counterbores and countersinks with exact recess diameter and depth. Build checks the available material before saving.
+- Individually placed underside and supported planar top mounts support counterbores and countersinks with exact recess diameter and depth. Build checks the available material before saving.
 
 - Build checks the actual material around recessed screw fixings before saving. Thin stock and nearby cuts that remove the supporting material are refused.
 - Build restores the last accepted fixing diameter after an out-of-range edit and preserves exact fractional diameters.

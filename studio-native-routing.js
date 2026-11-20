@@ -240,7 +240,7 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
  const mounts=recipe.negative.filter(part=>part.mountHole||part.manualMountRecess);
  const mountConflicts=(mount,path)=>{
   const [x,,z]=mount.position;
-  const clearance=mount.radius+radius+routeSideStock;
+  const clearance=Math.max(mount.radius,mount.topRadius??0)+radius+routeSideStock;
   if(front){
    // A through-hole spans all vertical positions on the front routing plane.
    if(z+mount.radius<front.z-depth-roof)return false;

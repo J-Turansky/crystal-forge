@@ -4,6 +4,7 @@ Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) co
 
 ## Latest checkpoint
 
+- Planar Gear tops accept manually placed screw recesses alongside underside fixings. Manifold and independently decoded STL and 3MF verify the top taper. Thin or buried stock is refused. Focused Chromium prepared and downloaded a Gear with both faces in use.
 - Manual underside counterbores and countersinks use independently editable dimensions and production stock checks. Chromium verified the Gear counterbore in downloaded STL and 3MF and confirmed rollback of an invalid depth.
 
 ## Earlier implementation

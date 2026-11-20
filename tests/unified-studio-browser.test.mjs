@@ -2016,6 +2016,33 @@ try{
    assert(Math.abs(hit(-z+2,-1,0,1).point.z-3)<.01);
    geometry.dispose();
   }
+  await buildTab.click();
+  await page.locator('[data-view=top]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await palette.getByRole('button',{name:'Place mounting hole in 3D'}).click();
+  const upper=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(20,0,'top'));
+  assert(upper);await page.mouse.click(upper.x,upper.y);
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.manualMountHoles?.length===2);
+  await page.keyboard.press('Escape');
+  await palette.locator('[data-mount-profile]').selectOption('Countersink');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[1].profile==='Countersink');
+  const topMount=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[1]);
+  assert.equal(topMount.entryFace,'top');
+  await printTab.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  await job.locator('[data-job-prepare]').click();
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const topSTL=await useDownload(job.locator('[data-job-stl]'));
+  const topMF=await useDownload(job.locator('[data-job-3mf]'));
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(topSTL.bytes).buffer),
+   read3MFGeometry(zipEntries(topMF.bytes).get('3D/3dmodel.model').toString())]){
+   const mesh=new THREE.Mesh(geometry,material);
+   const width=height=>[-1,1].reduce((sum,side)=>sum+new THREE.Raycaster(
+    new THREE.Vector3(topMount.x,-topMount.z,height),new THREE.Vector3(0,side,0)).intersectObject(mesh)[0].distance,0);
+   assert(Math.abs(width(9.3)-4.25)<.01);
+   assert(Math.abs(width(8)-3.4)<.01);
+   geometry.dispose();
+  }
   material.dispose();
  }
  {

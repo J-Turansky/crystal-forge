@@ -20,7 +20,8 @@ export function mountHoleIssue(recipe,mount,otherMounts=[],pixelHoles=[]){
  if(!mountProfiles.includes(profile))return 'Choose a supported fixing profile.';
  if(profile!==mountProfiles[0]){
   const recess=recessDimensions(mount);
-  if(mount.entryFace!=='underside')return 'Place the mount on a solid underside face to add a recess.';
+  if(mount.entryFace!=='underside'&&!Number.isFinite(recipe.serialSupport?.topY))
+   return 'Place the mount on an underside or supported planar top face to add a recess.';
   if(!Number.isFinite(recess.diameter)||recess.diameter<mount.diameter+.4||recess.diameter>12||
      !Number.isFinite(recess.depth)||recess.depth<.5||recess.depth>8)
    return 'Choose a recess 0.5–8 mm deep and at least 0.4 mm wider than the through-hole, up to 12 mm.';
@@ -49,9 +50,12 @@ export function addManualMountCuts(recipe,build={}){
   });
   if(mount.profile&&mount.profile!==mountProfiles[0]){
    const {diameter,depth}=recessDimensions(mount);
-   const cut={kind:'cylinder',radius:diameter/2,height:depth+.2,position:[mount.x,(depth-.2)/2,mount.z],
-    fixingId,fixingRecess:'M'+(i+1)+' recess',manualMountRecess:true};
-   if(mount.profile==='Countersink')cut.topRadius=mount.diameter/2;
+   const top=mount.entryFace!=='underside',surfaceY=top?recipe.serialSupport.topY:0;
+   const tapered=mount.profile==='Countersink',pilot=mount.diameter/2,opening=diameter/2;
+   const outer=tapered?opening+(opening-pilot)*.2/depth:opening;
+   const cut={kind:'cylinder',radius:top&&tapered?pilot:outer,topRadius:!top&&tapered?pilot:outer,
+    height:depth+.2,position:[mount.x,surfaceY+(top?-1:1)*(depth-.2)/2,mount.z],
+    fixingId,fixingRecess:'M'+(i+1)+' recess',manualMountRecess:true,fixingSurfaceY:surfaceY,fixingTopEntry:top};
    recipe.negative.push(cut);
   }
  }
