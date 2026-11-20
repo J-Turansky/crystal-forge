@@ -41,6 +41,10 @@ Physical-only gate (#10): owner reported a tight but successful fit and a roughl
 - **Next actions and exact gates:** see [WT021_CODEX_HANDOFF.md](WT021_CODEX_HANDOFF.md). Keep all rows PARTIAL until their individual browser, exported-mesh and, where necessary, owner-only physical requirements are evidenced.
 - **Original Cura dimensional discrepancy:** cannot be reconciled without the owner's original project, STL and Cura import/layer-view evidence. Keep #10 open.
 
+## Historical evidence notes
+
+The following sections preserve the earlier incremental fixture history. Their older “Next” statements are superseded by the up-to-date acceptance table, verified checkpoint in the Resume record, and [WT021_CODEX_HANDOFF.md](WT021_CODEX_HANDOFF.md).
+
 ### Crystal exported route and socket evidence
 
 - tests/fabrication.test.mjs now independently decodes a complete Crystal's STL and 3MF. The single-pixel IN/OUT fixture samples the usable channel at intervals of at most 1 mm, across a 5.8 mm span and to 1.95 mm depth. Both formats pass. A shallow backing is refused. Exact bend/edge cross sections and multi-pixel junction coverage remain open.
@@ -51,10 +55,10 @@ Physical-only gate (#10): owner reported a tight but successful fit and a roughl
 
 - tests/fabrication.test.mjs: two offset gumdrop sockets with retention, sampled curved link, IN and OUT. The independently decoded STL and 3MF pass route clearance point probes and both roof apex and radial slope measurements. A 25 mm inter-pixel cable is rejected. Existing single-pixel, thin backing and shallow socket checks remain.
 - The fixture reproduced degenerate STL facets from overlapping vaulted cuts. fabrication-v1.js rebuilds and simplifies the Manifold at 0.0001 mm tolerance, and refuses volume drift over 0.01 cubic millimetres.
-- Next: use explicit exterior-face cross sections and bend-radius checks, add blocked-exit and collision cases with state preservation, and implement FIT-02 physical preview. Keep DIM-04 and FAB-01/02 PARTIAL.
+- Historical next step at this point: exact exterior-face cross-sections and bend-radius checks, blocked exits, and collision/state preservation. **The initial Crystal FIT-02 preview was subsequently implemented and the shared Gear/Tile positive/negative preview now has targeted acceptance evidence.** DIM-04 and FAB-01/02 remain PARTIAL.
 
 ### FIT-02 Crystal viewport
 
 - PARTIAL. Crystal Build can toggle translucent, profile-derived housing and the production socket cutter at accepted underside seats. It reports insertion depth, centre roof, volume outside the base and Boolean interference with the base. Collision changes the positive overlay colour.
 - The Chromium dimensional workflow now exercises the Build preview toggle on a 22 mm gumdrop with a conical socket. The earlier downloaded STL/3MF dimensional assertions still pass. The base interference check does not yet account for all routed cuts or arbitrary faces.
-- Next: reuse cutter pose and positive housing for native Gear/Tile seats, compare the visible transform to downloaded geometry, and cover invalid placement, drag and state preservation.
+- Historical next step at this point: extend to native Gear/Tile. **Shared Gear-top/Tile-underside preview and production-cutter parity are now covered** (see FIT-02 row). Independently downloaded positive/cutter dimensions, arbitrary-face drag and invalid-state preservation are still unverified.
