@@ -11,9 +11,11 @@ function exportPoint(input,i){
  if(!point.every(Number.isFinite))throw Error('Non-finite material vertex.');
  return point;
 }
-export function preparedDimensionsMm(prepared){
+export function preparedDimensionsMm(prepared,role){
  const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
- for(const {mesh} of prepared.bodies){
+ for(const body of prepared.bodies){
+  if(role!==undefined&&body.role!==role)continue;
+  const {mesh}=body;
   const stride=mesh.numProp??3,input=mesh.vertProperties??mesh.points;
   if(!input?.length||stride<3||input.length%stride)throw Error('Invalid material vertices.');
   for(let i=0;i<input.length;i+=stride){

@@ -184,12 +184,13 @@ export function planPixelStringRoutes(crystals,s,hardware){
  plan.unrouted=(pixels.length-1+(s.wireInputEnabled!==false?1:0)+(s.wireOutputEnabled!==false?1:0))-plan.connections.length;
  plan.previewRoutes=all; // show over-length runs in RED even when export is blocked
  plan.lengthMm=all.reduce((sum,r)=>sum+r.lengthMm,0);
- if(plan.unrouted||plan.overLengthCount){
+ if(plan.unrouted||(plan.overLengthCount&&s.wireAllowOverLength!==true)){
   plan.messages.push('Manufacturing blocked: '+plan.unrouted+' unrouted connection(s), '+plan.overLengthCount+
     ' over-length cable run(s). Adjust rotations/spacing or positions before Prepare Print.');
   return plan;
  }
  plan.routes=all;plan.ready=true;
+ if(plan.overLengthCount)plan.messages.push('Cable length is advisory for this model. Use longer wires for the marked runs.');
  plan.messages.push('Validated physical P1→P'+pixels.length+' cable-string path; verify your measured cable and real print.');
  return plan;
 }

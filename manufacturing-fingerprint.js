@@ -1,5 +1,6 @@
 /* Physical manufacturing geometry signature. Visual guides do not invalidate exports. */
 export const relevantManufacturingKeys=[
+ 'wireAllowOverLength','wireEntryX','wireEntryZ','wireOutputX','wireOutputZ','wireInputEnabled','wireOutputEnabled',
  'count','height','width','crystalSize','widthRandomness','seed','pattern','spacing','leanMode','leanAmount','angleRandomness','familyMix','familyWeights','bottomScale','topScale',
  'cornerRadius','shoulderRound','tipFlat','tipRound','tipStyle','tipLength','roundSteps',
  'baseType','baseHeight','baseDome','baseEdgeRadius','baseProfile','domeFalloff','sideWall','baseWidth','baseStyle','undersideAccess','baseVault','vaultSupportPitch','wallThickness','lightPorts','lightPortDiameter','lightPortReach','lightingMode','pixelCount','pixelDiameter',

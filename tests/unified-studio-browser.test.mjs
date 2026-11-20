@@ -879,10 +879,13 @@ try{
  assert(await dual.locator('[data-job-3mf]').isDisabled());
  assert(await dual.locator('[data-job-export]').isDisabled());
  assert.match(await dual.innerText(),/Choose Ultimaker 3 Extended for two materials/);
+ for(const role of ['primary','secondary'])
+  await dual.getByText(new RegExp('^Prepared '+role+' STL X × Y × Z: \\d+\\.\\d{2} × \\d+\\.\\d{2} × \\d+\\.\\d{2} mm$')).waitFor();
  await page.locator('.sms-workspace-nav [data-tab=design]').click();
  await page.locator('.sms-palette [data-palette-key=width]').press('ArrowRight');
  await openPrint();
  assert.match(await dual.innerText(),/Stale/);
+ assert.equal(await dual.getByText(/^Prepared (primary|secondary) STL/).count(),0);
  assert(await dual.locator('[data-job-export]').isDisabled());
  {
   await page.locator('#smsNew').click();

@@ -23,6 +23,8 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
  preview.visible=false;
  const ray=new THREE.Raycaster(),cursorNDC=new THREE.Vector2();
  const ground=new THREE.Plane(new THREE.Vector3(0,1,0),0);
+ const edgeMarkerHeight=.8;
+ const edgeMarkerPlane=new THREE.Plane(new THREE.Vector3(0,1,0),-edgeMarkerHeight);
  let placing=null,pointerStart=null,lastCursor=null,draggingHole=null,selectedHardware=null,markerDrag=null;
  let edgeDrag=null,guideWorker=null,guideSerial=0;
  const movementGuides=new THREE.Group();movementGuides.name='Cable-constrained movement guide';scene.add(movementGuides);
@@ -153,7 +155,7 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
    if(e.button!==0||!isBuild()||placing||!canEdit())return;
    e.stopPropagation();
    if(selectedHardware?.kind!==kind||selectedHardware?.id!==id)return;
-   if(kind==='tab'||invalid||markerDrag)return;
+   if(kind==='tab'||invalid||markerDrag||edgeDrag)return;
    const cfg=getSettings(),isPixel=kind==='pixel',key=isPixel?'manualPixelHoles':'manualMountHoles';
    const mode=isPixel?'pixelPlacement':'mountPlacement';
    const plan=getPlan();
@@ -175,7 +177,7 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
   markerLayer.hidden=!build||!!placing;
   movementGuides.visible=build&&!placing&&!getManufacturingVisible();
   if(build&&!placing&&rect.width&&rect.height)for(const {button,p} of markerObjects){
-   const pt=new THREE.Vector3(p.x,.8,p.z).project(camera);
+   const pt=new THREE.Vector3(p.x,edgeMarkerHeight,p.z).project(camera);
    const visible=pt.z>-1&&pt.z<1&&Math.abs(pt.x)<1.2&&Math.abs(pt.y)<1.2;
    button.hidden=!visible;
    if(visible){
@@ -292,15 +294,26 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
  }
  function addEdgeMarker(kind,p){
   const button=document.createElement('button');button.type='button';button.className='hardware-marker hardware-edge-marker edge-'+kind;
+  button.style.touchAction='none';
+  button.style.cursor='grab';
   button.textContent=kind==='input'?'IN':'OUT';button.dataset.edgeWire=kind;
   button.dataset.tooltipTitle=kind==='input'?'Input cable opening':'Output cable opening';
   button.dataset.tooltipBody='Drag this '+kind+' opening along the base edge. Only positions within the chosen curved cable length and clear of other hardware can be applied. The coloured edge line shows sampled available positions.';
   button.setAttribute('aria-label','Move '+kind+' edge wire opening');
   button.onclick=e=>{e.stopPropagation();requestMovementGuide({edgeKind:kind});};
-  button.onpointerdown=e=>{if(e.button!==0||placing)return;e.preventDefault();e.stopPropagation();
-   const state=getSettings();edgeDrag={kind,original:copy(state),startX:e.clientX,startY:e.clientY,moved:false,lastValid:null,lastPreview:0,endingValid:false};requestMovementGuide({edgeKind:kind});
+  button.onpointerdown=e=>{
+   if(e.button!==0||placing||markerDrag||edgeDrag||!isBuild()||!canEdit())return;
+   e.preventDefault();e.stopPropagation();
+   button.focus({preventScroll:true});
+   const rect=button.getBoundingClientRect();
+   edgeDrag={kind,pointerId:e.pointerId,crystals:getCrystals(),original:JSON.stringify(getSettings()),
+    startX:e.clientX,startY:e.clientY,offsetX:e.clientX-rect.left-rect.width/2,
+    offsetY:e.clientY-rect.top-rect.height/2,moved:false,lastPreview:-Infinity};
+   button.setPointerCapture(e.pointerId);
+   requestMovementGuide({edgeKind:kind});
   };
   button.onkeydown=e=>{
+   if(!isBuild()||placing||edgeDrag||!canEdit())return;
    const delta={ArrowLeft:-1,ArrowUp:-1,ArrowRight:1,ArrowDown:1}[e.key];if(!delta)return;e.preventDefault();
    const poly=getPlan().polygon,near=nearestEdgePosition(poly,p),step=(e.shiftKey?5:1)/Math.max(1,poly.reduce((n,a,i)=>n+Math.hypot(a.x-poly[(i+1)%poly.length].x,a.z-poly[(i+1)%poly.length].z),0));
    const u=(near.u+delta*step+1)%1;let travelled=0;const total=poly.reduce((n,a,i)=>n+Math.hypot(a.x-poly[(i+1)%poly.length].x,a.z-poly[(i+1)%poly.length].z),0);
@@ -696,21 +709,46 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
  const canvas=renderer.domElement;
  // A second click-and-hold on a selected marker moves the actual socket.
  // Preserve orbit on empty canvas and commit only once the pointer is released.
+ function solveEdgeDrag(drag,e){
+  const rect=canvas.getBoundingClientRect();
+  if(!isBuild()||!canEdit()||placing||drag.crystals!==getCrystals()||drag.original!==JSON.stringify(getSettings())||
+    !rect.width||!rect.height||e.clientX<rect.left||e.clientX>rect.right||e.clientY<rect.top||e.clientY>rect.bottom)return null;
+  cursorNDC.set(2*(e.clientX-drag.offsetX-rect.left)/rect.width-1,1-2*(e.clientY-drag.offsetY-rect.top)/rect.height);
+  ray.setFromCamera(cursorNDC,camera);
+  const edgePoint=ray.ray.intersectPlane(edgeMarkerPlane,new THREE.Vector3());
+  if(!edgePoint)return null;
+  const draft=copy(getSettings());
+  draft.constrainPixelMotion=true;
+  return solvePixelMove(drag.crystals,draft,{edgeKind:drag.kind,edgePoint});
+ }
+ function finishEdgeDrag(e){
+  const drag=edgeDrag;
+  edgeDrag=null;
+  if(!drag.moved)return;
+  orbit.enabled=!placing&&!gizmo.dragging;
+  const result=e&&solveEdgeDrag(drag,e);
+  if(result?.valid){
+   applyWireDraft(result.settings);onEdit();requestMovementGuide({edgeKind:drag.kind});
+   onStatus('Moved '+drag.kind+' perimeter opening; pixel rotation and curved length checked.');
+  }else{
+   refresh();
+   onStatus('Move cancelled · original '+drag.kind+' perimeter opening kept.');
+  }
+ }
  document.addEventListener('pointermove',e=>{
-  if(!edgeDrag)return;if(Math.hypot(e.clientX-edgeDrag.startX,e.clientY-edgeDrag.startY)<4&&!edgeDrag.moved)return;
-  e.preventDefault();const now=performance.now();if(now-edgeDrag.lastPreview<70)return;edgeDrag.lastPreview=now;
-  const data=findPoint(e);if(!data)return;edgeDrag.moved=true;orbit.enabled=false;
-  const draft=copy(getSettings());draft.constrainPixelMotion=true;if(!draft.wireInputTailLength)draft.wireInputTailLength=draft.pixelStringSpacing||50;if(!draft.wireOutputTailLength)draft.wireOutputTailLength=draft.pixelStringSpacing||50;
-  const result=solvePixelMove(getCrystals(),draft,{edgeKind:edgeDrag.kind,edgePoint:data.pos});edgeDrag.endingValid=result.valid;
-  if(result.valid){applyWireDraft(result.settings);edgeDrag.lastValid=copy(result.settings);draw(result.plan,true);onStatus('Edge opening is within the curved cable length. Release to apply.');}
-  else onStatus('Edge movement blocked by cable length, bend or clearance. Release here cancels the move.');
+  const drag=edgeDrag;
+  if(!drag||e.pointerId!==drag.pointerId||(!drag.moved&&Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)<4))return;
+  e.preventDefault();drag.moved=true;orbit.enabled=false;
+  const now=performance.now();
+  if(now-drag.lastPreview<70)return;
+  drag.lastPreview=now;
+  const result=solveEdgeDrag(drag,e);
+  draw(result?.valid?result.plan:getPlan(),true);
+  onStatus(result?.valid?'Edge opening is ready. Release to apply.':'Edge movement blocked. Release here to keep the original opening.');
  },true);
- document.addEventListener('pointerup',()=>{
-  if(!edgeDrag)return;const drag=edgeDrag;edgeDrag=null;orbit.enabled=!placing&&!gizmo.dragging;
-  if(!drag.moved)return;applyWireDraft(drag.endingValid&&drag.lastValid?drag.lastValid:drag.original);onEdit();requestMovementGuide({edgeKind:drag.kind});
-  onStatus(drag.endingValid?'Moved '+drag.kind+' perimeter opening; pixel rotation and curved length checked.':'Invalid release: original edge opening restored.');
- },true);
- document.addEventListener('pointercancel',()=>{if(edgeDrag){const drag=edgeDrag;edgeDrag=null;applyWireDraft(drag.original);orbit.enabled=!placing&&!gizmo.dragging;onEdit();}},true);
+ document.addEventListener('pointerup',e=>{if(e.pointerId===edgeDrag?.pointerId)finishEdgeDrag(e);},true);
+ for(const event of ['pointercancel','lostpointercapture'])
+  document.addEventListener(event,e=>{if(e.pointerId===edgeDrag?.pointerId)finishEdgeDrag();},true);
  function updateMarkerDrag(e,final=false){
   const drag=markerDrag;
   if(!drag||e.pointerId!==drag.pointerId)return;
@@ -857,6 +895,7 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
  });
  document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
+   if(edgeDrag){finishEdgeDrag();e.preventDefault();return;}
    if(markerDrag){finishMarkerDrag(false);e.preventDefault();return;}
    if(!contextMenu.hidden)clearContext();
    if(placing)cancel();

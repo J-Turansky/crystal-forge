@@ -1,6 +1,9 @@
 # WT-021 overnight checkpoint
 
-[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `163b78443999b23cf2d507b73851d35d70ad3dc9`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
+[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) merged as `3326ac9`. [Follow-up PR #103](https://github.com/connorturansky-svg/crystal-forge/pull/103) covers print size and Crystal wiring. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/103/checks)
+
+- Print Centre shows dimensions for each STL in a two-material job. Crystal Build supports dragging both cable openings and treating cable lengths as warnings. Local Chromium moved both endpoints, rejected invalid drops, reloaded them, and independently measured both exports against the prepared dimensions. Re-enabling strict lengths invalidated both old downloads.
+- Next, measure the owner’s sample STL and compare its axis extents with the matching saved model revision. The original sample is pending.
 
 ## Owner experiment checkpoint
 

@@ -78,5 +78,9 @@ assert.equal(tooLong.routes.length,0,'Overlength string cuts are refused rather 
 assert(tooLong.previewRoutes.length>0,'Unprintable overlength path remains visible for red highlighting');
 assert(tooLong.connections.some(c=>c.overLength&&c.lengthMm>c.allowedMm),
  'Measured curved route length determines over-budget flag');
+const advisory=planHardware(crystals,{...close,wireAllowOverLength:true}).wirePlan;
+assert(advisory.ready&&advisory.overLengthCount===tooLong.overLengthCount);
+assert.deepEqual(advisory.routes,tooLong.previewRoutes);
+assert(advisory.messages.some(message=>message.includes('Use longer wires')));
 console.log('PR10 collinear 180-degree ports, tangent curve geometry and fail-closed spacing checks passed');
 console.log('PR9 pixel-string topology, opposed perimeter tails, serial order and identities passed');

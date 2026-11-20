@@ -1,6 +1,6 @@
 # WT-021 completion register
 
-Integration is confined to draft #102. Baseline: main 9fdccd4d1323114f840e407308ac51dba775986f includes #100; #102 c877115df9c92c79f9bf87b9c59dddced397fad4 incorporates the #101 tip implementation. #90 and #101 are open independently. #79 and #10 are open. Baseline CI passed static 44617761051, Chromium 44617760985 and fabrication 44617761039. Baseline suite results do not verify untested requirements.
+PR #102 merged as `3326ac9` with the #101 Crystal tip implementation. The owner prioritised print size and Crystal wire placement for follow-up [PR #103](https://github.com/connorturansky-svg/crystal-forge/pull/103). Software parity remains under #79 and physical Cura and print evidence remains under #10.
 
 **The 23 original WT-021 acceptance requirements remain intact. UX-01 P1 is an additional owner-approved UI task dated 20 November 2026, making 24 tracked items.** See [UX-01 brief](WT021_FEATURE_CATALOGUE_BRIEF.md).
 

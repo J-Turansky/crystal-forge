@@ -393,6 +393,8 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
    throw new Error('Pixel string route invalid: '+(hardware.wirePlan?.messages?.join(' ')||
     'Fix IN, linked pixels and OUT before preparing a printable mesh.'));
   warnings.push(...hardware.messages);
+  if(s.wireAllowOverLength===true&&hardware.wirePlan?.overLengthCount)
+   warnings.push(...hardware.wirePlan.messages);
   // Permanent semicircular fixing ears are fused to the base before drilling.
   if(hardware.tabs.length){
    const tabs=hardware.tabs.map(tab=>hold(wasm.Manifold.cylinder(
@@ -820,6 +822,7 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
   if(s.hollowCrystals&&!s.cutSockets&&!s.undersideAccess)warnings.push('Hollow chambers may be sealed. Enable socket openings or underside access for LED service and venting.');
   const report={ready:true,status:'Manifold mesh validated',printerFits,printerLimit:volumeLimit||null,roofReview,orientation,triangleCount:combined.numTri(),volumeMm3:volume,materialPLAgrams:volume/1000*1.24,initialVolume,disconnected,internalCavities,shellVolumes,
     bounds:size,quality,lightPassageInspection,hollowed,hollowPorts,skippedHollowPorts,directLightPorts,skippedDirectLightPorts,lightPortDetails,targetedLightCount,targetedLightAcceptedIds:acceptedTargetedLightIds,targetedLightSkipped:targetedPlan.skipped,baseFitsPixel,lightPathScreened,sealedCavitiesFilled,vault,ventCuts,socketCeilings,socketsCut,mountingHolesCut,edgeTabs:hardware.tabs.length,wireChannelsCut,wireLengthMm:hardware.wirePlan?.lengthMm||0,unroutedPixels:hardware.wirePlan?.unrouted||0,wireExitAdded:!!hardware.wirePlan?.exitAdded,
+     wireOverLengthCount:hardware.wirePlan?.overLengthCount||0,
      plannedSockets:hardware.sockets,plannedMounts:[...hardware.mounts,...hardware.tabHoles],hardware,warnings,mesh:indexed};
   return {geometry:geom,report};
  }finally{cleanupAll(owned)}

@@ -55,7 +55,17 @@ const splitLens=prepareRecipe(THREE,wasm,capGenerator.recipe({...indicator.param
 assert.deepEqual(splitLens.bodies.map(body=>body.role),['primary','secondary']);
 assert(Math.abs(splitLens.bodies.reduce((volume,body)=>volume+body.volume,0)-lens.bodies[0].volume)<1e-4,
  'The indicator material split must preserve the lens volume.');
-assert.equal(exportMaterialBodies(splitLens,{name:'indicator-lens-regression'}).stls.length,2);
+const lensStls=exportMaterialBodies(splitLens,{name:'indicator-lens-regression'}).stls;
+assert.equal(lensStls.length,2);
+for(const {role,bytes} of lensStls){
+ const geometry=new STLLoader().parse(bytes.buffer);
+ geometry.computeBoundingBox();
+ const measured=geometry.boundingBox.getSize(new THREE.Vector3()).toArray();
+ const reported=preparedDimensionsMm(splitLens,role);
+ assert(reported.every((dimension,axis)=>Math.abs(dimension-measured[axis])<.001),role+' STL dimensions');
+ geometry.dispose();
+}
+assert.notDeepEqual(preparedDimensionsMm(splitLens,'primary'),preparedDimensionsMm(splitLens,'secondary'));
 console.log('Indicator lens regression: connected material bodies, conserved volume and STL export passed.');
 const river=pebbleGenerator.presets.find(preset=>preset.id==='river');
 const riverSingle=prepareRecipe(THREE,wasm,pebbleGenerator.recipe({...river.parameters,dualMaterial:false}));
