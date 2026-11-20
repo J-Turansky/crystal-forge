@@ -292,3 +292,5 @@
 - Six native vaulted 6 mm routes passed independent roof slope, apex stock, upper passage and aperture measurements in both formats. Each refuses 4 mm backing. Together with Crystal’s asymmetric vaulted witness this verifies FAB-01.
 
 - The full unified Chromium suite passed real overlapping-drag rejection on backed Character, Light Pod and stationary Rotary Cap. FIT-01 is verified. The owner requested an experiment checkpoint. Freeze further feature expansion until a specific draft head has required CI evidence and a current handoff.
+
+- After #102 merged, PR #103 added per-material STL dimensions (`7894c48`), Crystal endpoint dragging (`f368e7a`) and advisory cable lengths (`b0045b2`). Local Chromium confirmed both revised downloads match the prepared bounds and toggling strict lengths invalidates the older files.

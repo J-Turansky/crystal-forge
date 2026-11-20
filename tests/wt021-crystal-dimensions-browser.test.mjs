@@ -496,6 +496,23 @@ try{
   await routedJob.getByText('Some cable runs need longer wires.',{exact:false}).waitFor();
   assert(await routedJob.locator('[data-job-stl]').isEnabled());
   assert(await routedJob.locator('[data-job-3mf]').isEnabled());
-  console.log('WT-021 both Crystal cable openings drag, reject outside release and survive reload');
+  const downloadRouted=async format=>{
+   const [file]=await Promise.all([page.waitForEvent('download'),routedJob.locator('[data-job-'+format+']').click()]);
+   return readFile(await file.path());
+  };
+  const movedStl=bounds(stlPoints(await downloadRouted('stl')));
+  const movedXml=modelXml(await downloadRouted('3mf'));
+  assert.match(movedXml,/<model unit="millimeter"/);
+  const moved3mf=bounds([...movedXml.matchAll(/<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"/g)].map(match=>match.slice(1).map(Number)));
+  for(const key of ['min','max'])for(let axis=0;axis<3;axis++)
+   assert(Math.abs(movedStl[key][axis]-moved3mf[key][axis])<.001,'Moved openings export with matching print bounds');
+  assert.deepEqual(await readDimensions(routedJob.getByText(/^Prepared X/)),movedStl.size.map(value=>Number(value.toFixed(1))));
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await wireControls.getByRole('checkbox',{name:'Allow over-length cables'}).uncheck();
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await routedJob.getByText('Stale',{exact:true}).waitFor();
+  assert(await routedJob.locator('[data-job-stl]').isDisabled());
+  assert(await routedJob.locator('[data-job-3mf]').isDisabled());
+  console.log('WT-021 moved cable openings persist and both exports match the prepared dimensions');
  }
 }finally{await browser.close();}
