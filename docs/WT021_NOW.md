@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** FIT-02 / FIT-03 P0, verify routed side walls and exterior apertures, then extend shaped sockets and routing to eligible side and curved faces.
+- **Target:** FIT-02 / FIT-03 P0, add an accepted non-underside routed fixture, then extend to eligible side and curved faces.
 - **Checkpoint:** shared Manifold preview now shows insertion approach, stock and adjacent-cut warnings from fabrication checks and measures wire/positive overlap. Gear/Tile and four additional compact backed-underside Manifold fixtures pass. Chromium proves adjacent Gear socket placement is rejected and the original fitting survives reload. Tile backing now has an editable thickness and reset; the test measures 8 mm in both downloaded formats. Wire overlap alone is informational because contact with the intended relief is normal.
-- **Next test:** Gear rejected-drag rollback passed locally. Native preparation now verifies the roof against actual stock and other cuts. Straight native exported route proofs now include flat 3.2 mm clearance, vaulted ceiling and both open exterior apertures. The pinned curved route now has independent 3.2 mm width and >6 mm roof checks in both formats. Next verify minimum residual side-wall stock and add an accepted non-underside routed fixture.
+- **Next test:** Gear rejected-drag rollback passed locally. Native preparation now verifies the roof against actual stock and other cuts. Straight native exported route proofs now include flat 3.2 mm clearance, vaulted ceiling and both open exterior apertures. The pinned curved route now has independent 3.2 mm width and >6 mm roof checks in both formats. Native underside preparation now rejects missing side stock and interfering cuts. Both exports retain at least 0.55 mm at sampled straight and curved vaulted sections. Next start with a planar upward-facing route fixture in tests/studio-catalogue.test.mjs and measure both exports.
 - **Then:** add Wave/Cap/Character/Pod interactive preview and export proof, arbitrary-face drag, side/curved continuous routing and seven independent browser-to-STL/3MF journeys.
 - **UX-01:** implement the approved catalogue after P0 work. Keep #10 for Cura and printed proof.
 

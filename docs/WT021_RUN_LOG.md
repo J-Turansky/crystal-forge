@@ -68,3 +68,9 @@
 - Independent native route export evidence: tests/studio-catalogue.test.mjs decoded binary STL and indexed 3MF separately, probing five cross sections including both edges. Both files had 3.2 mm usable width, expected lowered vault section at a 0.2 mm lateral offset, open cable direction through both exterior faces and material beside the openings. Test suite passed; no whole-family gate promoted.
 
 - Added the pinned curved witness in both formats. Surface-normal ray sections between the socket junction and exterior edge preserved 3.2 mm clearance within 0.06 mm and more than 6 mm roof stock in every sampled section. Browser regression including rejected Gear drag passed. Minimum side stock and independent curved radius remain open.
+
+### 2026-11-20 - native route side-wall stock
+
+- Base `960f9c90e4bbe486929aca11ec7ef825aa72bb10`; all three required GitHub workflows passed at that base.
+- Production Manifold checks a 0.55 mm side envelope against real stock and neighbouring cuts. A side-cut regression failed before the implementation. The catalogue suite then passed with that case, thin actual stock, and independently decoded STL/3MF straight and curved side-wall probes. FIT-02 and FIT-03 remain PARTIAL.
+- Next: create a physically cut planar top fixture in tests/studio-catalogue.test.mjs and measure the route and outlets in both exports.

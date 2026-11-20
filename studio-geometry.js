@@ -238,17 +238,21 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{},inspectFittin
      throw Error((part.pixelHole||part.mountHole||part.tabHole||part.wireChannel||'Cut')+' does not cut the model.');
     if(routeFootprint&&part.wireChannel&&part.junctionIds){
      const raised=hold(cut.translate([0,roofStock.thickness,0]));
-     let guard=hold(hold(raised.subtract(cut)).intersect(routeFootprint));
-     for(const other of recipe.negative){
-      if(part.junctionIds.includes(other.pixelId))guard=hold(guard.subtract(convert(other)));
+     const stockChecks=[[raised,'above']];
+     if(part.sideStock)stockChecks.push([convert(part.sideStock),'beside']);
+     for(const [envelope,direction] of stockChecks){
+      let guard=hold(hold(envelope.subtract(cut)).intersect(routeFootprint));
+      for(const other of recipe.negative){
+       if(part.junctionIds.includes(other.pixelId))guard=hold(guard.subtract(convert(other)));
+      }
+      for(const other of recipe.negative){
+       if(other===part||part.junctionIds.includes(other.pixelId))continue;
+       if(hold(guard.intersect(convert(other))).volume()>.05)
+        throw Error(part.wireChannel+' intersects another cut '+direction+' the channel. Move the route or the conflicting feature.');
+      }
+      if(guard.volume()-hold(total.intersect(guard)).volume()>.05)
+       throw Error(part.wireChannel+' lacks continuous material '+direction+' the channel. Increase fitting backing or move the route.');
      }
-     for(const other of recipe.negative){
-      if(other===part||part.junctionIds.includes(other.pixelId))continue;
-      if(hold(guard.intersect(convert(other))).volume()>.05)
-       throw Error(part.wireChannel+' intersects another cut above the channel. Move the route or the conflicting feature.');
-     }
-     if(guard.volume()-hold(total.intersect(guard)).volume()>.05)
-      throw Error(part.wireChannel+' lacks continuous material above the channel. Increase fitting backing or move the route.');
     }
     cuts.push(cut);
    }

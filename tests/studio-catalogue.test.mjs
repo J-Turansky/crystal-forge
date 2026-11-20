@@ -382,13 +382,23 @@ for(const fixture of [vaultedStock,pinnedVault]){
  for(const [format,geometry] of [['STL',stlGeometry],['3MF',threeMFGeometry]]){
   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
   const mesh=new THREE.Mesh(geometry,material);
-  const hit=(origin,direction)=>new THREE.Raycaster(new THREE.Vector3(...origin),new THREE.Vector3(...direction)).intersectObject(mesh)[0]?.point;
+  const intersections=(origin,direction)=>new THREE.Raycaster(new THREE.Vector3(...origin),new THREE.Vector3(...direction)).intersectObject(mesh);
+  const hit=(origin,direction)=>intersections(origin,direction)[0]?.point;
+  const assertSideStock=(origin,normal,label)=>{
+   for(const sign of [-1,1]){
+    const hits=intersections(origin,[sign*normal.x,sign*normal.y,0]);
+    const inner=hits[0];
+    const outer=inner&&hits.find(candidate=>candidate.distance-inner.distance>1e-4);
+    assert(outer&&outer.distance-inner.distance>=.55,format+' retains at least 0.55 mm of continuous side stock at '+label);
+   }
+  };
   if(fixture===vaultedStock){
    for(const x of [-34.99,-25,0,25,34.99]){
     const left=hit([x,0,1],[0,-1,0]);
     const right=hit([x,0,1],[0,1,0]);
     assert(left&&right,format+' has two side-wall intersections near '+x);
     assert(Math.abs(right.y-left.y-3.2)<.005,format+' full wire width near '+x);
+    assertSideStock([x,0,1],{x:0,y:1},'straight section '+x);
     const ceiling=hit([x,.2,-1],[0,0,1]);
     assert(ceiling&&Math.abs(ceiling.z-(1.8+1.4/.9))<.005,format+' vaulted roof near '+x);
    }
@@ -414,6 +424,7 @@ for(const fixture of [vaultedStock,pinnedVault]){
      const right=hit(origin,[normal.x,normal.y,0]);
      assert(left&&right,format+' curved wire walls at '+link.label+' section '+i);
      assert(Math.abs(left.distanceTo(right)-3.2)<.06,format+' curved width at '+link.label+' section '+i);
+     assertSideStock(origin,normal,link.label+' section '+i);
      const upper=hit([x,y,11],[0,0,-1]);
      const ceiling=hit([x,y,-1],[0,0,1]);
      assert(ceiling&&upper&&upper.z-ceiling.z>6,format+' continuous roof stock at '+link.label+' section '+i);
@@ -425,10 +436,15 @@ for(const fixture of [vaultedStock,pinnedVault]){
   geometry.dispose();
   material.dispose();
  }
- console.log('WT-021 native vaulted STL/3MF sections: 3.2 mm width, roof stock and open straight apertures');
+ console.log('WT-021 native vaulted STL/3MF sections: 3.2 mm width, roof and side stock, and open straight apertures');
 }
 const shallowActualStock={...vaultedStock,positive:[{kind:'box',size:[70,4,40],position:[0,2,0]}]};
 assert.throws(()=>prepareRecipe(THREE,wasm,shallowActualStock),/lacks continuous material above the channel/);
+const narrowActualStock={...vaultedStock,positive:[{kind:'box',size:[70,10,40],position:[0,5,-18.2]}]};
+assert.throws(()=>prepareRecipe(THREE,wasm,narrowActualStock),/lacks continuous material beside the channel/);
+const sideObstruction={...vaultedStock,negative:[...vaultedStock.negative,
+ {kind:'box',size:[3,1.5,2],position:[0,.75,2.8]}]};
+assert.throws(()=>prepareRecipe(THREE,wasm,sideObstruction),/intersects another cut beside the channel/);
 const roofObstruction={...vaultedStock,negative:[...vaultedStock.negative,
  {kind:'box',size:[3,2,3],position:[0,5,0]}]};
 assert.throws(()=>prepareRecipe(THREE,wasm,roofObstruction),/intersects another cut above the channel/);

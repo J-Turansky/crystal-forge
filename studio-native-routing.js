@@ -100,6 +100,8 @@ function cutter(points,label,radius,depth,vaulted){
  return {kind:'extrude',outline:[...side(1),...side(-1).reverse()],height:depth+.5,position:[0,-.5,0],wireChannel:label};
 }
 
+const routeSideStock=.55;
+
 function channelSize(build){
  // Physical wire relief F and user-requested track width are independent of
  // the socket's diametral body clearance (which changes the negative bore only).
@@ -160,7 +162,7 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
   const measure=path.slice(1).reduce((sum,p,i)=>sum+gap(path[i],p),centreAllowance);
   const dense=samples(path);
   const invalid=dense.some(point=>{
-   if(boundary(point,outline)<radius+.55&&(!edge||gap(point,edge)>4))return true;
+   if(boundary(point,outline)<radius+routeSideStock&&(!edge||gap(point,edge)>4))return true;
    return pixels.some(p=>!ends.includes(p.id)&&gap(point,p)<p.radius+radius+1.25);
   });
   let reason=invalid?'Channel approaches an edge or unrelated bore.':measure>budget+1e-6?'Cable budget exceeded.':'';
@@ -207,7 +209,8 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
   const points=link.path.slice();
   if(i===0)points.unshift(add(entry.point,entry.outward,4));
   if(i===plan.links.length-1)points.push(add(exit.point,exit.outward,4));
-  return {...cutter(points,link.label,radius,depth,settings.vaulted===true),junctionIds:link.ends};
+  return {...cutter(points,link.label,radius,depth,settings.vaulted===true),junctionIds:link.ends,
+   sideStock:cutter(points,link.label,radius+routeSideStock,depth,false)};
  });
  if(plan.ready&&plan.enabled)plan.roofStock={outline:recipe.serialSupport.outline,thickness:roof};
  for(const link of plan.links){delete link.dense;delete link.ends;}
