@@ -539,12 +539,12 @@ for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),coni
   const mesh=new THREE.Mesh(geometry,material);
   const intersections=(origin,direction)=>new THREE.Raycaster(new THREE.Vector3(...origin),new THREE.Vector3(...direction)).intersectObject(mesh);
   const hit=(origin,direction)=>intersections(origin,direction)[0]?.point;
-  const assertOpenRun=(a,b,lateral,label)=>{
+  const assertOpenRun=(a,b,lateral,label,heights=[.35,1.5])=>{
    const start=new THREE.Vector3(a.x,-a.z,0),end=new THREE.Vector3(b.x,-b.z,0);
    const direction=end.clone().sub(start),length=direction.length();
    direction.normalize();
    const normal=new THREE.Vector3(-direction.y,direction.x,0);
-   for(const height of [.35,1.5])for(const width of [-lateral,0,lateral]){
+   for(const height of heights)for(const width of [-lateral,0,lateral]){
     const origin=start.clone().addScaledVector(normal,width);
     origin.z=height;
     const ray=new THREE.Raycaster(origin,direction,0,length+.0001);
@@ -702,7 +702,11 @@ for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),coni
     const path=[...link.path];
     if(i>0)path.unshift(socketCentres[i-1]);
     if(i<socketCentres.length)path.push(socketCentres[i]);
-    const length=path.slice(1).reduce((total,point,j)=>total+assertOpenRun(path[j],point,1.45,link.label+' segment '+j),0);
+    const length=path.slice(1).reduce((total,point,j)=>{
+     const label=link.label+' segment '+j;
+     assertOpenRun(path[j],point,.55,label+' upper vault',[2.35,2.7]);
+     return total+assertOpenRun(path[j],point,1.45,label);
+    },0);
     // Tail budgets begin at the socket port. Internal budgets are already centre-to-centre.
     const tailPort=i===0?link.path.at(-1):i===links.length-1?link.path[0]:null;
     const tailSeat=i===0?socketCentres[0]:socketCentres.at(-1);
@@ -716,6 +720,7 @@ for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),coni
    for(const [aperture,sign] of [[input,-1],[output,1]]){
     const y=-aperture.z;
     assertOpenRun({x:aperture.x+sign*.1,z:aperture.z},{x:aperture.x-sign*.1,z:aperture.z},1.45,'exterior opening');
+    assertOpenRun({x:aperture.x+sign*.1,z:aperture.z},{x:aperture.x-sign*.1,z:aperture.z},.55,'upper exterior opening',[2.35,2.7]);
     const left=hit([aperture.x-sign*.01,y,1],[0,-1,0]),right=hit([aperture.x-sign*.01,y,1],[0,1,0]);
     assert(left&&right&&Math.abs(right.y-left.y-3.2)<.025,format+' full 3.2 mm aperture at exterior face');
     const shoulder=hit([aperture.x+sign*.1,y+2,1],[-sign,0,0]);
@@ -738,6 +743,13 @@ for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),coni
      assert(left&&right,format+' curved wire walls at '+link.label+' section '+i);
      assert(Math.abs(left.distanceTo(right)-3.2)<.06,format+' curved width at '+link.label+' section '+i);
      assertSideStock(origin,normal,link.label+' section '+i);
+     for(const height of [2.2,2.8]){
+      const upperOrigin=[x,y,height];
+      const upperLeft=hit(upperOrigin,[-normal.x,-normal.y,0]),upperRight=hit(upperOrigin,[normal.x,normal.y,0]);
+      const expectedWidth=3.2-2*.9*(height-1.8);
+      assert(upperLeft&&upperRight&&Math.abs(upperLeft.distanceTo(upperRight)-expectedWidth)<.08,
+       format+' bent vault slopes preserve the tapered cross-section');
+     }
      measured.push(left.clone().lerp(right,.5));
      planned.push(new THREE.Vector3(x,y,1));
      const upper=hit([x,y,11],[0,0,-1]);

@@ -4,6 +4,8 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
+- Build checks vaulted channel clearance and supporting roof material before saving an enabled vault.
+
 - Native shaped pixel sockets support a conical roof on level underside faces. Build validates the extra roof height before saving. The routed test coupon can use the selected socket’s measurements, clearance, retention and conical roof.
 
 - External backing tabs support underside counterbores and countersinks with editable recess dimensions. Build rejects edits that leave insufficient tab stock.

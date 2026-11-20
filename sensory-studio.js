@@ -1329,10 +1329,25 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   block.append(note);
   block.insertAdjacentHTML('beforeend','<label><input type="checkbox" data-native-route'+(settings.enabled?' checked':'')+
    (model.link||(!settings.enabled&&plan.reason)?' disabled':'')+'> Cut serial channels</label>');
-  block.querySelector('[data-native-route]').onchange=e=>change({enabled:e.target.checked});
+  const changeVault=fields=>{
+   const serialRouting={...settings,...fields};
+   if(!serialRouting.enabled||!serialRouting.vaulted){change(fields);return;}
+   checkFittingBuild(model,{...model.build,serialRouting},()=>change(fields),{
+    pending:'Checking the vaulted channel clearance and roof stock…'
+   });
+  };
+  block.querySelector('[data-native-route]').onchange=event=>{
+   const input=event.target,enabled=input.checked;
+   input.checked=!!settings.enabled;
+   changeVault({enabled});
+  };
   block.insertAdjacentHTML('beforeend','<label><input type="checkbox" data-vaulted-route'+
    (settings.vaulted?' checked':'')+disabled+'> Vault wire-track roofs for underside-down printing</label>');
-  block.querySelector('[data-vaulted-route]').onchange=e=>change({vaulted:e.target.checked});
+  block.querySelector('[data-vaulted-route]').onchange=event=>{
+   const input=event.target,vaulted=input.checked;
+   input.checked=!!settings.vaulted;
+   changeVault({vaulted});
+  };
   const widthLabel=document.createElement('label'),widthInput=document.createElement('input');
   widthLabel.textContent='Requested wire-track width (mm) ';
   widthInput.type='number';widthInput.min='1.5';widthInput.max='12';widthInput.step='any';

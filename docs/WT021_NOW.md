@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** FAB-01, expand native vaulted route evidence for a bent path and its exits.
+- **Target:** FAB-01, verify vaulted route setting edits retain validated width, edge and roof geometry.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** The full unified Chromium suite passed native cutaway/export range comparisons. Focused Chromium passed stale Gear cutaway withdrawal and disabled downloads. The rendered Gear cutaway matches both exports at three heights through its countersink and pilot. The rendered Wave channel measures 3.2 mm and matches both downloaded walls at the same plane. The Wave drag/undo/redo journey passed with the installation normal preserved. The Gear conical roof passed stock refusal and STL/3MF checks. Six native family cone sections and positive containment passed Manifold, STL and 3MF. The Gear browser fixture downloaded conical routed coupons and full STL/3MF with matching apex. Next probe usable clearance through a bent vaulted native route and both exterior apertures.
+- **Next test:** On the pinned Tile witness, edit width and edge position with the vault enabled. Assert production rejection preserves the saved revision, then prepare valid edits and compare fresh STL and 3MF sections.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

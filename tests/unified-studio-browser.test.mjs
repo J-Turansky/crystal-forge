@@ -1790,6 +1790,12 @@ try{
   assert(!(await machine.isDisabled()),await waveSerial.innerText());
   await machine.check();
   await waveSerial.getByText('Channels ready for preparation.').waitFor();
+  const acceptedRoute=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  const vault=waveSerial.getByLabel('Vault wire-track roofs for underside-down printing');
+  await vault.click();
+  await page.locator('#smsModelError').getByText(/Turn off the vaulted option for a Wave route/).waitFor();
+  assert.equal(await vault.isChecked(),false);
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),acceptedRoute);
   await wavePalette.locator('[data-pixel-backing]').check();
   const addTab=wavePalette.getByRole('button',{name:'Add external tab',exact:true});
   await addTab.click();
@@ -2309,6 +2315,52 @@ try{
    assert(Math.abs(apex-socketProfile.bodyHeight-radius)<.01);
    assert(Math.abs(ray(6,1,0).distance+ray(6,-1,0).distance-2*radius)<.01);
    assert(Math.abs(ray(10,1,0).distance+ray(10,-1,0).distance-2*(radius-1))<.01);
+   geometry.dispose();
+  }
+  material.dispose();
+ }
+ // FAB-01: validate a bent underside vault before saving and measure the print files.
+ {
+  const name='Vaulted underside Tile';
+  await page.evaluate(name=>window.__sensoryStudio.addModel('tactile-tiles',{
+   width:100,depth:80,thickness:12,outline:'square',relief:2,pattern:'terraces',dualMaterial:false
+  },name),name);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  const palette=page.locator('.sms-palette');
+  await palette.locator('[data-fit-profile=seed]').click();
+  await page.locator('[data-view=bottom]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await palette.getByRole('button',{name:'Place LED fitting in 3D'}).click();
+  for(const [i,x] of [-15,15].entries()){
+   const target=await page.evaluate(x=>window.__sensoryStudio.fittingPointScreen(x,0,'underside'),x);
+   assert(target);await page.mouse.click(target.x,target.y);
+   await page.waitForFunction(count=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===count,i+1);
+  }
+  await page.keyboard.press('Escape');
+  const serial=palette.getByRole('group',{name:'Serial LED string'});
+  await serial.getByRole('button',{name:'Pin automatic IN opening'}).click();
+  const edge=serial.getByLabel('IN perimeter position (%)');
+  const automatic=Number(await edge.inputValue()),offset=(automatic+98)%100;
+  await edge.fill(String(offset));await edge.press('Tab');
+  await serial.getByLabel('Cut serial channels').check();
+  await serial.getByText('Channels ready for preparation.').waitFor();
+  await serial.getByLabel('Vault wire-track roofs for underside-down printing').click();
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.serialRouting.vaulted===true);
+  assert.equal(await serial.getByLabel('Vault wire-track roofs for underside-down printing').isChecked(),true);
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  const job=page.locator('#smsJobs article').filter({hasText:name});
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const stl=await useDownload(job.locator('[data-job-stl]'));
+  const mf=await useDownload(job.locator('[data-job-3mf]'));
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(stl.bytes).buffer),
+   read3MFGeometry(zipEntries(mf.bytes).get('3D/3dmodel.model').toString())]){
+   const mesh=new THREE.Mesh(geometry,material);
+   const section=height=>[-1,1].reduce((sum,sign)=>sum+new THREE.Raycaster(
+    new THREE.Vector3(0,0,height),new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0].distance,0);
+   assert(Math.abs(section(1)-3.2)<.02);
+   assert(Math.abs(section(2.8)-1.4)<.02);
    geometry.dispose();
   }
   material.dispose();
