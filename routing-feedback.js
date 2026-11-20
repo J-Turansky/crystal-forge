@@ -1,12 +1,13 @@
 export function routingSummary(plan,settings){
  const route=plan?.wirePlan;
  if(!route?.enabled)return {severity:'info',title:'Cable grooves are off.',body:'Turn on cable grooves when you want channels cut for your LED wires.',details:[]};
+ if(route.ready&&route.overLengthCount)return {severity:'warning',title:'Some cable runs need longer wires.',body:'You can prepare these channels. Use cables long enough for the marked runs.',details:route.messages||[]};
  if(route.ready)return {severity:'success',title:'All pixel cables have valid routes.',body:'The checked curves fit within your selected lengths. Prepare the print mesh next.',details:route.messages||[]};
  const invalid=(plan.invalidManualPixels?.length||0)+(plan.invalidManualMounts?.length||0);
  if(invalid)return {severity:'error',title:'Some holes need moving.',body:'Move the red holes inside the base and away from other hardware.',details:route.messages||[]};
  const edge=(settings.wireInputEnabled!==false&&!route.entryAdded)||(settings.wireOutputEnabled!==false&&!route.exitAdded);
  if(edge)return {severity:'error',title:'A pixel cannot reach the base edge.',body:'Try automatic routing, or move the first or last pixel nearer a clear part of the edge.',details:route.messages||[]};
- if(route.overLengthCount)return {severity:'error',title:route.overLengthCount===1?'One cable is too short for this layout.':route.overLengthCount+' cables are too short for this layout.',body:'Move the affected pixels closer together, or enter a longer cable length that matches your real hardware.',details:route.messages||[]};
+ if(route.overLengthCount)return {severity:'error',title:route.overLengthCount===1?'One cable is too short for this layout.':route.overLengthCount+' cables are too short for this layout.',body:'Enter a longer cable length or turn on “Allow over-length cables” in Build to use length as a warning.',details:route.messages||[]};
  return {severity:'error',title:'A cable route is blocked.',body:'A fixing, another pixel or a tight bend is in the way. Try automatic routing first.',details:route.messages||[]};
 }
 export function renderFeedback(node,{severity='info',title,body='',details=[]},{fix=null,focus=null}={}){

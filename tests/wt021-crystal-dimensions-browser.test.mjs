@@ -437,7 +437,17 @@ try{
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
   await page.locator('[data-view=top]').click();
   await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  const wireControls=page.locator('.sms-palette');
+  await wireControls.locator('[data-build-wire-pitch]').selectOption('custom');
+  const available=wireControls.locator('[data-build-wire-custom]');
+  await available.fill('10');
+  await available.press('Tab');
+  const strict=await crystal();
+  const strictRoute=planHardware(strict.editableState.crystals,strict.parameters).wirePlan;
+  assert(strictRoute.overLengthCount>0&&!strictRoute.ready&&strictRoute.unrouted===0);
+  await wireControls.getByRole('checkbox',{name:'Allow over-length cables'}).check();
   const original=await crystal();
+  assert.equal(original.parameters.wireAllowOverLength,true);
   const openingKeys=['wireEntryX','wireEntryZ','wireOutputX','wireOutputZ'];
   for(const [kind,prefix,pointKey] of [['input','wireEntry','entryPoint'],['output','wireOutput','exitPoint']]){
    const {parameters,editableState:{crystals}}=await crystal();
@@ -476,6 +486,16 @@ try{
   await page.reload();
   await page.waitForFunction(id=>window.__sensoryStudio?.currentModel?.id===id,moved.id);
   for(const key of openingKeys)assert.equal((await crystal()).parameters[key],moved.parameters[key]);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  assert(await wireControls.getByRole('checkbox',{name:'Allow over-length cables'}).isChecked());
+  await page.getByRole('button',{name:'Render actual model',exact:true}).click();
+  await inspector.getByText('Prepared manufacturing mesh').waitFor({timeout:120000});
+  await inspector.getByRole('button',{name:'Close inspection'}).click();
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  const routedJob=page.locator('#smsJobs article').filter({hasText:name});
+  await routedJob.getByText('Some cable runs need longer wires.',{exact:false}).waitFor();
+  assert(await routedJob.locator('[data-job-stl]').isEnabled());
+  assert(await routedJob.locator('[data-job-3mf]').isEnabled());
   console.log('WT-021 both Crystal cable openings drag, reject outside release and survive reload');
  }
 }finally{await browser.close();}

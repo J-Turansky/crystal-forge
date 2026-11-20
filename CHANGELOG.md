@@ -61,6 +61,7 @@ Only in the draft integration branch; **not a production release**. Owner approv
 ## v0.16.0-dev.35.13 — Print size and Crystal cable opening controls
 - Print Centre shows the dimensions of each STL in a two-material job so each file can be checked separately in Cura.
 - Drag Crystal IN and OUT cable openings along the base edge. Invalid releases keep the last accepted route.
+- In Crystal Build, make measured cable lengths advisory with Allow over-length cables. Accepted channels still warn when longer wires are needed.
 
 ## v0.16.0-dev.35.12 — Integrate Crystal tips and vaulted wire tracks
 

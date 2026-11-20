@@ -1313,7 +1313,8 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const arrows=document.querySelector('[data-state="wireDirectionArrows"]');
   const width=document.querySelector('[data-state="wireWidth"]');
   const vaulted=document.querySelector('[data-state="wireVaulted"]');
-  if(!length||!channels||!arrows||!width||!vaulted)return;
+  const allowOverLength=document.querySelector('[data-state="wireAllowOverLength"]');
+  if(!length||!channels||!arrows||!width||!vaulted||!allowOverLength)return;
   const field=document.createElement('fieldset');
   field.innerHTML='<legend>Wire routing and cable lengths</legend>'+
    '<label>Available pixel-to-pixel cable length<select data-build-wire-pitch>'+
@@ -1322,10 +1323,11 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    '<label>Wire-track width (mm)<input data-build-wire-width type="number" min="1.5" max="9" step=".25" required></label>'+
    '<label><input data-build-wire-channels type="checkbox"> Cut underside wiring channels</label>'+
    '<label><input data-build-wire-vaulted type="checkbox"> Vault wire-track roofs</label>'+
+   '<label><input data-build-wire-over-length type="checkbox"> Allow over-length cables</label>'+
    '<label><input data-build-wire-arrows type="checkbox"> Show direction arrows</label>'+
    '<div class="sms-actions"><button type="button" data-build-wire-snap>Snap pixels to cable length</button>'+
    '<button type="button" data-build-wire-reverse>Reverse pixel order</button></div>'+
-   '<p>Ordered P1 → Pn; opposite 180° IN/OUT. The real curved cable length is checked and overlength routes show red. Thin or blocked paths are refused by Prepare.</p>';
+   '<p>Red routes need longer wires. Allow over-length cables to place and prepare those routes while keeping the length warning. Thin or blocked paths still need to be fixed.</p>';
   const trackWidth=field.querySelector('[data-build-wire-width]');
   trackWidth.value=width.value;
   trackWidth.onchange=()=>{
@@ -1348,9 +1350,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   };
   custom.onchange=()=>{
    if(!custom.checkValidity()){custom.reportValidity();custom.value=length.value;return;}
-   length.value=custom.value;length.dispatchEvent(new Event('change',{bubbles:true}));
+   length.value=custom.value;
+   length.dispatchEvent(new Event('input',{bubbles:true}));
+   length.dispatchEvent(new Event('change',{bubbles:true}));
   };
-  for(const [selector,origin] of [['[data-build-wire-channels]',channels],['[data-build-wire-vaulted]',vaulted],['[data-build-wire-arrows]',arrows]]){
+  for(const [selector,origin] of [['[data-build-wire-channels]',channels],['[data-build-wire-vaulted]',vaulted],
+   ['[data-build-wire-arrows]',arrows],['[data-build-wire-over-length]',allowOverLength]]){
    const control=field.querySelector(selector);control.checked=origin.checked;
    control.onchange=()=>{origin.click();control.checked=origin.checked;};
   }
@@ -2512,6 +2517,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     '<p class="sms-descriptor">'+esc(printEnvelope(result,settings))+'</p>'+
     (result?preparedSizes(result).perBody.map(({role,size})=>
      '<p class="sms-descriptor">Prepared '+esc(role)+' STL X × Y × Z: '+size.map(n=>n.toFixed(2)).join(' × ')+' mm</p>').join(''):'')+
+    (result?.report.wireOverLengthCount?'<p>Some cable runs need longer wires. Check the route measurements in Build.</p>':'')+
     '<p>'+esc(block||'Downloads available.')+'</p>'+
     (advisory?'<p>'+esc(advisory)+'</p>':'')+
     '<fieldset><legend>Job printer settings</legend><p class="sms-descriptor">Job overrides take precedence over model settings and project defaults.</p>'+
