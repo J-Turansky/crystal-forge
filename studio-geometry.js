@@ -1,5 +1,6 @@
 import {tileWallPosition} from './studio-native-routing.js';
 import {putSocket} from './fabrication-v1.js';
+import {socketShoulderRise} from './pixel-profiles.js';
 import {makePixelReplicaRecipe} from './pixel-replica.js';
 /* Shared solid recipes. Preview components may overlap; only prepareRecipe
  * Boolean results may reach manufacturing exporters. Units mm; Y-up. */
@@ -165,8 +166,8 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{},inspectFittin
  const socket=part=>{
   const {profile}=part;
   const roofRise=part.conical?Math.max(.8,part.radius):0;
-  const bore=putSocket(wasm,hold,{x:0,z:0},part.radius,profile.bodyHeight+roofRise+3,-3,profile,
-    {includeLocalWireRelief:part.includeLocalWireRelief,conical:part.conical});
+  const bore=putSocket(wasm,hold,{x:0,z:0},part.radius,profile.bodyHeight+roofRise+socketShoulderRise(profile,part.shoulderAngle)+3,-3,profile,
+    {includeLocalWireRelief:part.includeLocalWireRelief,conical:part.conical,shoulderAngle:part.shoulderAngle});
   return {...bore,solid:positionSeat(bore.solid,part,90-part.pixelRotation)};
  };
  const convert=part=>{
@@ -204,7 +205,7 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{},inspectFittin
   for(const seat of seats){
    const warnings=[];
    const warn=message=>{if(!inspectFittings)throw Error(message);warnings.push(message);};
-   const {profile}=seat,stockHeight=profile.bodyHeight+(seat.conical?Math.max(.8,seat.radius):0)+2.8;
+   const {profile}=seat,stockHeight=profile.bodyHeight+(seat.conical?Math.max(.8,seat.radius):0)+socketShoulderRise(profile,seat.shoulderAngle)+2.8;
    const stockRadius=Math.max(profile.maxDiameter/2+1,seat.includeLocalWireRelief?profile.boreDiameter*.675+4.8:0);
    const stock=hold(wasm.Manifold.cylinder(stockHeight,stockRadius,stockRadius,32));
    const envelope=positionSeat(hold(stock.rotate([-90,0,0])),seat);

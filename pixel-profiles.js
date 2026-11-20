@@ -38,3 +38,12 @@ export function resolveSocketProfile(s,pos={}){
  const item=allPixelProfiles(s).find(p=>p.id===pos.profileId);
  return item?resolvePixelProfile({...s,pixelProfileId:item.id,pixelDiameter:item.bodyDiameter}):resolvePixelProfile(s);
 }
+
+export function socketShoulderRise(profile,angle){
+ if(angle==null)return 0;
+ if(!Number.isFinite(angle)||angle<30||angle>60)
+  throw Error('Choose a pixel shoulder angle from 30 to 60 degrees from horizontal.');
+ if(profile.kind==='seed'||profile.flangeHeight<=.1||profile.maxDiameter<=profile.boreDiameter+.1)return 0;
+ const radialRun=profile.maxDiameter/2-Math.max(.8,profile.boreDiameter/2);
+ return Math.max(0,radialRun)*Math.tan(angle*Math.PI/180);
+}

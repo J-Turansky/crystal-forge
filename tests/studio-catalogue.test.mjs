@@ -503,6 +503,7 @@ const shortConeProfile={...measuredProfile,bodyDiameter:5,bodyHeight:4,capHeight
 const conicalCoupon=makeRoutedSocketSpecimen(measuredProfile,{clearance:.3,retentionLip:.4,conical:true});
 assert.equal(conicalCoupon.nativeRouting.links.length,3);
 const familyConeFixtures=new Map();
+const familyShoulderFixtures=new Map();
 const familyRetainedConeFixtures=new Map();
 const familyWireFitFixtures=new Map();
 const familyWideRouteFixtures=new Map();
@@ -528,6 +529,19 @@ for(const [family,parameters] of [
   assert(exposed.volume()<.02,family.typeId+' conical cutter encloses the full measured housing');
  }finally{exposed.delete();negative.delete();positive.delete();}
  familyConeFixtures.set(fixture,family.typeId);
+ const tapered=applyBuildModules(source,{pixelBacking:true,pixelBackingThickness:10,pixelHoles:[{
+  ...conicalStud,diameter:5,clearance:.3,x:0,z:0,supportFreeShoulders:true,socketProfile:shortConeProfile
+ }]},family.capabilities);
+ const [taperedPreview]=nativeFittingPreviews(THREE,wasm,tapered);
+ assert.deepEqual(taperedPreview.warnings,[],family.typeId+' tapered shoulder has enough actual stock');
+ assert.equal(taperedPreview.insertionDepth,4.5);
+ const taperedCutter=new wasm.Manifold(taperedPreview.negative);
+ const taperedPixel=new wasm.Manifold(taperedPreview.positive);
+ const exposedPixel=taperedPixel.subtract(taperedCutter);
+ try{
+  assert(exposedPixel.volume()<.02,family.typeId+' tapered fitting preserves measured housing clearance');
+ }finally{exposedPixel.delete();taperedPixel.delete();taperedCutter.delete();}
+ familyShoulderFixtures.set(tapered,family.typeId);
  const wideProfile={...measuredProfile,bodyHeight:7};
  for(const vaulted of [false,true]){
   const build={pixelBuilderVersion:1,pixelBacking:true,pixelBackingThickness:10,
@@ -612,7 +626,7 @@ for(const [fixture] of fixingFixtures){
  const interrupted={...fixture,negative:[...fixture.negative,{kind:'box',size:[1,2,2],position:[18.5,1,0]}]};
  assert.throws(()=>prepareRecipe(THREE,wasm,interrupted),/too close to another cut/);
 }
-for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),...familyRetainedConeFixtures.keys(),...familyWireFitFixtures.keys(),...familyWideRouteFixtures.keys(),conicalRecipe,conicalCoupon,...familyTabFixtures.keys(),...familyPocketFixtures.keys(),tabRecessRecipe,topRecessRecipe,wideVault,vaultedStock,pinnedVault,topRouted,sideRouted,rearRouted,...perpendicularRoutes,curvedSeatOnly,curvedWaveRoute,biaxialRoute,biaxialPinned,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
+for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),...familyShoulderFixtures.keys(),...familyRetainedConeFixtures.keys(),...familyWireFitFixtures.keys(),...familyWideRouteFixtures.keys(),conicalRecipe,conicalCoupon,...familyTabFixtures.keys(),...familyPocketFixtures.keys(),tabRecessRecipe,topRecessRecipe,wideVault,vaultedStock,pinnedVault,topRouted,sideRouted,rearRouted,...perpendicularRoutes,curvedSeatOnly,curvedWaveRoute,biaxialRoute,biaxialPinned,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -737,6 +751,15 @@ for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),...f
     assert(Math.abs(span(-15,height)-expected)<.015,format+' '+name+' unchanged bore section at '+height);
    const apex=hit([-15,0,-1],[0,0,1]);
    assert(apex&&Math.abs(apex.z-7)<.01,format+' '+name+' unchanged insertion depth');
+  }else if(familyShoulderFixtures.has(fixture)){
+   const label=format+' '+familyShoulderFixtures.get(fixture);
+   const apex=hit([0,0,-1],[0,0,1]);
+   assert(apex&&Math.abs(apex.z-7.15)<.01,label+' raised pointed roof');
+   // Wire reliefs run along X, leaving the Y section of the shoulder visible.
+   for(const [height,diameter] of [[.3,6.3],[.75,5.8],[1.2,5.3],[2.5,5.3]]){
+    const left=hit([0,0,height],[0,-1,0]),right=hit([0,0,height],[0,1,0]);
+    assert(left&&right&&Math.abs(left.distanceTo(right)-diameter)<.015,label+' taper section at '+height);
+   }
   }else if(familyRetainedConeFixtures.has(fixture)){
    const {name,sections,apex:expectedApex}=familyRetainedConeFixtures.get(fixture);
    const apex=hit([0,0,-1],[0,0,1]);

@@ -2545,6 +2545,58 @@ try{
   }
   material.dispose();
  }
+ // The underside shoulder control updates the physical overlay and both print files.
+ {
+  const name='Tapered Gear socket';
+  await page.evaluate(name=>window.__sensoryStudio.addModel('gears',{mode:'Decorative',
+   wheelStyle:'Rounded lobes',webStyle:'Solid',diameter:100,thickness:25,bore:0,reliefStyle:'None',dualMaterial:false},name),name);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  const palette=page.locator('.sms-palette');
+  await palette.locator('[data-fit-profile=bullet]').click();
+  await page.locator('[data-view=bottom]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await palette.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+  const target=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(0,0,'underside'));
+  assert(target);await page.mouse.click(target.x,target.y);
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===1);
+  await page.keyboard.press('Escape');
+  const checkbox=palette.getByRole('checkbox',{name:'Support-Free Shoulders'});
+  assert.equal(await checkbox.isChecked(),false);
+  const preview=palette.locator('[data-native-fit-preview-status]');
+  await palette.getByRole('checkbox',{name:'Show physical pixels and socket cutters'}).check();
+  await preview.getByText(/insertion 18\.00 mm/).waitFor();
+  await checkbox.click();
+  const angle=palette.getByLabel('Shoulder angle from horizontal (°)');
+  await angle.waitFor();
+  assert.equal(await angle.inputValue(),'45');
+  await preview.getByText(/insertion 18\.50 mm/).waitFor();
+  await angle.fill('61');await angle.press('Tab');
+  assert.equal(await angle.inputValue(),'45');
+  await angle.fill('60');await angle.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].shoulderAngle===60);
+  await preview.getByText(/insertion 18\.87 mm/).waitFor();
+  const hole=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0]);
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  const job=page.locator('#smsJobs article').filter({hasText:name});
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const stl=await useDownload(job.locator('[data-job-stl]'));
+  const mf=await useDownload(job.locator('[data-job-3mf]'));
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(stl.bytes).buffer),
+   read3MFGeometry(zipEntries(mf.bytes).get('3D/3dmodel.model').toString())]){
+   const mesh=new THREE.Mesh(geometry,material),rise=Math.sqrt(3)/2;
+   const hit=(height,y,z)=>new THREE.Raycaster(new THREE.Vector3(hole.x,-hole.z,height),
+    new THREE.Vector3(0,y,z)).intersectObject(mesh)[0];
+   assert(Math.abs(hit(-1,0,1).point.z-18-rise)<.01);
+   for(const [height,diameter] of [[.5,13],[1.5+rise/2,12.5],[3,12]]){
+    const width=hit(height,1,0).distance+hit(height,-1,0).distance;
+    assert(Math.abs(width-diameter-hole.clearance)<.015,'Exported taper section at '+height+' mm');
+   }
+   geometry.dispose();
+  }
+  material.dispose();
+ }
  // FAB-01: validate a bent underside vault before saving and measure the print files.
  {
   const name='Vaulted underside Tile';

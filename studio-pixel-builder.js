@@ -1,4 +1,4 @@
-import {allPixelProfiles,PIXEL_PRESETS} from './pixel-profiles.js';
+import {allPixelProfiles,PIXEL_PRESETS,socketShoulderRise} from './pixel-profiles.js';
 import {applyPixelFittingProfile} from './studio-pixel-fit.js';
 import {pixelBoreIssue} from './studio-pixel-bore-validation.js';
 
@@ -46,16 +46,19 @@ export function addPixelHoleCuts(recipe,holes=[],{routed=false}={}){
     profile.wireWidth<0||profile.wireWidth>12||profile.wireDepth<0||profile.wireDepth>8||profile.retentionLip<0||profile.retentionLip>.7)
     throw Error(label+' has invalid measured socket dimensions.');
    const conical=hole.conical===true;
-   if(conical&&((hole.surface&&!(hole.surface.normal?.[1]<=-.9999))||(!hole.surface&&hole.entryFace!=='underside')))
-    throw Error(label+' needs a level underside installation face for its conical roof.');
-   const roofHeight=profile.bodyHeight+(conical?Math.max(.8,bore):0)+2.8;
+   const shoulderAngle=hole.supportFreeShoulders===true?hole.shoulderAngle??45:undefined;
+   const underside=hole.surface?hole.surface.normal?.[1]<=-.9999:hole.entryFace==='underside';
+   if(!underside&&(conical||shoulderAngle!=null))
+    throw Error(label+' needs a level underside installation face for its '+(conical?'conical roof.':'support-free shoulder.'));
+   cut.profile={...profile,id:hole.profileId,bodyDiameter:hole.diameter,clearance:hole.clearance,
+    boreDiameter:bore*2,maxDiameter:Math.max(hole.diameter,profile.flangeDiameter)+hole.clearance};
+   const roofHeight=profile.bodyHeight+(conical?Math.max(.8,bore):0)+socketShoulderRise(cut.profile,shoulderAngle)+2.8;
    if(!hole.surface&&height<roofHeight)throw Error(label+' needs '+roofHeight.toFixed(1)+' mm of stock for its socket and roof.');
    cut.conical=conical;
+   cut.shoulderAngle=shoulderAngle;
    cut.kind='pixel-seat';
    cut.surface=hole.surface;
    cut.includeLocalWireRelief=!routed;
-   cut.profile={...profile,id:hole.profileId,bodyDiameter:hole.diameter,clearance:hole.clearance,
-    boreDiameter:bore*2,maxDiameter:Math.max(hole.diameter,profile.flangeDiameter)+hole.clearance};
   }
   recipe.negative.push(cut);
  }
