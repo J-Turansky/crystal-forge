@@ -2685,6 +2685,52 @@ try{
   }
   material.dispose();
  }
+ // FIT-03: place two shaped sockets on a measured Wave that varies in both horizontal directions.
+ {
+  const name='Two-axis routed Wave';
+  await page.evaluate(name=>window.__sensoryStudio.addModel('waves',{width:160,depth:100,thickness:15,
+   amplitude:1,frequency:.5,variation:.1,direction:12,dualMaterial:false},name),name);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await page.locator('[data-view=top]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  const palette=page.locator('.sms-palette');
+  await palette.locator('[data-fit-profile=seed]').click();
+  await palette.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+  for(const [i,x] of [-40,-20].entries()){
+   const target=await page.evaluate(x=>window.__sensoryStudio.fittingPointScreen(x,-18,'top'),x);
+   assert(target);await page.mouse.click(target.x,target.y);
+   await page.waitForFunction(count=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===count,i+1);
+  }
+  await page.keyboard.press('Escape');
+  const holes=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
+  assert(holes.every(hole=>Math.abs(hole.surface.normal[0])>.001&&Math.abs(hole.surface.normal[2])>.001));
+  for(const label of ['P1','P2']){
+   await palette.getByRole('button',{name:label,exact:true}).click();
+   const rotation=palette.getByLabel('Body rotation (°)');
+   await rotation.fill('180');await rotation.press('Tab');
+  }
+  const serial=palette.getByRole('group',{name:'Serial LED string'});
+  await serial.getByLabel('Cut serial channels').check();
+  await serial.getByText('Channels ready for preparation.').waitFor();
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  const job=page.locator('#smsJobs article').filter({hasText:name});
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const stl=await useDownload(job.locator('[data-job-stl]'));
+  const mf=await useDownload(job.locator('[data-job-3mf]'));
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(stl.bytes).buffer),
+   read3MFGeometry(zipEntries(mf.bytes).get('3D/3dmodel.model').toString())]){
+   const mesh=new THREE.Mesh(geometry,material);
+   const span=[-1,1].reduce((sum,sign)=>sum+new THREE.Raycaster(new THREE.Vector3(0,18,14.5),
+    new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0].distance,0);
+   assert(Math.abs(span-3.2)<.03);
+   const lead=new THREE.Raycaster(new THREE.Vector3(-81,18,14.5),new THREE.Vector3(1,0,0),0,162);
+   assert.equal(lead.intersectObject(mesh).length,0);
+   geometry.dispose();
+  }
+  material.dispose();
+ }
  assert.deepEqual(errors,[]);
  console.log('Unified Home, Design, Build, Library and Quick Print screenshots captured.');
 }catch(error){

@@ -187,11 +187,12 @@ export const waveGenerator=define('waves','Waves & Organic Forms','Organic',[
   return p.thickness+p.amplitude*relief;
  };
  const segments=48,mesh=heightField(p.width,p.depth,top,segments);
- const heights=Array.from({length:segments+1},(_,i)=>mesh.points[i*3+1]);
- const step=p.width/segments;
- const wave=p.flowStyle==='Parallel'&&p.variation===0&&p.direction%180===0&&
-  heights.slice(1).every((height,i)=>Math.abs(height-heights[i])<=step*.025)
-  ?{start:-p.width/2,step,heights}:null;
+ const count=segments+1,stepX=p.width/segments,stepZ=p.depth/segments;
+ const heights=Array.from({length:count*count},(_,i)=>mesh.points[i*3+1]);
+ // The cutter and stock guards can follow both axes on gentle relief.
+ const gentle=heights.every((height,i)=>(i%count===segments||Math.abs(heights[i+1]-height)<=stepX*.025)&&
+  (i>=segments*count||Math.abs(heights[i+count]-height)<=stepZ*.025));
+ const wave=gentle?{width:p.width,depth:p.depth,segments,heights}:null;
  const w = p.width / 2, d = p.depth / 2;
  const pixelBoreSupport = {outline:[[-w,-d],[w,-d],[w,d],[-w,d]],minThickness:p.thickness};
  const material=p.flowStyle==='Parallel'?{secondary:[box([p.width,.8,p.depth],[0,.4,0])]}:{secondary:[],materialSplitHeight:.8,materialSplitRole:'top'};

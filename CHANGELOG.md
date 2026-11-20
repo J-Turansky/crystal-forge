@@ -4,6 +4,8 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
+- Gentle Wave cable grooves can follow height changes in both directions across the actual mesh. Steeper relief still requires another supported installation surface.
+
 - Rectangular Tactile Tiles support serial cable grooves on any of their four planar walls. Build checks the actual material surrounding the groove before preparation.
 
 - Native serial wiring can reverse pixel order, fitting directions, pinned openings and tail limits together. Build rejects an unsafe reordering before saving.

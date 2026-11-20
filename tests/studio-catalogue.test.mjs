@@ -440,6 +440,21 @@ assert.equal(prepareRecipe(THREE,wasm,curvedWaveRoute).bodies.length,1);
 const waveConflict={...curvedWaveRoute,negative:[...curvedWaveRoute.negative,{kind:'box',size:[2,1,.3],position:[0,15,1.8]}]};
 assert.throws(()=>prepareRecipe(THREE,wasm,waveConflict),/intersects another cut beside the channel/);
 assert.throws(()=>applyBuildModules(gentleWave,{...waveRouteBuild,serialRouting:{...serial,vaulted:true}}),/Turn off the vaulted option for a Wave route/);
+const biaxialStock=waveGenerator.recipe({width:160,depth:100,thickness:15,amplitude:1,frequency:.5,variation:.1,direction:12});
+const biaxialMesh=previewRecipe(THREE,biaxialStock);
+const waveAt=(x,z)=>new THREE.Raycaster(new THREE.Vector3(x,30,z),new THREE.Vector3(0,-1,0)).intersectObject(biaxialMesh.children[0])[0];
+const biaxialHoles=[-40,-20].map(x=>{
+ const {point,face}=waveAt(x,-18);
+ return {...checked('biaxial-'+x,x,-18,180),entryFace:'top',surface:{y:point.y,normal:face.normal.toArray()},
+  socketProfile:{...shortProfile,retentionLip:0}};
+});
+assert(biaxialHoles.every(hole=>Math.abs(hole.surface.normal[0])>.001&&Math.abs(hole.surface.normal[2])>.001));
+const biaxialRoute=applyBuildModules(biaxialStock,{...waveRouteBuild,pixelHoles:biaxialHoles},waveGenerator.capabilities);
+assert.equal(biaxialRoute.nativeRouting.face,'wave');
+const biaxialSections=[-60,-30,0,60].map(x=>[x,waveAt(x,-18).point.y]);
+disposeGroup(biaxialMesh);
+const steepWave=waveGenerator.recipe({width:160,depth:100,thickness:15,amplitude:12,frequency:2,variation:.1,direction:12});
+assert.throws(()=>applyBuildModules(steepWave,{...waveRouteBuild,pixelHoles:biaxialHoles},waveGenerator.capabilities),/same supported face/);
 const flatBuild={...curveBuild,pixelHoles:[checked('left',-15),checked('right',15)],serialRouting:serial};
 const automatic=applyBuildModules(flatStock,flatBuild).nativeRouting;
 const pinnedBuild={...flatBuild,serialRouting:{...serial,inEdgePercent:automatic.edgePositions.in-2,outEdgePercent:automatic.edgePositions.out+2}};
@@ -534,7 +549,7 @@ for(const [fixture] of fixingFixtures){
  const interrupted={...fixture,negative:[...fixture.negative,{kind:'box',size:[1,2,2],position:[18.5,1,0]}]};
  assert.throws(()=>prepareRecipe(THREE,wasm,interrupted),/too close to another cut/);
 }
-for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),conicalRecipe,conicalCoupon,tabRecessRecipe,topRecessRecipe,wideVault,vaultedStock,pinnedVault,topRouted,sideRouted,rearRouted,...perpendicularRoutes,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
+for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),conicalRecipe,conicalCoupon,tabRecessRecipe,topRecessRecipe,wideVault,vaultedStock,pinnedVault,topRouted,sideRouted,rearRouted,...perpendicularRoutes,curvedSeatOnly,curvedWaveRoute,biaxialRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -665,6 +680,15 @@ for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),coni
    assert(left&&right&&Math.abs(left.distanceTo(right)-5.3)<.02,format+' curved seat diametral clearance');
    const rear=hit([apex.x,apex.y,-1],[0,0,1]);
    assert(rear&&apex.z-rear.z>2.8,format+' leaves more than 2.8 mm of actual material behind the seat');
+  }else if(fixture===biaxialRoute){
+   for(const [x,height] of biaxialSections){
+    const origin=[x,18,height-1];
+    const left=hit(origin,[0,-1,0]),right=hit(origin,[0,1,0]);
+    assert(left&&right&&Math.abs(left.distanceTo(right)-3.2)<.02,format+' biaxial route width');
+    const floor=hit([x,18,height+1],[0,0,-1]);
+    assert(floor&&Math.abs(floor.z-(height-1.8))<.02,format+' biaxial route follows actual mesh height');
+   }
+   assert.equal(hit([-81,18,14.5],[1,0,0]),undefined,format+' biaxial route has two clear exterior apertures');
   }else if(fixture===curvedWaveRoute){
    for(const x of [-79,-60,-30,0,30,60,79]){
     const origin=[x,0,14.8];

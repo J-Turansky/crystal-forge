@@ -85,7 +85,7 @@ function cutter(points,label,radius,depth,vaulted,wave=null,guard=false){
   const left=side(1),right=side(-1),vertices=[],triangles=[];
   const lip=guard?-.02:.5;
   for(let i=0;i<points.length;i++){
-   const [lx,lz]=left[i],[rx,rz]=right[i],ly=waveHeight(wave,lx),ry=waveHeight(wave,rx);
+   const [lx,lz]=left[i],[rx,rz]=right[i],ly=waveHeight(wave,lx,lz),ry=waveHeight(wave,rx,rz);
    vertices.push(lx,ly-depth,lz,rx,ry-depth,rz,rx,ry+lip,rz,lx,ly+lip,lz);
    if(i===0)continue;
    for(let j=0;j<4;j++){
@@ -138,10 +138,14 @@ function topRouteHeight(recipe,holes){
  return null;
 }
 
-function waveHeight(wave,x){
- const position=Math.max(0,Math.min(wave.heights.length-1,(x-wave.start)/wave.step));
- const i=Math.min(Math.floor(position),wave.heights.length-2);
- return wave.heights[i]+(wave.heights[i+1]-wave.heights[i])*(position-i);
+function waveHeight({width,depth,segments,heights},x,z){
+ const u=Math.max(0,Math.min(segments,(x/width+.5)*segments));
+ const v=Math.max(0,Math.min(segments,(z/depth+.5)*segments));
+ const col=Math.min(Math.floor(u),segments-1),row=Math.min(Math.floor(v),segments-1);
+ const dx=u-col,dz=v-row,count=segments+1,i=row*count+col;
+ const a=heights[i],b=heights[i+1],c=heights[i+count],d=heights[i+count+1];
+ // Follow the same diagonal used when triangulating the printed surface.
+ return dx+dz<=1?a+(b-a)*dx+(c-a)*dz:d+(c-d)*(1-dx)+(b-d)*(1-dz);
 }
 
 function waveRouteSurface(recipe,holes){
@@ -149,8 +153,8 @@ function waveRouteSurface(recipe,holes){
  if(!wave||!holes.length)return null;
  return holes.every(hole=>{
   const normal=hole.surface?.normal;
-  return hole.socketProfile&&normal&&Math.abs(hole.surface.y-waveHeight(wave,hole.x))<.01&&
-   normal[1]>.999&&Math.abs(normal[2])<.00001;
+  return hole.socketProfile&&normal&&Math.abs(hole.surface.y-waveHeight(wave,hole.x,hole.z))<.01&&
+   normal[1]>.999;
  })?wave:null;
 }
 
@@ -272,7 +276,7 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
   const dense=samples(path);
   const measuredPath=wave?dense:path;
   const measure=measuredPath.slice(1).reduce((sum,p,i)=>{
-   const a=measuredPath[i],rise=wave?waveHeight(wave,p.x)-waveHeight(wave,a.x):0;
+   const a=measuredPath[i],rise=wave?waveHeight(wave,p.x,p.z)-waveHeight(wave,a.x,a.z):0;
    return sum+Math.hypot(gap(a,p),rise);
   },centreAllowance);
   const invalid=dense.some(point=>{
@@ -355,7 +359,7 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
  });
  if(plan.ready&&plan.enabled)plan.roofStock={outline:supportOutline,thickness:roof};
  for(const link of plan.links){
-  if(wave&&link.path.length)link.path=link.dense.map(p=>({...p,y:waveHeight(wave,p.x)}));
+  if(wave&&link.path.length)link.path=link.dense.map(p=>({...p,y:waveHeight(wave,p.x,p.z)}));
   delete link.dense;delete link.ends;
  }
  return plan;

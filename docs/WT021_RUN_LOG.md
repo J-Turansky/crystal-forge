@@ -244,3 +244,7 @@
 ### 2026-11-20 - perpendicular Tile walls
 
 - Generalised the Tile wall routing frame to front, rear, left and right. Focused Chromium placed sockets on each new wall and downloaded both files. STL and 3MF preserve width, inward depth and open apertures. Manifold rejects a nearby cut on either perpendicular side.
+
+### 2026-11-20 - two-axis Wave routing
+
+- The Wave cutter and stock guards sample the same triangulated heightfield as the manufactured model. Unit probes compare exported floor height against independently raycast source stock. Focused Chromium placed two sockets with nonzero slope in both directions and verified a 3.2 mm channel and both open apertures in STL and 3MF.
