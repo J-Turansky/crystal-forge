@@ -58,6 +58,9 @@ Only in the draft integration branch; **not a production release**. Owner approv
 
 **Codex rule:** after each independently tested *user-visible* milestone, update this draft section with concise impact and limitations in the same batched source/test commit. Synchronise in-app What's New/version data through UX-01. Never mislabel a draft-only change as shipped.
 
+## v0.16.0-dev.35.13 — Show the size of each material STL
+- Print Centre shows the dimensions of each STL in a two-material job so each file can be checked separately in Cura.
+
 ## v0.16.0-dev.35.12 — Integrate Crystal tips and vaulted wire tracks
 
 - Choose global Crystal tip shapes and optionally vault native underside wire tracks while preserving their usable dimensions.

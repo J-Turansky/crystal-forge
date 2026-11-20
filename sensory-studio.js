@@ -2458,10 +2458,15 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    return 'Choose Ultimaker 3 Extended for two materials, or switch the model to one material and prepare again.';
   return '';
  }
- function preparedSize(result){
-  if(!printSizes.has(result))printSizes.set(result,preparedDimensionsMm(result));
+ function preparedSizes(result){
+  if(!printSizes.has(result))printSizes.set(result,{
+   combined:preparedDimensionsMm(result),
+   perBody:result.bodies.length>1?
+    result.bodies.map(({role})=>({role,size:preparedDimensionsMm(result,role)})):[]
+  });
   return printSizes.get(result);
  }
+ const preparedSize=result=>preparedSizes(result).combined;
  function printEnvelope(result,settings){
   if(!result)return '';
   const size=preparedSize(result);
@@ -2504,7 +2509,10 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    tile.innerHTML='<h3>'+esc(model.name)+'</h3><p>'+esc(family)+' · source revision '+model.revision+
     (result?' · prepared revision '+job.preparedRevision:'')+'</p><p><strong>'+state+'</strong></p>'+
     '<p role="status" data-job-progress>'+esc(job.error||(preparing?job.progress:'')||'')+'</p>'+
-    '<p class="sms-descriptor">'+esc(printEnvelope(result,settings))+'</p><p>'+esc(block||'Downloads available.')+'</p>'+
+    '<p class="sms-descriptor">'+esc(printEnvelope(result,settings))+'</p>'+
+    (result?preparedSizes(result).perBody.map(({role,size})=>
+     '<p class="sms-descriptor">Prepared '+esc(role)+' STL X × Y × Z: '+size.map(n=>n.toFixed(2)).join(' × ')+' mm</p>').join(''):'')+
+    '<p>'+esc(block||'Downloads available.')+'</p>'+
     (advisory?'<p>'+esc(advisory)+'</p>':'')+
     '<fieldset><legend>Job printer settings</legend><p class="sms-descriptor">Job overrides take precedence over model settings and project defaults.</p>'+
     printSettings.map(([key,label,options])=>{
