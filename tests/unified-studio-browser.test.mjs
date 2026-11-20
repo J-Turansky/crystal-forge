@@ -2071,6 +2071,52 @@ try{
   await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
   assert((await useDownload(job.locator('[data-job-stl]'))).bytes.length>84);
   assert(zipEntries((await useDownload(job.locator('[data-job-3mf]'))).bytes).has('3D/3dmodel.model'));
+  const original=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  const modelState=()=>page.evaluate(()=>window.__sensoryStudio.currentModel);
+  await page.locator('#smsLibrary').click();
+  await page.locator('#smsLibraryAll').click();
+  const projectCard=page.locator('#smsProjectModels article').filter({has:page.getByRole('heading',{name:witness,exact:true})}).first();
+  await projectCard.getByRole('button',{name:'Save to library',exact:true}).click();
+  const libraryCard=page.locator('#smsSavedModels article').filter({has:page.getByRole('heading',{name:witness,exact:true})});
+  await libraryCard.getByRole('button',{name:'Linked copy',exact:true}).click();
+  const linked=await modelState();
+  assert.equal(linked.link.revision,1);
+  assert.deepEqual(linked.build,original.build);
+  await buildTab.click();
+  assert(await tabProfile.isDisabled());
+  await page.locator('#smsLibrary').click();
+  await libraryCard.getByRole('button',{name:'Independent copy',exact:true}).click();
+  const independent=await modelState();
+  assert.equal(independent.link,null);
+  assert.deepEqual(independent.build,original.build);
+  await buildTab.click();
+  await tabDepth.fill('2.75');await tabDepth.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.backingTabs[0].recessDepth===2.75);
+  await page.reload();await page.waitForFunction(()=>window.__sensoryStudio);
+  const copies=await page.evaluate(ids=>Object.fromEntries(window.__sensoryStudio.project.models
+   .filter(model=>ids.includes(model.id)).map(model=>[model.id,model.build.backingTabs[0].recessDepth])),
+   [original.id,linked.id,independent.id]);
+  assert.deepEqual(copies,{[original.id]:3,[linked.id]:3,[independent.id]:2.75});
+  await page.locator('#model-tab-'+original.id).click();
+  await buildTab.click();
+  await tabDepth.fill('3.25');await tabDepth.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.backingTabs[0].recessDepth===3.25);
+  await page.locator('#smsLibrary').click();
+  await projectCard.getByRole('button',{name:'Save to library',exact:true}).click();
+  await page.locator('#model-tab-'+linked.id).click();
+  assert.equal((await modelState()).build.backingTabs[0].recessDepth,3);
+  await page.getByRole('button',{name:'Accept library revision 2'}).click();
+  assert.equal((await modelState()).link.revision,2);
+  assert.equal((await modelState()).build.backingTabs[0].recessDepth,3.25);
+  assert.equal(await page.evaluate(id=>window.__sensoryStudio.project.models.find(model=>model.id===id)
+   .build.backingTabs[0].recessDepth,independent.id),2.75);
+  await printTab.click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  const linkedJobId=await page.evaluate(id=>window.__sensoryStudio.project.printJobs.find(item=>item.modelId===id).id,linked.id);
+  const linkedJob=page.locator('[data-print-job="'+linkedJobId+'"]');
+  await linkedJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  assert((await useDownload(linkedJob.locator('[data-job-stl]'))).bytes.length>84);
+  assert(zipEntries((await useDownload(linkedJob.locator('[data-job-3mf]'))).bytes).has('3D/3dmodel.model'));
  }
  {
   await page.evaluate(()=>window.__sensoryStudio.addModel('waves',{width:100,depth:70,thickness:2,amplitude:1,variation:0},'Thin fixing witness'));

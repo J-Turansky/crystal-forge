@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** DIM-05 and PAR-01, verify linked and copied projects preserve the recessed mount and tab configurations independently.
+- **Target:** PAR-03, expand prepared section and export parity across native builders.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Use a recessed Gear with a backing tab as the library source. Verify linked read-only controls, independent copy edits, update/reload and fresh STL/3MF exports.
+- **Next test:** The recessed Gear library scenario passed linking, independent edit/reload, explicit revision acceptance and fresh STL/3MF downloads. Next exercise native prepared cutaways with a revised fixture and independent section probes.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

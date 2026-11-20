@@ -172,3 +172,7 @@
 ### 2026-11-20 - external backing tab recesses
 
 - Reused the recessed fixing cutter and production stock checks on external backing tabs. Manifold and both export decoders passed the 5.1 mm recess, 3.4 mm pilot, 3 mm depth and 5 mm remaining stock. Chromium passed rejected depth, rejected backing reduction and successful STL/3MF downloads.
+
+### 2026-11-20 - recessed library copy and update
+
+- Focused Chromium verified that a linked Gear retains a read-only mounting setup, an independent copy keeps its own edited depth after reload, and accepting a new linked revision refreshes the tab depth and enables fresh STL/3MF preparation.
