@@ -4,6 +4,8 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
+- External backing tabs support underside counterbores and countersinks with editable recess dimensions. Build rejects edits that leave insufficient tab stock.
+
 - Individually placed underside and supported planar top mounts support counterbores and countersinks with exact recess diameter and depth. Build checks the available material before saving.
 
 - Build checks the actual material around recessed screw fixings before saving. Thin stock and nearby cuts that remove the supporting material are refused.

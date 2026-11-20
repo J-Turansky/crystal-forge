@@ -4,7 +4,7 @@ import {planNativePixelString} from './studio-native-routing.js';
 import {layeredCharacter} from './studio-character-relief.js';
 import {createPodShell} from './wt002-pod-shell.js';
 import {addPixelHoleCuts,checkedPixelBore} from './studio-pixel-builder.js';
-import {addManualMountCuts} from './studio-mount-builder.js';
+import {addManualMountCuts,fixingRecessCut,mountProfiles} from './studio-mount-builder.js';
 import {planEdgeTabs} from './edge-tabs.js';
 import {generateTile,tactileTileGenerator} from './tactile-tile-generator.js';
 import {createGeneratorRegistry} from './studio-generator-registry.js';
@@ -511,10 +511,15 @@ function addBackingTabs(recipe,build,routing){
    throw Error('Tab '+(tab.index+1)+' is too close to a cut cable route. Move the tab away from the cable exit.');
   recipe.positive.push(cylinder(tab.radius,tab.thickness,[tab.x,tab.thickness/2,tab.z]));
  }
- for(const hole of plan.tabHoles)recipe.negative.push({
-  ...cylinder(hole.radius,backing.thickness+2,[hole.x,backing.thickness/2,hole.z]),
-  tabHole:'Tab fixing hole '+(hole.tabIndex+1)
- });
+ for(const hole of plan.tabHoles){
+  const tab=tabs[hole.tabIndex],profile=tab.profile??mountProfiles[0];
+  const label='Tab '+(hole.tabIndex+1),fixingId='backing-tab-'+hole.tabIndex;
+  if(!mountProfiles.includes(profile))throw Error(label+' needs a supported fixing profile.');
+  recipe.negative.push({...cylinder(hole.radius,backing.thickness+2,[hole.x,backing.thickness/2,hole.z]),
+   tabHole:'Tab fixing hole '+(hole.tabIndex+1),fixingId});
+  if(profile!==mountProfiles[0])recipe.negative.push(fixingRecessCut({...tab,profile,diameter,x:hole.x,z:hole.z},
+   {fixingId,label:label+' recess'}));
+ }
  recipe.bounds={...recipe.bounds,
   width:Math.max(recipe.bounds.width,...plan.tabs.map(tab=>2*(Math.abs(tab.x)+tab.radius))),
   depth:Math.max(recipe.bounds.depth,...plan.tabs.map(tab=>2*(Math.abs(tab.z)+tab.radius)))};

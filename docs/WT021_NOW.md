@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** DIM-05 and PAR-01, extend validated recessed fixing profiles to eligible external tabs.
+- **Target:** DIM-05 and PAR-01, verify linked and copied projects preserve the recessed mount and tab configurations independently.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Manual underside and planar Gear-top mounts passed Chromium export checks. Add recessed options to eligible external tabs and measure the tab stock in both exports.
+- **Next test:** Use a recessed Gear with a backing tab as the library source. Verify linked read-only controls, independent copy edits, update/reload and fresh STL/3MF exports.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

@@ -167,4 +167,8 @@
 
 ### 2026-11-20 - planar top recessed fixings
 
-- Manual planar Gear top recesses use the production stock envelope, which rejects thin stock and blocked entry. Focused Chromium and independent STL/3MF sections confirm the countersink and pilot with an underside counterbore on the same model. External tab recesses remain open.
+- Manual planar Gear top recesses use the production stock envelope, which rejects thin stock and blocked entry. Focused Chromium and independent STL/3MF sections confirm the countersink and pilot with an underside counterbore on the same model. External tab recesses remained open at this checkpoint.
+
+### 2026-11-20 - external backing tab recesses
+
+- Reused the recessed fixing cutter and production stock checks on external backing tabs. Manifold and both export decoders passed the 5.1 mm recess, 3.4 mm pilot, 3 mm depth and 5 mm remaining stock. Chromium passed rejected depth, rejected backing reduction and successful STL/3MF downloads.

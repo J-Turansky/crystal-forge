@@ -980,7 +980,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    worker.terminate();
    if(seatCheck!==worker)return;
    seatCheck=null;
-   if(active()?.id!==model.id||model.revision!==revision||!canEditPixels(model))return;
+   if(active()?.id!==model.id||active().revision!==revision||!canEditPixels(model))return;
    if(message){report(message);return;}
    onValidated();
   };
@@ -1471,13 +1471,30 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    '<p>Add screw tabs to a stationary design using the fitting backing. Adjust each position along the perimeter.</p>'+
    '<label>Tab hole diameter (mm)<input type="number" data-tab-diameter min="2" max="8" step=".1" value="'+esc(tabDiameter)+'"'+disabled+'></label>'+
    '<button type="button" data-add-backing-tab'+(locked||tabList.length>=24?' disabled':'')+'>Add external tab</button>'+
-   tabList.map((tab,i)=>'<div class="sms-actions"><label>T'+(i+1)+' perimeter (%)<input type="number" data-backing-tab="'+i+'" min="0" max="99.9" step=".1" value="'+esc((tab.u*100).toFixed(1))+'"'+disabled+'></label>'+
-     '<button type="button" data-remove-backing-tab="'+i+'"'+disabled+'>Remove T'+(i+1)+'</button></div>').join('');
+   tabList.map((tab,i)=>{
+    const profile=tab.profile??mountProfiles[0],recess=recessDimensions({...tab,diameter:tabDiameter});
+    return '<fieldset><legend>T'+(i+1)+'</legend><label>Perimeter (%)<input type="number" data-backing-tab="'+i+
+     '" min="0" max="99.9" step=".1" value="'+esc((tab.u*100).toFixed(1))+'"'+disabled+'></label>'+
+     '<label>Underside fixing profile<select data-tab-profile="'+i+'"'+disabled+'>'+mountProfiles.map(option=>
+      '<option'+(option===profile?' selected':'')+'>'+option+'</option>').join('')+'</select></label>'+
+     (profile!==mountProfiles[0]?[['recessDiameter','Recess diameter (mm)',12,recess.diameter],['recessDepth','Recess depth (mm)',8,recess.depth]]
+      .map(([field,label,max,value])=>'<label>'+label+'<input type="number" required min=".5" max="'+max+
+       '" step="any" data-tab-index="'+i+'" data-tab-recess="'+field+'" value="'+esc(value)+'"'+disabled+'></label>').join(''):'')+
+     '<button type="button" data-remove-backing-tab="'+i+'"'+disabled+'>Remove T'+(i+1)+'</button></fieldset>';
+   }).join('');
   block.append(tabs);
   const saveTabs=(backingTabs,backingTabDiameter)=>{
-   if(commit({build:{...model.build,backingTabs,backingTabDiameter}})){redrawPixelEditor();return true;}
-   pixelStatus(model,$('smsModelError')?.textContent||'Could not attach the external tab.');
-   return false;
+   const build={...model.build,backingTabs,backingTabDiameter};
+   const save=()=>{
+    if(commit({build})){pixelMessages.delete(model.id);redrawPixelEditor();return true;}
+    pixelStatus(model,$('smsModelError')?.textContent||'Could not attach the external tab.');
+    return false;
+   };
+   if(backingTabs.some(tab=>tab.profile&&tab.profile!==mountProfiles[0])){
+    checkFittingBuild(model,build,save,{pending:'Checking material around the recessed tab fixings…'});
+    return false;
+   }
+   return save();
   };
   const diameterInput=tabs.querySelector('[data-tab-diameter]');
   diameterInput.onchange=()=>{
@@ -1501,6 +1518,17 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    const i=Number(input.dataset.backingTab);
    if(input.value&&input.checkValidity()&&saveTabs(tabList.map((tab,index)=>index===i?{...tab,u:input.valueAsNumber/100}:tab),tabDiameter))return;
    input.value=(tabList[i].u*100).toFixed(1);
+  });
+  const editTab=(index,patch)=>saveTabs(tabList.map((tab,i)=>i===index?{...tab,...patch}:tab),tabDiameter);
+  tabs.querySelectorAll('[data-tab-profile]').forEach(select=>select.onchange=()=>{
+   const index=Number(select.dataset.tabProfile);
+   if(!editTab(index,{profile:select.value}))select.value=tabList[index].profile??mountProfiles[0];
+  });
+  tabs.querySelectorAll('[data-tab-recess]').forEach(input=>input.onchange=()=>{
+   const index=Number(input.dataset.tabIndex),field=input.dataset.tabRecess;
+   const accepted=recessDimensions({...tabList[index],diameter:tabDiameter})[field==='recessDepth'?'depth':'diameter'];
+   if(!input.checkValidity()){input.reportValidity();input.value=accepted;return;}
+   if(!editTab(index,{[field]:input.valueAsNumber}))input.value=accepted;
   });
   tabs.querySelectorAll('[data-remove-backing-tab]').forEach(button=>button.onclick=()=>
    saveTabs(tabList.filter((_,i)=>i!==Number(button.dataset.removeBackingTab)),tabDiameter));
@@ -1568,7 +1596,9 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     if(value===previous)return;
     const build={...model.build,pixelBackingThickness:value};
     const apply=()=>{if(commit({build}))renderEditor();};
-    if(holes.some(hole=>hole.socketProfile)||build.serialRouting?.enabled)checkFittingBuild(model,build,apply);
+    const hasRecess=build.mounting&&['Underside countersinks','Underside counterbores'].includes(build.mountStyle)||
+     [...(build.backingTabs||[]),...mountHoles(model)].some(fixing=>fixing.profile&&fixing.profile!==mountProfiles[0]);
+    if(holes.some(hole=>hole.socketProfile)||build.serialRouting?.enabled||hasRecess)checkFittingBuild(model,build,apply);
     else apply();
    };
    backingThickness.onchange=()=>changeThickness(backingThickness.valueAsNumber);

@@ -2044,6 +2044,33 @@ try{
    geometry.dispose();
   }
   material.dispose();
+  await buildTab.click();
+  await palette.locator('[data-pixel-backing]').check();
+  await palette.getByRole('button',{name:'Add external tab'}).click();
+  const tabProfile=palette.locator('[data-tab-profile="0"]');
+  await tabProfile.selectOption('Counterbore');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.backingTabs?.[0]?.profile==='Counterbore');
+  const tabDepth=palette.locator('[data-tab-recess=recessDepth]');
+  const savedTab=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
+  await tabDepth.fill('3');await tabDepth.press('Tab');
+  await page.locator('#smsModelError').getByText(/Tab 1 recess needs continuous underside stock/).waitFor();
+  assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),savedTab);
+  assert.equal(Number(await tabDepth.inputValue()),1.4);
+  const thickness=palette.getByLabel('Fitting backing thickness (mm)');
+  await thickness.fill('8');await thickness.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelBackingThickness===8);
+  await tabDepth.fill('3');await tabDepth.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.backingTabs[0].recessDepth===3);
+  await thickness.fill('4');await thickness.press('Tab');
+  await page.locator('#smsModelError').getByText(/Tab 1 recess needs continuous underside stock/).waitFor();
+  assert.equal(Number(await thickness.inputValue()),8);
+  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelBackingThickness),8);
+  await printTab.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  await job.locator('[data-job-prepare]').click();
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  assert((await useDownload(job.locator('[data-job-stl]'))).bytes.length>84);
+  assert(zipEntries((await useDownload(job.locator('[data-job-3mf]'))).bytes).has('3D/3dmodel.model'));
  }
  {
   await page.evaluate(()=>window.__sensoryStudio.addModel('waves',{width:100,depth:70,thickness:2,amplitude:1,variation:0},'Thin fixing witness'));

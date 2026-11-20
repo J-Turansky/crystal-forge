@@ -465,13 +465,21 @@ assert.throws(()=>prepareRecipe(THREE,wasm,{...topRecessRecipe,
  positive:[{kind:'box',size:[70,4,40],position:[0,8,0]}]}),/needs continuous planar top stock/);
 assert.throws(()=>prepareRecipe(THREE,wasm,{...topRecessRecipe,
  positive:[{kind:'box',size:[70,12,40],position:[0,6,0]}]}),/needs an unobstructed top opening/);
+const tabRecessBuild={pixelBacking:true,pixelBackingThickness:8,backingTabs:[{u:.125,profile:'Counterbore',recessDepth:3}]};
+const tabRecessRecipe=applyBuildModules(gearTopStock,tabRecessBuild,gearGenerator.capabilities);
+const [tabX,,tabZ]=tabRecessRecipe.negative.find(cut=>cut.fixingRecess).position;
+assert.throws(()=>prepareRecipe(THREE,wasm,applyBuildModules(gearTopStock,
+ {...tabRecessBuild,pixelBackingThickness:4},gearGenerator.capabilities)),/Tab 1 recess needs continuous underside stock/);
+assert.throws(()=>prepareRecipe(THREE,wasm,applyBuildModules(gearTopStock,
+ {...tabRecessBuild,backingTabs:[{...tabRecessBuild.backingTabs[0],recessDiameter:8}]},
+ gearGenerator.capabilities)),/Tab 1 recess needs continuous underside stock/);
 for(const [fixture] of fixingFixtures){
  const thin={...fixture,positive:[{kind:'box',size:[70,2.8,40],position:[0,1.4,0]}]};
  assert.throws(()=>prepareRecipe(THREE,wasm,thin),/needs continuous underside stock/);
  const interrupted={...fixture,negative:[...fixture.negative,{kind:'box',size:[1,2,2],position:[18.5,1,0]}]};
  assert.throws(()=>prepareRecipe(THREE,wasm,interrupted),/too close to another cut/);
 }
-for(const fixture of [...fixingFixtures.keys(),topRecessRecipe,vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
+for(const fixture of [...fixingFixtures.keys(),tabRecessRecipe,topRecessRecipe,vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -551,6 +559,13 @@ for(const fixture of [...fixingFixtures.keys(),topRecessRecipe,vaultedStock,pinn
    assert(Math.abs(span([0,0,.8])-dimensions.width)<.02,format+' '+dimensions.name+' route width');
    const apex=hit([-15,0,-1],[0,0,1]);
    assert(apex&&Math.abs(apex.z-9)<.01,format+' shaped socket roof stays at the measured 9 mm body length');
+  }else if(fixture===tabRecessRecipe){
+   for(const [height,diameter] of [[1,5.1],[4,3.4]]){
+    const left=hit([tabX,-tabZ,height],[-1,0,0]),right=hit([tabX,-tabZ,height],[1,0,0]);
+    assert(left&&right&&Math.abs(left.distanceTo(right)-diameter)<.01,format+' recessed tab diameter at '+height+' mm');
+   }
+   const shoulder=hit([tabX+2,-tabZ,-1],[0,0,1]),top=hit([tabX+2,-tabZ,9],[0,0,-1]);
+   assert(shoulder&&top&&Math.abs(shoulder.z-3)<.01&&Math.abs(top.z-shoulder.z-5)<.01,format+' recessed tab depth and remaining stock');
   }else if(fixture===topRecessRecipe){
    for(const [height,diameter] of [[9.9,6.9],[8,5],[6,4]]){
     const left=hit([-15,0,height],[0,-1,0]),right=hit([-15,0,height],[0,1,0]);
