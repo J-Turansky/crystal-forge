@@ -4,6 +4,8 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
+- Rotating a shaped fitting on an enabled cable route checks the resulting geometry before saving.
+
 - Numeric movement and keyboard nudges for shaped fittings recheck the installation surface and preserve the last accepted position if stock is missing.
 
 - Crystal uses the measured clearance when selecting an imported profile for the first time. A locally adjusted clearance stays with its existing profile.

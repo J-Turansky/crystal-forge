@@ -1,9 +1,10 @@
 # WT-021 overnight checkpoint
 
-[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `25a6f14e9cc282859a5041dbbdab2e8868a81b2c`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
+[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `97967c6510782dcab83ee1e3156280faecd72604`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
 
 ## Latest checkpoint
 
+- A routed Wave rejects a 90° socket rotation while its valid job remains downloadable. A valid rotation to 179° invalidates the previous files and prepares a 3.2 mm route in fresh STL and 3MF.
 - Exact typed coordinates and keyboard nudges resolve shaped sockets against the real surface before saving. Chromium verified curved Wave movement and tangent movement along a vertical Tile face, plus rollback when the move would leave the face.
 - Crystal Chromium tests verified measured profile imports and preserved local overrides. The revised import produced a 5.60 mm bore in both formats, while the original retained its locally adjusted 5.30 mm bore.
 - Original and revised native project snapshots reopened and prepared independently. Their decoded exports preserve the original 4.85 mm and revised 5.10 mm following fit, while the local fit remains 4.85 mm.

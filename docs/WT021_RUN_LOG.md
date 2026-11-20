@@ -228,3 +228,7 @@
 ### 2026-11-20 - exact shaped socket movement
 
 - Numeric movement and keyboard nudges raycast the intended installation face and use production validation before saving. Fixed a numeric step mismatch left by fractional drag coordinates. Chromium verified a nudge and exact Wave move, a tangent move on a vertical Tile, and rejection of off-surface motion.
+
+### 2026-11-20 - rotation with routed stock validation
+
+- The production worker now validates shaped socket rotation on an enabled route. Focused Chromium refused 90°, reproduced the accepted job, then approved 179°, invalidated both previous exports and prepared matching fresh 3.2 mm channels.

@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** PAR-02 and FIT-03, validate shaped socket rotation against enabled cable routes.
+- **Target:** FIT-03, verify native reordering and reversing regenerate the cable path without stale output.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Wave and vertical Tile proved exact placement and safe numeric motion. Next attempt a blocked rotation with a prepared route, verify the saved job remains valid, then prepare and measure a valid rotation.
+- **Next test:** Routed Wave validated exact position and rotation. Next use a symmetric backed fixture and verify a valid native sequence reversal, a refused unsafe reorder and fresh matching exports.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

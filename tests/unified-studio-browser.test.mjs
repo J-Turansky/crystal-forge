@@ -1908,6 +1908,40 @@ try{
    }
    material.dispose();geometry.dispose();
   }
+  const job=page.locator('#smsJobs article').filter({hasText:'FIT-03 gentle Wave'});
+  const rotationBuild=page.locator('.sms-workspace-nav [data-tab=build]');
+  const rotationPrint=page.locator('.sms-workspace-nav [data-tab=print]');
+  await rotationBuild.click();
+  await wavePalette.getByRole('button',{name:'P1',exact:true}).click();
+  const rotationControl=wavePalette.getByLabel('Body rotation (°)');
+  const savedRotation=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  await rotationControl.fill('90');await rotationControl.press('Tab');
+  await page.locator('#smsModelError').getByText(/No safe tangent|Chosen IN edge|approaches an edge/i).waitFor();
+  assert.equal(Number(await rotationControl.inputValue()),180);
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),savedRotation);
+  await rotationPrint.click();
+  await job.getByText('Prepared',{exact:true}).waitFor();
+  assert(!(await job.locator('[data-job-stl]').isDisabled()));
+  await rotationBuild.click();
+  await rotationControl.fill('179');await rotationControl.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].rotation===179);
+  await rotationPrint.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  assert(await job.locator('[data-job-stl]').isDisabled());
+  assert(await job.locator('[data-job-3mf]').isDisabled());
+  await job.locator('[data-job-prepare]').click();
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const rotatedSTL=await useDownload(job.locator('[data-job-stl]'));
+  const rotatedMF=await useDownload(job.locator('[data-job-3mf]'));
+  const routePoint=new THREE.Vector3((a.x+b.x)/2,-(a.z+b.z)/2,(a.surface.y+b.surface.y)/2-1);
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(rotatedSTL.bytes).buffer),
+   read3MFGeometry(zipEntries(rotatedMF.bytes).get('3D/3dmodel.model').toString())]){
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),mesh=new THREE.Mesh(geometry,material);
+   const width=[-1,1].reduce((sum,sign)=>sum+new THREE.Raycaster(routePoint,new THREE.Vector3(0,sign,0))
+    .intersectObject(mesh)[0].distance,0);
+   assert(Math.abs(width-3.2)<.08);
+   geometry.dispose();material.dispose();
+  }
  }
  // Independent stationary backed journeys. Each uses its own model, placement, calibration and actual files.
  const backedFamilies=[

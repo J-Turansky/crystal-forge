@@ -846,7 +846,8 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    if(saved)onSaved?.();
    return saved;
   };
-  if(hole.socketProfile&&(moved||hole.socketProfile!==previous.socketProfile||
+  const routeRotation=model.build.serialRouting?.enabled&&hole.rotation!==previous.rotation;
+  if(hole.socketProfile&&(moved||routeRotation||hole.socketProfile!==previous.socketProfile||
      hole.diameter!==previous.diameter||hole.clearance!==previous.clearance)){
    checkFittingBuild(model,{...model.build,pixelHoles:holes,pixelBuilderVersion:1},save);
    return false;
