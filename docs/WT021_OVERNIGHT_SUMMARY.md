@@ -60,3 +60,9 @@ Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) co
 - Base was `2c68782d187be2725d38488b6fd09707d0129696`. The browser fixture places and drags a shaped socket on the vertical Tile face, reloads the moved pose, places a second socket, enables routing, then prepares and downloads STL and 3MF. The focused Chromium run passed.
 - The catalogue Manifold suite verified a 3.2 mm wide and 1.8 mm deep channel with uninterrupted clearance through the front groove and both open ends in each independently decoded file. Preparation refuses a neighbouring cut that removes side stock.
 - Next prove curved-face seating and routing, then finish full family journeys and UX-01. Printed and Cura evidence remain with #10.
+
+### Gentle Wave curved sockets and routing
+
+- Base was `c6655a30e33d9a2707e368ce38e32ba14e9f7e36`. The focused Chromium Wave case placed two sockets with distinct normals and downloaded routed STL and 3MF. Full unified Chromium also passed the preceding Tile checkpoint.
+- The actual production Wave mesh supports flat, upward-opening grooves on gentle parallel profiles. Both exported formats show 3.2 mm width and 1.8 mm depth at seven sections and an open path between exterior ends. A sampled shaped seat had 9 mm installed-axis depth and 5.3 mm diameter. A convex location with inadequate stock and a cut in a route wall were rejected.
+- Next test concurrent routing and noninterfering manual mounts, then advance the full model-family journeys. Broad multi-axis curved routing, final acceptance and physical Cura/print checks remain open.

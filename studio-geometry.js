@@ -125,7 +125,7 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
   if(link.path.length<2)continue;
   const guideY=(recipe.nativeRouting.surfaceY??0)+.15;
   const front=recipe.nativeRouting.front;
-  const points=[],point=p=>front?new THREE.Vector3(p.x,p.z,front.z+.15):new THREE.Vector3(p.x,guideY,p.z);
+  const points=[],point=p=>front?new THREE.Vector3(p.x,p.z,front.z+.15):new THREE.Vector3(p.x,p.y===undefined?guideY:p.y+.15,p.z);
   for(let i=1;i<link.path.length;i++)points.push(point(link.path[i-1]),point(link.path[i]));
   const k=Math.floor((link.path.length-1)/2),a=point(link.path[k]),b=point(link.path[k+1]);
   const d=b.clone().sub(a).normalize(),tip=a.clone().lerp(b,.63),back=tip.clone().addScaledVector(d,-2.5);
@@ -247,7 +247,7 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{},inspectFittin
     if(hold(total.intersect(cut)).volume()<.1)
      throw Error((part.pixelHole||part.mountHole||part.tabHole||part.wireChannel||'Cut')+' does not cut the model.');
     if(routeFootprint&&part.wireChannel&&part.junctionIds){
-     const top=recipe.nativeRouting.face==='top';
+     const top=['top','wave'].includes(recipe.nativeRouting.face);
      const thickness=roofStock.thickness;
      const inward=hold(cut.translate(front?[0,0,-thickness]:[0,top?-thickness:thickness,0]));
      const stockChecks=[[inward,front?'behind':top?'below':'above']];

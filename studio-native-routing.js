@@ -74,13 +74,29 @@ function samples(points){
  }
  return result;
 }
-function cutter(points,label,radius,depth,vaulted){
+function cutter(points,label,radius,depth,vaulted,wave=null,guard=false){
  const side=sign=>points.map((p,i)=>{
   const a=unit(sub(p,points[i-1]||p)),b=unit(sub(points[i+1]||p,p));
   const d=unit(add(a,b,1)),q={x:-d.z,z:d.x};
   const scale=radius/Math.max(.9,dot(d,i===0?b:a));
   const v=add(p,q,sign*scale);return [v.x,v.z];
  });
+ if(wave){
+  const left=side(1),right=side(-1),vertices=[],triangles=[];
+  const lip=guard?-.02:.5;
+  for(let i=0;i<points.length;i++){
+   const [lx,lz]=left[i],[rx,rz]=right[i],ly=waveHeight(wave,lx),ry=waveHeight(wave,rx);
+   vertices.push(lx,ly-depth,lz,rx,ry-depth,rz,rx,ry+lip,rz,lx,ly+lip,lz);
+   if(i===0)continue;
+   for(let j=0;j<4;j++){
+    const a=(i-1)*4+j,b=(i-1)*4+(j+1)%4;
+    triangles.push(a,b,b+4,a,b+4,a+4);
+   }
+  }
+  const end=(points.length-1)*4;
+  triangles.push(0,2,1,0,3,2,end,end+1,end+2,end,end+2,end+3);
+  return {kind:'mesh',mesh:{points:vertices,triangles},wireChannel:label};
+ }
  if(vaulted){
   const left=side(1),right=side(-1),vertices=[],triangles=[];
   for(let i=0;i<points.length;i++){
@@ -122,6 +138,22 @@ function topRouteHeight(recipe,holes){
  return null;
 }
 
+function waveHeight(wave,x){
+ const position=Math.max(0,Math.min(wave.heights.length-1,(x-wave.start)/wave.step));
+ const i=Math.min(Math.floor(position),wave.heights.length-2);
+ return wave.heights[i]+(wave.heights[i+1]-wave.heights[i])*(position-i);
+}
+
+function waveRouteSurface(recipe,holes){
+ const wave=recipe.serialSupport?.wave;
+ if(!wave||!holes.length)return null;
+ return holes.every(hole=>{
+  const normal=hole.surface?.normal;
+  return hole.socketProfile&&normal&&Math.abs(hole.surface.y-waveHeight(wave,hole.x))<.01&&
+   normal[1]>.999&&Math.abs(normal[2])<.00001;
+ })?wave:null;
+}
+
 function frontRouteFace(recipe,holes){
  const front=recipe.serialSupport?.front;
  if(!front||!holes.length)return null;
@@ -140,9 +172,11 @@ function frontRouteExtrude(part,front){
 
 export function nativeRouteEligibility(recipe,build){
  const holes=build.pixelHoles||[];
- const topY=topRouteHeight(recipe,holes),front=frontRouteFace(recipe,holes);
- if(holes.some(hole=>hole.socketProfile&&hole.surface)&&topY===null&&!front)
-  return 'Physical grooves require a shared flat underside or an eligible planar top or front. Move the sockets to the same supported face.';
+ const topY=topRouteHeight(recipe,holes),front=frontRouteFace(recipe,holes),wave=waveRouteSurface(recipe,holes);
+ if(holes.some(hole=>hole.socketProfile&&hole.surface)&&topY===null&&!front&&!wave)
+  return 'Physical grooves require a shared flat underside or an eligible planar top, front or gentle Wave surface. Move the sockets to the same supported face.';
+ if(wave&&build.serialRouting?.vaulted)
+  return 'Wave surface grooves open upward. Turn off the vaulted option for a Wave route.';
  if(front&&build.serialRouting?.vaulted)
   return 'Front grooves open sideways. Turn off the vaulted option for a front route.';
  if(topY!==null&&build.serialRouting?.vaulted)
@@ -179,11 +213,12 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
   new Set(holes.map(p=>p.id)).size!==holes.length){
   plan.reason='Place 1 to 16 checked pixel fittings in Build before routing.';return plan;
  }
- const topY=topRouteHeight(recipe,holes),front=frontRouteFace(recipe,holes);
+ const topY=topRouteHeight(recipe,holes),front=frontRouteFace(recipe,holes),wave=waveRouteSurface(recipe,holes);
  if(topY!==null){plan.face='top';plan.surfaceY=topY;}
  if(front){plan.face='front';plan.front=front;}
+ if(wave)plan.face='wave';
  const pixels=holes.map(p=>({...p,z:front?p.surface.y:p.z,
-  radius:(p.diameter+p.clearance)/2,wireAngle:topY===null?(p.rotation??0):180-(p.rotation??0)}));
+  radius:(p.diameter+p.clearance)/2,wireAngle:topY===null&&!wave?(p.rotation??0):180-(p.rotation??0)}));
  const supportOutline=front?.outline??recipe.serialSupport.outline;
  const outline=supportOutline.map(([x,z])=>({x,z}));
  const undersized=pixels.findIndex(p=>p.radius<2.1);
@@ -196,8 +231,12 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
  }
  const addLink=(label,path,ends,budget,edge=null,centreAllowance=0)=>{
   if(!path){plan.links.push({label,path:[],reason:'No safe tangent-compatible path.'});return;}
-  const measure=path.slice(1).reduce((sum,p,i)=>sum+gap(path[i],p),centreAllowance);
   const dense=samples(path);
+  const measuredPath=wave?dense:path;
+  const measure=measuredPath.slice(1).reduce((sum,p,i)=>{
+   const a=measuredPath[i],rise=wave?waveHeight(wave,p.x)-waveHeight(wave,a.x):0;
+   return sum+Math.hypot(gap(a,p),rise);
+  },centreAllowance);
   const invalid=dense.some(point=>{
    if(boundary(point,outline)<radius+routeSideStock&&(!edge||gap(point,edge)>4))return true;
    return pixels.some(p=>!ends.includes(p.id)&&gap(point,p)<p.radius+radius+1.25);
@@ -246,8 +285,9 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
   const points=link.path.slice();
   if(i===0)points.unshift(add(entry.point,entry.outward,4));
   if(i===plan.links.length-1)points.push(add(exit.point,exit.outward,4));
-  const cut=cutter(points,link.label,radius,depth,settings.vaulted===true);
-  const sideStock=cutter(points,link.label,radius+routeSideStock,depth,false);
+  const swept=wave?samples(points):points;
+  const cut=cutter(swept,link.label,radius,depth,settings.vaulted===true,wave);
+  const sideStock=cutter(swept,link.label,radius+routeSideStock,depth,false,wave,true);
   if(topY!==null){
    cut.position=[0,topY-depth,0];
    sideStock.position=cut.position;
@@ -256,6 +296,9 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
    sideStock:front?frontRouteExtrude(sideStock,front):sideStock};
  });
  if(plan.ready&&plan.enabled)plan.roofStock={outline:supportOutline,thickness:roof};
- for(const link of plan.links){delete link.dense;delete link.ends;}
+ for(const link of plan.links){
+  if(wave&&link.path.length)link.path=link.dense.map(p=>({...p,y:waveHeight(wave,p.x)}));
+  delete link.dense;delete link.ends;
+ }
  return plan;
 }

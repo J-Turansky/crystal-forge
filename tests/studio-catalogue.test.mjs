@@ -377,6 +377,30 @@ assert.equal(prepareRecipe(THREE,wasm,sideRouted).bodies.length,1);
 const sideRouteConflict={...sideRouted,negative:[...sideRouted.negative,{kind:'box',size:[2,.3,1],position:[0,11.8,24.2]}]};
 assert.throws(()=>prepareRecipe(THREE,wasm,sideRouteConflict),/intersects another cut beside the channel/);
 assert.throws(()=>applyBuildModules(sideRouteStock,{...sideRouteBuild,serialRouting:{...serial,vaulted:true}}),/Turn off the vaulted option for a front route/);
+const gentleWave=waveGenerator.recipe({width:160,depth:100,thickness:15,amplitude:1,frequency:.5,variation:0,direction:0});
+const waveSurfaceMesh=previewRecipe(THREE,gentleWave);
+const shortProfile=PIXEL_PRESETS.find(profile=>profile.id==='seed');
+function gentleWaveSeat(x){
+ const hit=new THREE.Raycaster(new THREE.Vector3(x,30,0),new THREE.Vector3(0,-1,0)).intersectObject(waveSurfaceMesh.children[0])[0];
+ const {point,face}=hit;
+ return {...checked('wave-seat-'+x,point.x,point.z,180),entryFace:'top',
+  surface:{y:point.y,normal:face.normal.toArray()},socketProfile:{...shortProfile,retentionLip:0}};
+}
+const gentleSeat=gentleWaveSeat(-40);
+const secondWaveSeat=gentleWaveSeat(-20);
+const convexSeat=gentleWaveSeat(40);
+disposeGroup(waveSurfaceMesh);
+assert(Math.abs(gentleSeat.surface.normal[0])>.005,'The seat follows the actual sloped face');
+const waveSeatRecipe=hole=>applyBuildModules(gentleWave,{pixelBuilderVersion:1,pixelHoles:[hole]},waveGenerator.capabilities);
+const curvedSeatOnly=waveSeatRecipe(gentleSeat);
+assert.throws(()=>prepareRecipe(THREE,wasm,waveSeatRecipe(convexSeat)),/needs continuous stock on its installation face/);
+const waveRouteBuild={pixelBuilderVersion:1,pixelHoles:[gentleSeat,secondWaveSeat],serialRouting:serial};
+const curvedWaveRoute=applyBuildModules(gentleWave,waveRouteBuild,waveGenerator.capabilities);
+assert.equal(curvedWaveRoute.nativeRouting.face,'wave');
+assert.equal(prepareRecipe(THREE,wasm,curvedWaveRoute).bodies.length,1);
+const waveConflict={...curvedWaveRoute,negative:[...curvedWaveRoute.negative,{kind:'box',size:[2,1,.3],position:[0,15,1.8]}]};
+assert.throws(()=>prepareRecipe(THREE,wasm,waveConflict),/intersects another cut beside the channel/);
+assert.throws(()=>applyBuildModules(gentleWave,{...waveRouteBuild,serialRouting:{...serial,vaulted:true}}),/Turn off the vaulted option for a Wave route/);
 const flatBuild={...curveBuild,pixelHoles:[checked('left',-15),checked('right',15)],serialRouting:serial};
 const automatic=applyBuildModules(flatStock,flatBuild).nativeRouting;
 const pinnedBuild={...flatBuild,serialRouting:{...serial,inEdgePercent:automatic.edgePositions.in-2,outEdgePercent:automatic.edgePositions.out+2}};
@@ -386,7 +410,7 @@ assert(pinned.nativeRouting.links[0].path.length>2,'Offset IN is a smooth curved
 assert(prepareRecipe(THREE,wasm,pinned).bodies[0].volume>0);
 const vaultedStock=applyBuildModules(flatStock,{...flatBuild,serialRouting:{...serial,vaulted:true}});
 const pinnedVault=applyBuildModules(flatStock,{...pinnedBuild,serialRouting:{...pinnedBuild.serialRouting,vaulted:true}});
-for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted]){
+for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -419,7 +443,30 @@ for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted]){
     assert(outer&&outer.distance-inner.distance>=.55,format+' retains at least 0.55 mm of continuous side stock at '+label);
    }
   };
-  if(fixture===sideRouted){
+  if(fixture===curvedSeatOnly){
+   const point=new THREE.Vector3(gentleSeat.x,-gentleSeat.z,gentleSeat.surface.y);
+   const [nx,ny,nz]=gentleSeat.surface.normal;
+   const axis=new THREE.Vector3(nx,-nz,ny);
+   const opening=point.clone().addScaledVector(axis,1);
+   const apex=hit(opening.toArray(),axis.clone().negate().toArray());
+   assert(apex&&Math.abs(point.distanceTo(apex)-9)<.01,format+' curved face socket depth follows the installed axis');
+   const centre=point.clone().addScaledVector(axis,-4).toArray();
+   const left=hit(centre,[0,-1,0]),right=hit(centre,[0,1,0]);
+   assert(left&&right&&Math.abs(left.distanceTo(right)-5.3)<.02,format+' curved seat diametral clearance');
+   const rear=hit([apex.x,apex.y,-1],[0,0,1]);
+   assert(rear&&apex.z-rear.z>2.8,format+' leaves more than 2.8 mm of actual material behind the seat');
+  }else if(fixture===curvedWaveRoute){
+   for(const x of [-79,-60,-30,0,30,60,79]){
+    const origin=[x,0,14.8];
+    const left=hit(origin,[0,-1,0]),right=hit(origin,[0,1,0]);
+    assert(left&&right&&Math.abs(right.y-left.y-3.2)<.01,format+' Wave route cross-section width at '+x);
+    const surface=hit([x,3,30],[0,0,-1]),floor=hit([x,0,30],[0,0,-1]);
+    assert(surface&&floor&&Math.abs(surface.z-floor.z-1.8)<.015,format+' Wave route follows actual surface height at '+x);
+    assert(floor.z>2,format+' Wave route leaves material behind the groove');
+   }
+   assert.equal(hit([-81,0,14.8],[1,0,0]),undefined,format+' continuous Wave route through both exterior apertures');
+   assert.equal(hit([81,0,14.8],[-1,0,0]),undefined,format+' open Wave route outlet');
+  }else if(fixture===sideRouted){
    for(const x of [-38,-25,0,25,38]){
     const origin=[x,-24.2,10];
     const lower=hit(origin,[0,0,-1]),upper=hit(origin,[0,0,1]);
@@ -484,7 +531,11 @@ for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted]){
   geometry.dispose();
   material.dispose();
  }
- console.log('WT-021 native STL/3MF sections: 3.2 mm width, surrounding stock and open apertures ('+(fixture===sideRouted?'front':fixture===topRouted?'top':fixture===pinnedVault?'curved underside':'straight underside')+')');
+ if(fixture===curvedSeatOnly){
+  console.log('WT-021 curved Wave seat STL/3MF: 9 mm depth, 5.3 mm diameter, measured stock behind the seat');
+  continue;
+ }
+ console.log('WT-021 native STL/3MF sections: 3.2 mm width, surrounding stock and open apertures ('+(fixture===curvedWaveRoute?'curved Wave':fixture===sideRouted?'front':fixture===topRouted?'top':fixture===pinnedVault?'curved underside':'straight underside')+')');
 }
 const shallowActualStock={...vaultedStock,positive:[{kind:'box',size:[70,4,40],position:[0,2,0]}]};
 assert.throws(()=>prepareRecipe(THREE,wasm,shallowActualStock),/lacks continuous material above the channel/);

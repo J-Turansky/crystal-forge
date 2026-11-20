@@ -1363,6 +1363,48 @@ try{
   assert.equal(JSON.parse(sidePack.get('print-job-manifest.json')).routing.channels.length,3);
   assert(zipEntries((await useDownload(sideJob.locator('[data-job-3mf]'))).bytes).has('3D/3dmodel.model'));
  }
+ // FIT-01/FIT-03: confirmed curved Wave seats and a surface-following wired export.
+ {
+  await page.evaluate(()=>window.__sensoryStudio.addModel('waves',{
+   width:160,depth:100,thickness:15,amplitude:1,frequency:.5,variation:0,direction:0,dualMaterial:false
+  },'FIT-03 gentle Wave'));
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await page.locator('[data-view=top]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await page.locator('[data-fit-profile=seed]').click();
+  await page.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+  const getSeats=()=>page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
+  for(const [index,x] of [-40,-20].entries()){
+   const target=await page.evaluate(x=>window.__sensoryStudio.fittingPointScreen(x,0,'top'),x);
+   assert(target);
+   await page.mouse.click(target.x,target.y);
+   await page.waitForFunction(count=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===count,index+1);
+  }
+  await page.keyboard.press('Escape');
+  const seats=await getSeats();
+  assert(seats.every(hole=>Math.abs(hole.surface.normal[0])>.005));
+  assert.notDeepEqual(seats[0].surface.normal,seats[1].surface.normal);
+  const wavePalette=page.locator('.sms-palette');
+  for(const number of [1,2]){
+   await wavePalette.getByRole('button',{name:'P'+number,exact:true}).click();
+   const angle=wavePalette.locator('[data-pixel-field=rotation]');
+   await angle.fill('180');
+   await angle.press('Tab');
+  }
+  const waveSerial=wavePalette.getByRole('group',{name:'Serial LED string'});
+  const machine=waveSerial.locator('[data-native-route]');
+  assert(!(await machine.isDisabled()),await waveSerial.innerText());
+  await machine.check();
+  await waveSerial.getByText('Channels ready for preparation.').waitFor();
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  const waveJob=page.locator('#smsJobs article').filter({hasText:'FIT-03 gentle Wave'});
+  await waveJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const wavePack=zipEntries((await useDownload(waveJob.locator('[data-job-export]'))).bytes);
+  assert([...wavePack.keys()].some(name=>name.endsWith('.stl')));
+  assert.equal(JSON.parse(wavePack.get('print-job-manifest.json')).routing.channels.length,3);
+  assert(zipEntries((await useDownload(waveJob.locator('[data-job-3mf]'))).bytes).has('3D/3dmodel.model'));
+ }
  // FIT-02: actual Gear and Tile profile/cutter overlay UI parity.
  await page.evaluate(()=>window.__sensoryStudio.addModel('tactile-tiles',{
   pattern:'terraces',width:90,depth:90,thickness:20,relief:2,dualMaterial:false

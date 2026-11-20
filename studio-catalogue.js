@@ -186,11 +186,16 @@ export const waveGenerator=define('waves','Waves & Organic Forms','Organic',[
   }
   return p.thickness+p.amplitude*relief;
  };
- const mesh=heightField(p.width,p.depth,top);
+ const segments=48,mesh=heightField(p.width,p.depth,top,segments);
+ const heights=Array.from({length:segments+1},(_,i)=>mesh.points[i*3+1]);
+ const step=p.width/segments;
+ const wave=p.flowStyle==='Parallel'&&p.variation===0&&p.direction%180===0&&
+  heights.slice(1).every((height,i)=>Math.abs(height-heights[i])<=step*.025)
+  ?{start:-p.width/2,step,heights}:null;
  const w = p.width / 2, d = p.depth / 2;
  const pixelBoreSupport = {outline:[[-w,-d],[w,-d],[w,d],[-w,d]],minThickness:p.thickness};
  const material=p.flowStyle==='Parallel'?{secondary:[box([p.width,.8,p.depth],[0,.4,0])]}:{secondary:[],materialSplitHeight:.8,materialSplitRole:'top'};
- return {positive:[{kind:'mesh',mesh}],...material,pixelBoreSupport,serialSupport:{outline:pixelBoreSupport.outline,thickness:p.thickness},negative:[],bounds:{width:p.width,depth:p.depth,height:p.thickness+p.amplitude},warnings:['Review the wave slopes in Cura; the flat underside is the intended bed face.']};
+ return {positive:[{kind:'mesh',mesh}],...material,pixelBoreSupport,serialSupport:{outline:pixelBoreSupport.outline,thickness:p.thickness,wave},negative:[],bounds:{width:p.width,depth:p.depth,height:p.thickness+p.amplitude},warnings:['Review the wave slopes in Cura; the flat underside is the intended bed face.']};
 });
 function raisedControlSymbol(symbol,width,surface,offset=0){
  const h=2.4,y=surface, size=width*.34;
@@ -575,7 +580,9 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
  addPixelHoleCuts(r,build.pixelHoles,{routed:routing.enabled&&routing.ready});
  if(routing.enabled&&routing.ready){
   r.negative.push(...routing.cutters);
-  r.warnings.push(routing.face==='front'
+  r.warnings.push(routing.face==='wave'
+   ?'Serial grooves follow the Wave surface. Check cable seating and floor layers in Cura and on a physical print.'
+   :routing.face==='front'
    ?'Serial grooves open on the front edge. Check cable seating and print orientation in Cura and on a physical print.'
    :routing.face==='top'
    ?'Serial grooves open upward. Check cable seating and floor layers in Cura and on a physical print.'

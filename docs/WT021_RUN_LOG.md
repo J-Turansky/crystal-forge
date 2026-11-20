@@ -91,3 +91,9 @@
 - Base `2c68782d187be2725d38488b6fd09707d0129696`. An initially failing front-route fixture now passes on the actual square Tile mesh. Guides and cutters share front-face coordinates. Manifold rejects inadequate surrounding stock and an adjacent side-wall cut.
 - Independently measured exported channel: 3.2 mm usable width, 1.8 mm depth and open passage through both apertures in STL and 3MF. Focused Chromium passed real side placement, held drag, reload, routing, preparation and downloads. FIT-01/FIT-03 remain PARTIAL.
 - Next place a short fitting on a genuinely curved Wave face and measure the accepted seat in both formats.
+
+### 2026-11-20 - gentle parallel Wave routes
+
+- Base `c6655a30e33d9a2707e368ce38e32ba14e9f7e36`. Added a failing curved Wave route case, then a groove swept along the same sampled Wave mesh used for manufacturing. Real Manifold tests reject an unsupported convex seat, route wall interference and vaulting on the upward-facing groove.
+- Both formats independently prove a 9 mm long, 5.3 mm sized tilted seat and continuous 3.2 × 1.8 mm surface-following wiring across the Wave. Focused Chromium passed real curved placement, rotation, routing, preparation and downloads. FIT-01/FIT-03 remain PARTIAL.
+- Next combine validated manual mounts with routed placement, covering real conflicts and state rollback.
