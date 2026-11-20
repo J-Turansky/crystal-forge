@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** CAL-02, verify fitted clearances across separately saved project snapshots and Crystal imports.
+- **Target:** CAL-02, verify Crystal profile updates versus locally fitted copies across imports.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Full Chromium passed shaped calibration, oversized diameter rollback and native exports. Next create separate project snapshots with a library-following and a local fit. Import a revised profile, reopen and verify the intended release of each fit in STL and 3MF.
+- **Next test:** Native saved project snapshots reproduced their captured clearances in STL and 3MF. Next import a revised Crystal profile and compare the following and locally captured fitting geometry across preparations.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

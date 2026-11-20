@@ -2604,7 +2604,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  function backup(){captureCrystal();adapter.download(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),'wonder-trunks-studio-backup.json');}
  function replaceProject(saved){
-  for(const worker of workers.values())worker.terminate();workers.clear();prepared.clear();
+  for(const worker of workers.values())worker.terminate();workers.clear();prepared.clear();histories.clear();
   for(const c of cache.values())if(c.group)disposeGroup(c.group);else adapter.release(c);cache.clear();
   currentId=null;Object.assign(project,copy(saved));delete project.snapshotId;for(const job of project.printJobs){job.status='stale';job.requestId=null;job.preparedRevision=null;}
   $('smsProjectTitle').value=project.title;switchModel(project.activeTab||project.models[0]?.id);save();

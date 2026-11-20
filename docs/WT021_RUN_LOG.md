@@ -216,3 +216,7 @@
 ### 2026-11-20 - native shaped calibration
 
 - Validate shaped profile and bore-size edits in the production worker. Focused Chromium measured successive flanged Gear exports after clearance and retention updates, including reload and stale-download protection. Static and profile tests passed. The subsequent full Chromium suite passed the oversized conical diameter rollback and the existing family journeys after the tests were updated to await production validation.
+
+### 2026-11-20 - native project snapshot calibration
+
+- Chromium reopened the earlier and later snapshots. Downloaded files measured 4.85 mm for both in the earlier snapshot and 5.10 mm following/4.85 mm local in the later snapshot. A reopened project clears the undo history of the project it replaces.

@@ -1125,8 +1125,22 @@ try{
   }
   material.dispose();
  };
+ const saveFitProject=async title=>{
+  await page.locator('#smsProjectTitle').fill(title);
+  await page.locator('#smsProjectTitle').press('Tab');
+  await page.locator('#smsLibrary').click();
+  await page.locator('#smsSaveProject').click();
+  await page.locator('#smsSavedProjects').getByRole('heading',{name:title,exact:true}).waitFor();
+ };
+ const openFitProject=async title=>{
+  await page.locator('#smsLibrary').click();
+  page.once('dialog',dialog=>dialog.accept());
+  await page.getByRole('button',{name:'Open project '+title,exact:true}).first().click();
+  assert.equal(await page.locator('#smsProjectTitle').inputValue(),title);
+ };
  await checkFitDownloads(linkedModel,4.85);
  await checkFitDownloads(localModel,4.85);
+ await saveFitProject('Original shared calibration snapshot');
  await switchFitModel(linkedModel.id);
  await selector.selectOption({label:'Reusable 4.5 mm seed'});
  await wavePalette.getByRole('button',{name:'Create / edit pixel profile'}).click();
@@ -1149,6 +1163,21 @@ try{
  const reloadedFits=await savedFitModels();
  assert.equal(reloadedFits.find(model=>model.id===linkedModel.id).build.pixelHoles[0].clearance,.6);
  assert.deepEqual(reloadedFits.find(model=>model.id===localModel.id).build,localModel.build);
+ await saveFitProject('Revised shared calibration snapshot');
+ await switchFitModel(linkedModel.id);
+ await wavePalette.getByRole('button',{name:'P1',exact:true}).click();
+ const unsavedClearance=wavePalette.getByLabel('Diameter clearance (mm)');
+ await unsavedClearance.fill('.55');await unsavedClearance.press('Tab');
+ assert.equal((await getHoles())[0].clearance,.55);
+ assert(await page.locator('#smsGlobalUndo').isEnabled());
+ await openFitProject('Original shared calibration snapshot');
+ await switchFitModel(linkedModel.id);
+ assert(await page.locator('#smsGlobalUndo').isDisabled(),'A reopened snapshot has no undo history from a different revision');
+ await checkFitDownloads(linkedModel,4.85);
+ await checkFitDownloads(localModel,4.85);
+ await openFitProject('Revised shared calibration snapshot');
+ await checkFitDownloads(linkedModel,5.1);
+ await checkFitDownloads(localModel,4.85);
  await switchFitModel(linkedModel.id);
  await wavePalette.getByRole('button',{name:'P1',exact:true}).click();
  await checkNativeDoubleClick('waves',wavePalette,(await getHoles())[0]);

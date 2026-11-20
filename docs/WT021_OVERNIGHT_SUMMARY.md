@@ -1,9 +1,10 @@
 # WT-021 overnight checkpoint
 
-[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `0d005365a6978dc56a926cbd16fa788432a2c033`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
+[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `bd8b08016614c6fc4de4d022d7e7aea3f8c584f4`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
 
 ## Latest checkpoint
 
+- Original and revised native project snapshots reopened and prepared independently. Their decoded exports preserve the original 4.85 mm and revised 5.10 mm following fit, while the local fit remains 4.85 mm.
 - Focused Chromium measured a flanged Gear before and after independent clearance and retention edits. STL and 3MF agree on the flange, bore, throat and 9 mm depth. The full Chromium rerun passed, including rollback of an oversized conical diameter. The existing calibration journeys wait for production validation before making the next edit.
 - A 6 mm native vault initially narrowed at its junction with an 8.3 mm socket. The cutter now reaches the first bore chord wide enough to accept it. Manifold and both export formats confirm the full lower corridor, upper clearance, taper and both exterior openings. Focused Chromium verified a 6 mm Tile width edit after reload, withheld stale downloads and measured both fresh files.
 - A pinned Tile vault passed Chromium preparation and both downloads. STL and 3MF agree on upper clearance through the bent channel and both apertures, and on the tapered side walls. Build validates active vaults when switched on and when route settings change. Focused Chromium verified width and edge rollback and measured 4 mm usable width in the edited exports.
