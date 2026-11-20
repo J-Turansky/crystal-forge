@@ -2,8 +2,15 @@
 
 [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `163b78443999b23cf2d507b73851d35d70ad3dc9`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
 
+## Owner experiment checkpoint
+
+- The draft offers verified representative editing and export journeys for all seven builders. Local Chrome and Manifold evidence covers measured fittings, backed mounts and tabs, routed slots, independent calibration, retained ceilings and vaulted tracks. Working on a copy of a saved project keeps the original available for comparison.
+- The remaining software work covers the original Crystal size discrepancy, additional fitting-preview diagnostics, route continuity on additional configurations, interaction and undo combinations, cutaway profiles, and Cura import. The original Crystal test project and reported exports are unavailable. Physical Cura and printed fit are tracked in #10.
+- Pushing to main triggers the repository’s GitHub Pages workflow. The version and release notes pass the production metadata gate against the current main base. Merge and deployment are owner-controlled.
+
 ## Latest checkpoint
 
+- FIT-01 is verified. The full unified Chromium suite passed overlapping drag refusal on backed Character, Light Pod and stationary Rotary Cap, with both accepted poses intact. Combined with the Crystal, Gear, Tile and Wave witnesses this covers all seven builders.
 - FAB-01 is verified. All six native 6 mm vaulted fixtures passed both exported sections, including upper clearance through both joins and apertures. Each retains material above the apex and refuses 4 mm backing. Crystal’s separate vaulted fixtures cover the seventh family.
 - DIM-04 is verified. Six native fixtures preserved 6 mm usable width, 1.8 mm depth, matching route length and open exterior apertures in STL and 3MF. Crystal also edited to 6 mm and reproduced that width after reload.
 - CAL-01 is verified. Crystal changed the route width from 3.2 to 4.5 mm, retained the 5.4 mm bore, and reproduced both measurements in STL and 3MF after reload and fresh preparation.
@@ -38,7 +45,7 @@
 
 ## Current acceptance
 
-- The register has 17 VERIFIED and 7 PARTIAL rows. All seven model families have browser journey evidence and UX-01 was verified at `8083c547b76b5b1df4b547ffccc3ceb6b5765439`.
+- The register has 18 VERIFIED and 6 PARTIAL rows. All seven model families have browser journey evidence and UX-01 was verified at `8083c547b76b5b1df4b547ffccc3ceb6b5765439`.
 - Recess editing applies to supported native mounts and external tabs. Planar top recesses were verified on Gear. Crystal retains its existing mounting workflow. Moving Rotary Caps require Stationary display before adding external tabs.
 - [Next software check](WT021_NOW.md) and [full acceptance register](WT021_COMPLETION_REGISTER.md). Physical Cura and printed fit still require owner validation under [#10](https://github.com/connorturansky-svg/crystal-forge/issues/10).
 

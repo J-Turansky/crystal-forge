@@ -2087,6 +2087,21 @@ try{
   await page.mouse.move(drag[1].x,drag[1].y,{steps:6});
   await page.mouse.up();
   await page.waitForFunction(x=>window.__sensoryStudio.currentModel.build.pixelHoles[1].x>x+2,second.x);
+  const placed=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  const [firstSeat,draggedSeat]=placed.build.pixelHoles;
+  const rejected=await page.evaluate(({firstSeat,draggedSeat})=>[
+   window.__sensoryStudio.pixelMarkerScreen(draggedSeat.id),
+   window.__sensoryStudio.fittingPointScreen(firstSeat.x+1,firstSeat.z,'underside')
+  ],{firstSeat,draggedSeat});
+  assert(rejected.every(Boolean),name+' can test overlap on real stock');
+  await page.mouse.move(rejected[0].x,rejected[0].y);
+  await page.mouse.down();
+  await page.waitForTimeout(225);
+  await page.mouse.move(rejected[1].x,rejected[1].y,{steps:6});
+  await page.mouse.up();
+  await palette.locator('[data-pixel-status]').getByText(/overlap|clearance|continuous .*stock/i).waitFor();
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),placed,
+   name+' refuses the overlapping drag without changing either saved cutter pose');
   const serial=palette.getByRole('group',{name:'Serial LED string'});
   const route=serial.locator('[data-native-route]');
   assert(!(await route.isDisabled()),await serial.innerText());

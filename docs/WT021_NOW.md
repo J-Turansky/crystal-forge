@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** FIT-01, audit actual face placement and rejected moves across the seven model builders.
+- **Target:** Owner experiment checkpoint. Complete required CI on the exact draft head before handing it back.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** FAB-01 is verified. Next audit placement and drag across the supported installation faces, and add the missing rejected-move or save/reload cases.
+- **Next test:** FIT-01 is verified. The next development task after the experiment checkpoint is FIT-02 diagnostic and overlay verification on the remaining browser fixtures. Preserve the six partial acceptance rows.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

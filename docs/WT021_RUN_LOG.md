@@ -290,3 +290,5 @@
 - All six native families passed 6 mm width, 1.8 mm depth, clear socket joins and both apertures in both export formats. Crystal passed a separate 6 mm Build edit and reload with the bore unchanged. DIM-04 is verified.
 
 - Six native vaulted 6 mm routes passed independent roof slope, apex stock, upper passage and aperture measurements in both formats. Each refuses 4 mm backing. Together with Crystal’s asymmetric vaulted witness this verifies FAB-01.
+
+- The full unified Chromium suite passed real overlapping-drag rejection on backed Character, Light Pod and stationary Rotary Cap. FIT-01 is verified. The owner requested an experiment checkpoint. Freeze further feature expansion until a specific draft head has required CI evidence and a current handoff.
