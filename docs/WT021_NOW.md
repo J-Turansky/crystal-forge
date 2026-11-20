@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** DIM-04 and FAB-01, measure a valid 6 mm vaulted channel on a wider native fixture.
+- **Target:** DIM-03 and CAL-01, compare retained bore, flange and insertion depth after an independent fitting edit.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Build rejected unsafe Tile vault width and edge edits and exported valid 4 mm geometry. Next use suitably wide sockets and stock with a 6 mm vaulted channel. Measure usable width, slope, raised apex and both openings.
+- **Next test:** The 6 mm Tile vault survived reload, disabled both stale downloads and passed fresh export probes. Next use a measured native profile with a flange and retention, change fit independently, and compare the installed STL and 3MF sections.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

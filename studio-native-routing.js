@@ -307,10 +307,26 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
  if(entry&&exit&&gap(entry.point,exit.point)<6)plan.links.at(-1).reason='Use distinct perimeter exits at least 6 mm apart.';
  plan.reason=plan.links.filter(link=>link.reason).map(link=>link.label+': '+link.reason).join(' ');
  plan.ready=!plan.reason;
+ // Extend a wide cutter to the first bore chord that fits its full width.
+ // Keep the cable path, edge openings and reported lengths at their planned points.
+ const openJunction=(pixel,port)=>{
+  const bore=pixel.radius-(pixel.socketProfile?.retentionLip??0),halfWidth=radius+.02;
+  if(halfWidth>=bore)return null;
+  const chord=Math.sqrt(bore*bore-halfWidth*halfWidth),current=gap(pixel,port);
+  return current>chord?add(pixel,sub(port,pixel),chord/current):null;
+ };
  if(plan.ready&&plan.enabled)plan.cutters=plan.links.map((link,i)=>{
   const points=link.path.slice();
   if(i===0)points.unshift(add(entry.point,entry.outward,4));
+  else{
+   const junction=openJunction(pixels[i-1],points[0]);
+   if(junction)points.unshift(junction);
+  }
   if(i===plan.links.length-1)points.push(add(exit.point,exit.outward,4));
+  else{
+   const junction=openJunction(pixels[i],points.at(-1));
+   if(junction)points.push(junction);
+  }
   const swept=wave?samples(points):points;
   const cut=cutter(swept,link.label,radius,depth,settings.vaulted===true,wave);
   const sideStock=cutter(swept,link.label,radius+routeSideStock,depth,false,wave,true);

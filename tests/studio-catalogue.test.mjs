@@ -435,8 +435,8 @@ const pinnedVault=applyBuildModules(flatStock,{...pinnedBuild,serialRouting:{...
 const measuredProfile={kind:'gumdrop',bodyDiameter:8,bodyHeight:9,capHeight:1.2,flangeDiameter:9,flangeHeight:1.2,wireWidth:2.4,wireDepth:1.6,retentionLip:0};
 const calibrationStock={...flatStock,bounds:{...flatStock.bounds,height:15},
  positive:[{kind:'box',size:[70,15,40],position:[0,7.5,0]}],serialSupport:{...flatStock.serialSupport,thickness:15}};
-const calibratedCut=({clearance=.3,retentionLip=0,channelWidthMm=3.2,bodyHeight=9}={})=>applyBuildModules(calibrationStock,{
- ...flatBuild,serialRouting:{...serial,channelWidthMm},pixelHoles:flatBuild.pixelHoles.map(hole=>({...hole,
+const calibratedCut=({clearance=.3,retentionLip=0,channelWidthMm=3.2,bodyHeight=9,vaulted=false}={})=>applyBuildModules(calibrationStock,{
+ ...flatBuild,serialRouting:{...serial,channelWidthMm,vaulted},pixelHoles:flatBuild.pixelHoles.map(hole=>({...hole,
   profileId:'measured-sample',entryFace:'underside',diameter:8,clearance,socketProfile:{...measuredProfile,retentionLip,bodyHeight}}))
 });
 assert.throws(()=>prepareRecipe(THREE,wasm,calibratedCut({bodyHeight:4,retentionLip:.4})),/Cannot cut the selected retention lip/);
@@ -475,6 +475,7 @@ for(const [family,parameters] of [
  }finally{exposed.delete();negative.delete();positive.delete();}
  familyConeFixtures.set(fixture,family.typeId);
 }
+const wideVault=calibratedCut({channelWidthMm:6,vaulted:true});
 const measuredReplica=makePixelReplicaRecipe(measuredProfile);
 const dimensionFixtures=new Map([
  [calibratedCut(),{name:'baseline',bore:8.3,flange:9.3,throat:8.3,width:3.2}],
@@ -514,7 +515,7 @@ for(const [fixture] of fixingFixtures){
  const interrupted={...fixture,negative:[...fixture.negative,{kind:'box',size:[1,2,2],position:[18.5,1,0]}]};
  assert.throws(()=>prepareRecipe(THREE,wasm,interrupted),/too close to another cut/);
 }
-for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),conicalRecipe,conicalCoupon,tabRecessRecipe,topRecessRecipe,vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
+for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),conicalRecipe,conicalCoupon,tabRecessRecipe,topRecessRecipe,wideVault,vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -677,6 +678,17 @@ for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),coni
    }
    assert.equal(hit([-36,0,9],[1,0,0]),undefined,format+' open top-route inlet');
    assert.equal(hit([36,0,9],[-1,0,0]),undefined,format+' open top-route outlet');
+  }else if(fixture===wideVault){
+   assertOpenRun({x:-35.1,z:0},{x:35.1,z:0},2.85,'6 mm usable route');
+   assertOpenRun({x:-35.1,z:0},{x:35.1,z:0},.85,'6 mm upper vault',[2.4,3.5]);
+   for(const x of [-34.9,0,34.9]){
+    for(const [height,diameter] of [[1,6],[2.8,4.2],[3.8,2.4]]){
+     const left=hit([x,0,height],[0,-1,0]),right=hit([x,0,height],[0,1,0]);
+     assert(left&&right&&Math.abs(left.distanceTo(right)-diameter)<.01,format+' 6 mm vaulted section at '+x+', '+height);
+    }
+    const apex=hit([x,0,-1],[0,0,1]);
+    assert(apex&&Math.abs(apex.z-(1.8+3/.9))<.01,format+' 6 mm vault apex at '+x);
+   }
   }else if(fixture===vaultedStock){
    for(const x of [-34.99,-25,0,25,34.99]){
     const left=hit([x,0,1],[0,-1,0]);

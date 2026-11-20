@@ -2379,6 +2379,46 @@ try{
    geometry.dispose();
   }
   material.dispose();
+  const buildTab=page.locator('.sms-workspace-nav [data-tab=build]');
+  const printTab=page.locator('.sms-workspace-nav [data-tab=print]');
+  await buildTab.click();
+  await edge.fill('');await edge.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.serialRouting.inEdgePercent===null);
+  for(const [i,label] of ['P1','P2'].entries()){
+   await palette.getByRole('button',{name:label,exact:true}).click();
+   const diameter=palette.getByLabel('Measured body diameter (mm)');
+   await diameter.fill('8');await diameter.press('Tab');
+   await page.waitForFunction(i=>window.__sensoryStudio.currentModel.build.pixelHoles[i].diameter===8,i);
+  }
+  await width.fill('6');await width.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.serialRouting.channelWidthMm===6);
+  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+  await page.reload();
+  await page.waitForFunction(()=>window.__sensoryStudio?.currentModel?.build.serialRouting.channelWidthMm===6);
+  await printTab.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  assert(await job.locator('[data-job-stl]').isDisabled());
+  assert(await job.locator('[data-job-3mf]').isDisabled());
+  await job.locator('[data-job-prepare]').click();
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const wideSTL=await useDownload(job.locator('[data-job-stl]'));
+  const wideMF=await useDownload(job.locator('[data-job-3mf]'));
+  const wideMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(wideSTL.bytes).buffer),
+   read3MFGeometry(zipEntries(wideMF.bytes).get('3D/3dmodel.model').toString())]){
+   const mesh=new THREE.Mesh(geometry,wideMaterial);
+   for(const y of [-2.85,0,2.85]){
+    const opening=new THREE.Raycaster(new THREE.Vector3(-51,y,1.5),new THREE.Vector3(1,0,0),0,102);
+    assert.equal(opening.intersectObject(mesh).length,0,'The wide lower track clears both bores and exterior apertures');
+   }
+   for(const x of [-49.9,0,49.9]){
+    const width=[-1,1].reduce((sum,sign)=>sum+new THREE.Raycaster(
+     new THREE.Vector3(x,0,1.5),new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0].distance,0);
+    assert(Math.abs(width-6)<.02);
+   }
+   geometry.dispose();
+  }
+  wideMaterial.dispose();
  }
  assert.deepEqual(errors,[]);
  console.log('Unified Home, Design, Build, Library and Quick Print screenshots captured.');

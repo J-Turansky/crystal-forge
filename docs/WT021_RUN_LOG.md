@@ -208,3 +208,7 @@
 ### 2026-11-20 - active vault route edits
 
 - Active vault changes use the fabrication worker before committing. Chromium rolled back an unsafe perimeter opening and a 5 mm width that left insufficient web on the Tile fixture. A valid 4 mm width and adjusted opening prepared successfully. STL and 3MF measure 4 mm usable width and 2.2 mm at 2.8 mm height.
+
+### 2026-11-20 - wide vault socket junction
+
+- A 6 mm routed fixture exposed partial obstructions at the junction between the round socket and the cutter’s original endpoints. Extending the cutter to the matching bore chord preserves the full usable corridor and planned cable length. STL and 3MF now pass the through-junction and exterior probes, and verify taper and apex. The full Chromium journey suite passed after widening the junction cutter. A focused follow-up verified the 6 mm Tile edit, stale download protection, reload and fresh measured STL/3MF.
