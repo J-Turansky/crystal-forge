@@ -471,10 +471,21 @@ export function installTooltips(doc=document){
  node.id='controlTooltip';node.className='control-tooltip';node.setAttribute('role','tooltip');node.hidden=true;
  const heading=doc.createElement('strong'),description=doc.createElement('span');
  node.append(heading,description);doc.body.append(node);
- let target=null,timer=0,enabled=true,lastPoint=null;
+ let target=null,timer=0,enabled=true;
  const eligible='button, input:not([type=file]), select, [data-tooltip-body]';
+ const descriptionIds=el=>el.getAttribute('aria-describedby')?.match(/[^\t\n\f\r ]+/g)||[];
  const clearTimer=()=>{if(timer){clearTimeout(timer);timer=0}};
- const hide=()=>{clearTimer();node.hidden=true;if(target?.getAttribute('aria-describedby')==='controlTooltip')target.removeAttribute('aria-describedby');target=null;lastPoint=null};
+ const hide=()=>{
+  clearTimer();
+  if(!node.hidden&&target){
+   const ids=descriptionIds(target),remaining=ids.filter(id=>id!==node.id);
+   if(remaining.length!==ids.length){
+    if(remaining.length)target.setAttribute('aria-describedby',remaining.join(' '));
+    else target.removeAttribute('aria-describedby');
+   }
+  }
+  node.hidden=true;target=null;
+ };
  const valid=el=>el&&!el.disabled&&!el.closest('[hidden]')&&el.getClientRects().length>0;
  const position=()=>{
   if(node.hidden||!target)return;
@@ -495,7 +506,10 @@ export function installTooltips(doc=document){
   timer=0;if(!enabled||!valid(target))return;
   const content=describeControl(target);if(!content)return;
   heading.textContent=content[0];description.textContent=content[1];
-  node.hidden=false;target.setAttribute('aria-describedby','controlTooltip');position();
+  node.hidden=false;
+  const ids=descriptionIds(target);
+  if(!ids.includes(node.id))target.setAttribute('aria-describedby',[...ids,node.id].join(' '));
+  position();
  };
  const prepare=(el,delay)=>{
   if(!enabled||!valid(el))return hide();

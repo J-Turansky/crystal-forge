@@ -1,5 +1,7 @@
 # Crystal Forge — verification strategy and commands
 
+The Studio Chromium suite (`node tests/studio-browser.test.mjs`) checks that shared keyboard help adds to an existing control description and that pressing Escape dismisses the tooltip without removing that description or moving focus.
+
 ## WT-016 backup recovery
 
 The mocked vault tests cover guarded writes, immutable asset integrity and interruption. Recovery tests cover linked conflict remapping, favourites and templates, repeated import, selective revisions and quota rollback. Chromium reviews local JSON, cancels and applies recovery while keeping the active project open.
