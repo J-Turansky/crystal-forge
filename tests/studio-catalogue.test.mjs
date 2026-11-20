@@ -358,8 +358,9 @@ assert.equal(pinned.nativeRouting.cutters.length,3,'Pinned openings retain both 
 assert(pinned.nativeRouting.links[0].path.length>2,'Offset IN is a smooth curved path');
 assert(prepareRecipe(THREE,wasm,pinned).bodies[0].volume>0);
 const vaultedStock=applyBuildModules(flatStock,{...flatBuild,serialRouting:{...serial,vaulted:true}});
-const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,vaultedStock));
-{
+const pinnedVault=applyBuildModules(flatStock,{...pinnedBuild,serialRouting:{...pinnedBuild.serialRouting,vaulted:true}});
+for(const fixture of [vaultedStock,pinnedVault]){
+ const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
  const zip=Buffer.from(vaultedNativeFiles.threeMF);
@@ -382,24 +383,49 @@ const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,vaultedSt
   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
   const mesh=new THREE.Mesh(geometry,material);
   const hit=(origin,direction)=>new THREE.Raycaster(new THREE.Vector3(...origin),new THREE.Vector3(...direction)).intersectObject(mesh)[0]?.point;
-  for(const x of [-34.99,-25,0,25,34.99]){
-   const left=hit([x,0,1],[0,-1,0]);
-   const right=hit([x,0,1],[0,1,0]);
-   assert(left&&right,format+' has two side-wall intersections near '+x);
-   assert(Math.abs(right.y-left.y-3.2)<.005,format+' full wire width near '+x);
-   const ceiling=hit([x,.2,-1],[0,0,1]);
-   assert(ceiling&&Math.abs(ceiling.z-(1.8+1.4/.9))<.005,format+' vaulted roof near '+x);
-  }
-  for(const x of [-35.2,35.2]){
-   const direction=x<0?1:-1;
-   assert.equal(hit([x,0,1],[direction,0,0]),undefined,format+' cable aperture stays open through both outer faces');
-   const wall=hit([x,2,1],[direction,0,0]);
-   assert(wall&&Math.abs(Math.abs(wall.x)-35)<.005,format+' stock remains beside the cable opening');
+  if(fixture===vaultedStock){
+   for(const x of [-34.99,-25,0,25,34.99]){
+    const left=hit([x,0,1],[0,-1,0]);
+    const right=hit([x,0,1],[0,1,0]);
+    assert(left&&right,format+' has two side-wall intersections near '+x);
+    assert(Math.abs(right.y-left.y-3.2)<.005,format+' full wire width near '+x);
+    const ceiling=hit([x,.2,-1],[0,0,1]);
+    assert(ceiling&&Math.abs(ceiling.z-(1.8+1.4/.9))<.005,format+' vaulted roof near '+x);
+   }
+   for(const x of [-35.2,35.2]){
+    const direction=x<0?1:-1;
+    assert.equal(hit([x,0,1],[direction,0,0]),undefined,format+' cable aperture stays open through both outer faces');
+    const wall=hit([x,2,1],[direction,0,0]);
+    assert(wall&&Math.abs(Math.abs(wall.x)-35)<.005,format+' stock remains beside the cable opening');
+   }
+  }else{
+   const curvedLinks=[fixture.nativeRouting.links[0],fixture.nativeRouting.links.at(-1)];
+   for(const link of curvedLinks){
+    let sections=0;
+    for(let i=0;i<link.path.length-1;i++){
+     const a=link.path[i],b=link.path[i+1];
+     const x=(a.x+b.x)/2,y=-(a.z+b.z)/2;
+     // At the designed opening and socket junction the channel wall is
+     // intentionally interrupted. Probe the continuous curved span.
+     if(Math.abs(x)>32||Math.abs(x)<20)continue;
+     const normal=new THREE.Vector2(b.z-a.z,b.x-a.x).normalize();
+     const origin=[x,y,1];
+     const left=hit(origin,[-normal.x,-normal.y,0]);
+     const right=hit(origin,[normal.x,normal.y,0]);
+     assert(left&&right,format+' curved wire walls at '+link.label+' section '+i);
+     assert(Math.abs(left.distanceTo(right)-3.2)<.06,format+' curved width at '+link.label+' section '+i);
+     const upper=hit([x,y,11],[0,0,-1]);
+     const ceiling=hit([x,y,-1],[0,0,1]);
+     assert(ceiling&&upper&&upper.z-ceiling.z>6,format+' continuous roof stock at '+link.label+' section '+i);
+     sections++;
+    }
+    assert(sections>=3,format+' sampled multiple curved cross-sections at '+link.label);
+   }
   }
   geometry.dispose();
   material.dispose();
  }
- console.log('WT-021 native vaulted STL/3MF sections: 3.2 mm side walls and both open apertures');
+ console.log('WT-021 native vaulted STL/3MF sections: 3.2 mm width, roof stock and open straight apertures');
 }
 const shallowActualStock={...vaultedStock,positive:[{kind:'box',size:[70,4,40],position:[0,2,0]}]};
 assert.throws(()=>prepareRecipe(THREE,wasm,shallowActualStock),/lacks continuous material above the channel/);
