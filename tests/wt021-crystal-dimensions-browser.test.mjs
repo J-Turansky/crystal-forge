@@ -250,14 +250,14 @@ try{
  console.log('WT-021 full Crystal manufacturing journey verified');
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
  const wireWidth=await reveal(page.locator('[data-state=wireWidth]'));
- await wireWidth.evaluate(node=>{node.value='4.5';node.dispatchEvent(new Event('input',{bubbles:true}));});
- await page.waitForFunction(()=>window.__sensoryStudio.currentModel.parameters.wireWidth===4.5);
+ await wireWidth.evaluate(node=>{node.value='6';node.dispatchEvent(new Event('input',{bubbles:true}));});
+ await page.waitForFunction(()=>window.__sensoryStudio.currentModel.parameters.wireWidth===6);
  const edited=await crystal();
  for(const key of ['pixelProfileId','pixelClearanceByProfile','pixelRetentionLip','manualPixelHoles'])
   assert.deepEqual(edited.parameters[key],savedCrystal.parameters[key],key+' stays fixed across the wire edit');
  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
  await page.reload();
- await page.waitForFunction(()=>window.__sensoryStudio?.currentModel?.parameters.wireWidth===4.5);
+ await page.waitForFunction(()=>window.__sensoryStudio?.currentModel?.parameters.wireWidth===6);
  await page.locator('.sms-workspace-nav [data-tab=print]').click();
  await crystalJob.getByText('Stale',{exact:true}).waitFor();
  assert(await crystalJob.locator('[data-job-stl]').isDisabled());
@@ -276,7 +276,7 @@ try{
   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),mesh=new THREE.Mesh(geometry,material);
   const span=origin=>[-1,1].reduce((sum,sign)=>sum+new THREE.Raycaster(new THREE.Vector3(...origin),
    new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0].distance,0);
-  assert(Math.abs(span([0,0,1])-4.5)<.04);
+  assert(Math.abs(span([0,0,1])-6)<.04);
   assert(Math.abs(span([calibratedSocket.x,-calibratedSocket.z,4])-5.4)<.04);
   geometry.dispose();material.dispose();
  }

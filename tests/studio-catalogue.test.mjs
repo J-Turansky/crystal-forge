@@ -495,6 +495,7 @@ assert.equal(conicalCoupon.nativeRouting.links.length,3);
 const familyConeFixtures=new Map();
 const familyRetainedConeFixtures=new Map();
 const familyWireFitFixtures=new Map();
+const familyWideRouteFixtures=new Map();
 const familyTabFixtures=new Map();
 const familyPocketFixtures=new Map();
 for(const [family,parameters] of [
@@ -517,6 +518,11 @@ for(const [family,parameters] of [
   assert(exposed.volume()<.02,family.typeId+' conical cutter encloses the full measured housing');
  }finally{exposed.delete();negative.delete();positive.delete();}
  familyConeFixtures.set(fixture,family.typeId);
+ const wideProfile={...measuredProfile,bodyHeight:7};
+ const wide=applyBuildModules(source,{pixelBuilderVersion:1,pixelBacking:true,pixelBackingThickness:10,
+  pixelHoles:[-15,15].map((x,i)=>({...checked('wide-route-'+i,x),diameter:8,entryFace:'underside',socketProfile:wideProfile})),
+  serialRouting:{...serial,channelWidthMm:6}},family.capabilities);
+ familyWideRouteFixtures.set(wide,family.typeId);
  for(const width of [3.2,4]){
   const profile={...shortConeProfile,bodyHeight:7,retentionLip:.15};
   const recipe=applyBuildModules(source,{pixelBuilderVersion:1,pixelBacking:true,pixelBackingThickness:10,
@@ -591,7 +597,7 @@ for(const [fixture] of fixingFixtures){
  const interrupted={...fixture,negative:[...fixture.negative,{kind:'box',size:[1,2,2],position:[18.5,1,0]}]};
  assert.throws(()=>prepareRecipe(THREE,wasm,interrupted),/too close to another cut/);
 }
-for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),...familyRetainedConeFixtures.keys(),...familyWireFitFixtures.keys(),conicalRecipe,conicalCoupon,...familyTabFixtures.keys(),...familyPocketFixtures.keys(),tabRecessRecipe,topRecessRecipe,wideVault,vaultedStock,pinnedVault,topRouted,sideRouted,rearRouted,...perpendicularRoutes,curvedSeatOnly,curvedWaveRoute,biaxialRoute,biaxialPinned,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
+for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),...familyRetainedConeFixtures.keys(),...familyWireFitFixtures.keys(),...familyWideRouteFixtures.keys(),conicalRecipe,conicalCoupon,...familyTabFixtures.keys(),...familyPocketFixtures.keys(),tabRecessRecipe,topRecessRecipe,wideVault,vaultedStock,pinnedVault,topRouted,sideRouted,rearRouted,...perpendicularRoutes,curvedSeatOnly,curvedWaveRoute,biaxialRoute,biaxialPinned,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -677,6 +683,25 @@ for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),...f
    const left=hit([0,0,5],[0,-1,0]),right=hit([0,0,5],[0,1,0]);
    assert(apex&&Math.abs(apex.z-6.65)<.01,format+' '+name+' conical apex');
    assert(left&&right&&Math.abs(left.distanceTo(right)-3.3)<.01,format+' '+name+' conical slope');
+  }else if(familyWideRouteFixtures.has(fixture)){
+   const name=familyWideRouteFixtures.get(fixture);
+   geometry.computeBoundingBox();
+   const bounds=geometry.boundingBox;
+   const inX=bounds.min.x,outX=bounds.max.x;
+   const links=fixture.nativeRouting.links;
+   assert.equal(links.length,3);
+   assert(Math.abs(links[0].path[0].x-inX)<.01&&Math.abs(links[2].path.at(-1).x-outX)<.01,
+    format+' '+name+' IN and OUT reach the exported perimeter');
+   assertOpenRun({x:inX-.1,z:0},{x:outX+.1,z:0},2.85,name+' 6 mm route through both sockets and exterior walls');
+   for(const x of [inX+.2,0,outX-.2]){
+    const left=hit([x,0,1],[0,-1,0]),right=hit([x,0,1],[0,1,0]);
+    const roof=hit([x,0,-1],[0,0,1]);
+    assert(left&&right&&Math.abs(left.distanceTo(right)-6)<.01,format+' '+name+' 6 mm route width');
+    assert(roof&&Math.abs(roof.z-1.8)<.01,format+' '+name+' route depth');
+   }
+   const portAllowance=Math.abs(links[0].path.at(-1).x+15)+Math.abs(links[2].path[0].x-15);
+   assert(Math.abs(links.reduce((sum,link)=>sum+link.measure,0)+portAllowance-(outX-inX))<.01,
+    format+' '+name+' published length and port allowances match the open span');
   }else if(familyWireFitFixtures.has(fixture)){
    const {name,width}=familyWireFitFixtures.get(fixture);
    const span=(x,height)=>{

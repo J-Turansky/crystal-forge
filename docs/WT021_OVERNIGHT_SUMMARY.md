@@ -4,6 +4,7 @@
 
 ## Latest checkpoint
 
+- DIM-04 is verified. Six native fixtures preserved 6 mm usable width, 1.8 mm depth, matching route length and open exterior apertures in STL and 3MF. Crystal also edited to 6 mm and reproduced that width after reload.
 - CAL-01 is verified. Crystal changed the route width from 3.2 to 4.5 mm, retained the 5.4 mm bore, and reproduced both measurements in STL and 3MF after reload and fresh preparation.
 - DIM-03 is verified. Both formats showed the expected changes from independent native clearance, flange, insertion depth and retention edits. Crystal kept a 5.3 mm straight bore after adding 0.2 mm of retention, with a measured 4.9 mm throat. Widening native cable channels left socket geometry unchanged across all six builders.
 - FAB-02 is verified. The six native retained conical fixtures reproduce flange, retention throat, straight bore and apex dimensions in STL and 3MF. The existing Crystal and routed coupon checks cover the other applicable cases.
@@ -36,7 +37,7 @@
 
 ## Current acceptance
 
-- The register has 15 VERIFIED and 9 PARTIAL rows. All seven model families have browser journey evidence and UX-01 was verified at `8083c547b76b5b1df4b547ffccc3ceb6b5765439`.
+- The register has 16 VERIFIED and 8 PARTIAL rows. All seven model families have browser journey evidence and UX-01 was verified at `8083c547b76b5b1df4b547ffccc3ceb6b5765439`.
 - Recess editing applies to supported native mounts and external tabs. Planar top recesses were verified on Gear. Crystal retains its existing mounting workflow. Moving Rotary Caps require Stationary display before adding external tabs.
 - [Next software check](WT021_NOW.md) and [full acceptance register](WT021_COMPLETION_REGISTER.md). Physical Cura and printed fit still require owner validation under [#10](https://github.com/connorturansky-svg/crystal-forge/issues/10).
 

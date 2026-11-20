@@ -286,3 +286,5 @@
 - All six native builders passed measured clearance, flange, depth and retention variations. Crystal Chromium verified the unchanged 5.3 mm bore and narrowed 4.9 mm throat. DIM-03 is verified. Native wire-width edits passed both formats without changing the selected socket dimensions.
 
 - Crystal Chromium verified a 4.5 mm wire edit survives reload, blocks stale output, and retains the 5.4 mm fitted bore in both fresh meshes. CAL-01 is verified.
+
+- All six native families passed 6 mm width, 1.8 mm depth, clear socket joins and both apertures in both export formats. Crystal passed a separate 6 mm Build edit and reload with the bore unchanged. DIM-04 is verified.
