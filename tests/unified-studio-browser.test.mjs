@@ -2829,21 +2829,28 @@ try{
   await page.locator('[data-view=bottom]').click();
   await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
   const palette=page.locator('.sms-palette');
-  await palette.getByRole('button',{name:'Place mounting hole in 3D'}).click();
-  for(const [i,x] of [-20,20].entries()){
+  const placementProfile=palette.getByLabel('New mounting profile');
+  const place=palette.getByRole('button',{name:'Place mounting hole in 3D'});
+  for(const [i,x,kind] of [[0,-20,'Magnet pocket'],[1,20,'Threaded insert pilot']]){
+   await placementProfile.selectOption(kind);
+   await place.click();
    const point=await page.evaluate(x=>window.__sensoryStudio.fittingPointScreen(x,0,'underside'),x);
    assert(point);await page.mouse.click(point.x,point.y);
-   await page.waitForFunction(count=>window.__sensoryStudio.currentModel.build.manualMountHoles?.length===count,i+1);
+   await page.waitForFunction(({i,kind})=>window.__sensoryStudio.currentModel.build.manualMountHoles?.[i]?.profile===kind,{i,kind});
+   await page.keyboard.press('Escape');
   }
+  await place.click();
+  const conflict=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(-15,0,'underside'));
+  assert(conflict);await page.mouse.click(conflict.x,conflict.y);
+  await page.locator('#smsModelError').getByText(/overlaps|clearance from another/).waitFor();
+  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles.length),2);
   await page.keyboard.press('Escape');
-  const profile=palette.getByLabel('Mount profile');
   const diameter=palette.getByLabel('Pocket diameter (mm)');
   const depth=palette.getByLabel('Pocket depth (mm)');
   const model=()=>page.evaluate(()=>window.__sensoryStudio.currentModel);
   for(const [index,kind,width,targetDepth] of [[0,'Magnet pocket',6.2,3],[1,'Threaded insert pilot',4.1,4]]){
    await palette.getByRole('button',{name:'M'+(index+1),exact:true}).click();
-   await profile.selectOption(kind);
-   await page.waitForFunction(({index,kind})=>window.__sensoryStudio.currentModel.build.manualMountHoles[index].profile===kind,{index,kind});
+   assert.equal((await model()).build.manualMountHoles[index].profile,kind);
    await diameter.fill(String(width));await diameter.press('Tab');
    await page.waitForFunction(({index,width})=>window.__sensoryStudio.currentModel.build.manualMountHoles[index].recessDiameter===width,{index,width});
    if(index===0){
@@ -2857,6 +2864,10 @@ try{
    }
   }
   const {build}=await model();
+  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+  await page.reload();
+  await page.waitForFunction(name=>window.__sensoryStudio?.currentModel?.name===name,name);
+  assert.deepEqual((await model()).build.manualMountHoles,build.manualMountHoles);
   await page.locator('.sms-workspace-nav [data-tab=print]').click();
   await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
   const job=page.locator('#smsJobs article').filter({hasText:name});

@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** DIM-05 and PAR-01, verify direct placement and saved state for blind native mounting profiles.
+- **Target:** PAR-01, extend native blind mounting placement and mounting-tool discovery across families.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Blind magnet and insert profiles passed paired geometry probes on all native families and Chromium edits on Tile. Next verify choosing a blind profile before placement, then use it on solid stock and refuse a conflicting placement before save.
+- **Next test:** Tile Chromium passed both directly placed blind profiles, conflict rollback, saved state and export dimensions. Next verify another native builder and wire mounting profile discovery into the tool finder.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

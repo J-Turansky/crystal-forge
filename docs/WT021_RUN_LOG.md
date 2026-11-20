@@ -264,3 +264,7 @@
 ### 2026-11-20 - blind native mounting profiles
 
 - Added editable magnet pockets and threaded insert pilots to native mounts. Shared production stock guards validate the blind cuts. Both file formats measure diameter and depth for all six native families, and Chromium verified both Tile pockets and rollback when insufficient stock remains.
+
+### 2026-11-20 - direct blind mount placement
+
+- Added the mounting profile picker before placement. Tile Chromium placed a magnet pocket and insert pilot directly, refused a conflicting placement, reloaded the accepted mounts and measured both exported cuts.
