@@ -366,6 +366,17 @@ assert.throws(()=>applyBuildModules(flatStock,topRouteBuild),/planar top/);
 const tiltedSeat={...topRouteBuild.pixelHoles[1],surface:{y:10,normal:[.6,.8,0]}};
 assert.throws(()=>applyBuildModules(topRouteStock,{...topRouteBuild,pixelHoles:[topRouteBuild.pixelHoles[0],tiltedSeat]}),/shared flat underside or an eligible planar top/);
 assert.throws(()=>applyBuildModules(topRouteStock,{...topRouteBuild,serialRouting:{...serial,vaulted:true}}),/Turn off the vaulted option/);
+const sideRouteStock=tileGenerator.recipe({width:80,depth:50,thickness:20,outline:'square',pattern:'terraces',relief:2});
+const sideRouteBuild={...topRouteBuild,pixelHoles:topRouteBuild.pixelHoles.map(hole=>({
+ ...hole,z:25,rotation:0,surface:{y:10,normal:[0,0,1]}
+}))};
+const sideRouted=applyBuildModules(sideRouteStock,sideRouteBuild,tileGenerator.capabilities);
+assert.equal(sideRouted.nativeRouting.face,'front');
+assert.equal(sideRouted.nativeRouting.links.length,3);
+assert.equal(prepareRecipe(THREE,wasm,sideRouted).bodies.length,1);
+const sideRouteConflict={...sideRouted,negative:[...sideRouted.negative,{kind:'box',size:[2,.3,1],position:[0,11.8,24.2]}]};
+assert.throws(()=>prepareRecipe(THREE,wasm,sideRouteConflict),/intersects another cut beside the channel/);
+assert.throws(()=>applyBuildModules(sideRouteStock,{...sideRouteBuild,serialRouting:{...serial,vaulted:true}}),/Turn off the vaulted option for a front route/);
 const flatBuild={...curveBuild,pixelHoles:[checked('left',-15),checked('right',15)],serialRouting:serial};
 const automatic=applyBuildModules(flatStock,flatBuild).nativeRouting;
 const pinnedBuild={...flatBuild,serialRouting:{...serial,inEdgePercent:automatic.edgePositions.in-2,outEdgePercent:automatic.edgePositions.out+2}};
@@ -375,7 +386,7 @@ assert(pinned.nativeRouting.links[0].path.length>2,'Offset IN is a smooth curved
 assert(prepareRecipe(THREE,wasm,pinned).bodies[0].volume>0);
 const vaultedStock=applyBuildModules(flatStock,{...flatBuild,serialRouting:{...serial,vaulted:true}});
 const pinnedVault=applyBuildModules(flatStock,{...pinnedBuild,serialRouting:{...pinnedBuild.serialRouting,vaulted:true}});
-for(const fixture of [vaultedStock,pinnedVault,topRouted]){
+for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -408,7 +419,17 @@ for(const fixture of [vaultedStock,pinnedVault,topRouted]){
     assert(outer&&outer.distance-inner.distance>=.55,format+' retains at least 0.55 mm of continuous side stock at '+label);
    }
   };
-  if(fixture===topRouted){
+  if(fixture===sideRouted){
+   for(const x of [-38,-25,0,25,38]){
+    const origin=[x,-24.2,10];
+    const lower=hit(origin,[0,0,-1]),upper=hit(origin,[0,0,1]);
+    assert(lower&&upper&&Math.abs(upper.z-lower.z-3.2)<.005,format+' side-route width at '+x);
+    const back=hit([x,-26,10],[0,1,0]);
+    assert(back&&Math.abs(back.y+23.2)<.005,format+' side-route depth at '+x);
+   }
+   assert.equal(hit([-41,-24.2,10],[1,0,0]),undefined,format+' continuous side route through inlet and outlet');
+   assert.equal(hit([41,-24.2,10],[-1,0,0]),undefined,format+' open side outlet');
+  }else if(fixture===topRouted){
    for(const x of [-34.99,-25,0,25,34.99]){
     const origin=[x,0,9];
     const left=hit(origin,[0,-1,0]),right=hit(origin,[0,1,0]);
@@ -463,7 +484,7 @@ for(const fixture of [vaultedStock,pinnedVault,topRouted]){
   geometry.dispose();
   material.dispose();
  }
- console.log('WT-021 native STL/3MF sections: 3.2 mm width, surrounding stock and open apertures ('+(fixture===topRouted?'top':fixture===pinnedVault?'curved underside':'straight underside')+')');
+ console.log('WT-021 native STL/3MF sections: 3.2 mm width, surrounding stock and open apertures ('+(fixture===sideRouted?'front':fixture===topRouted?'top':fixture===pinnedVault?'curved underside':'straight underside')+')');
 }
 const shallowActualStock={...vaultedStock,positive:[{kind:'box',size:[70,4,40],position:[0,2,0]}]};
 assert.throws(()=>prepareRecipe(THREE,wasm,shallowActualStock),/lacks continuous material above the channel/);

@@ -122,11 +122,29 @@ function topRouteHeight(recipe,holes){
  return null;
 }
 
+function frontRouteFace(recipe,holes){
+ const front=recipe.serialSupport?.front;
+ if(!front||!holes.length)return null;
+ return holes.every(hole=>{
+  const normal=hole.surface?.normal;
+  return hole.socketProfile&&normal&&Number.isFinite(hole.surface.y)&&Math.abs(hole.z-front.z)<.01&&
+   Math.hypot(normal[0],normal[1],normal[2]-1)<.00001;
+ })?front:null;
+}
+
+// Route X/Z is along the face, and +Y is into the material.
+function frontRouteExtrude(part,front){
+ const [x,y,z]=part.position??[0,0,0];
+ return {...part,rotation:[-Math.PI/2,0,0],position:[x,z,front.z-y]};
+}
+
 export function nativeRouteEligibility(recipe,build){
  const holes=build.pixelHoles||[];
- const topY=topRouteHeight(recipe,holes);
- if(holes.some(hole=>hole.socketProfile&&hole.surface)&&topY===null)
-  return 'Physical grooves require a shared flat underside or an eligible planar top. Move the sockets to the same supported face.';
+ const topY=topRouteHeight(recipe,holes),front=frontRouteFace(recipe,holes);
+ if(holes.some(hole=>hole.socketProfile&&hole.surface)&&topY===null&&!front)
+  return 'Physical grooves require a shared flat underside or an eligible planar top or front. Move the sockets to the same supported face.';
+ if(front&&build.serialRouting?.vaulted)
+  return 'Front grooves open sideways. Turn off the vaulted option for a front route.';
  if(topY!==null&&build.serialRouting?.vaulted)
   return 'Top grooves open upward. Turn off the vaulted option for a planar top route.';
  const requested=build.serialRouting?.channelWidthMm;
@@ -136,7 +154,7 @@ export function nativeRouteEligibility(recipe,build){
  if(recipe.dualMaterial)return 'Use a single material for native serial routing.';
  const channel=channelSize(build);
  const required=channel.depth+roof+(build.serialRouting?.vaulted?channel.radius/.9:0);
- if(recipe.serialSupport.thickness<required)return 'Routing needs at least '+required.toFixed(1)+' mm of solid backing for the groove and roof.';
+ if((front?.thickness??recipe.serialSupport.thickness)<required)return 'Routing needs at least '+required.toFixed(1)+' mm of solid backing for the groove and roof.';
  const blocksBacking=part=>part.kind!=='box'||part.rotation||!Array.isArray(part.position)||
   part.position[1]+part.size[1]/2>0;
  const obstructed=recipe.serialSupport.explicitBacking?recipe.negative.some(blocksBacking):recipe.negative.length>0;
@@ -161,10 +179,13 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
   new Set(holes.map(p=>p.id)).size!==holes.length){
   plan.reason='Place 1 to 16 checked pixel fittings in Build before routing.';return plan;
  }
- const topY=topRouteHeight(recipe,holes);
+ const topY=topRouteHeight(recipe,holes),front=frontRouteFace(recipe,holes);
  if(topY!==null){plan.face='top';plan.surfaceY=topY;}
- const pixels=holes.map(p=>({...p,radius:(p.diameter+p.clearance)/2,wireAngle:topY===null?(p.rotation??0):180-(p.rotation??0)}));
- const outline=recipe.serialSupport.outline.map(([x,z])=>({x,z}));
+ if(front){plan.face='front';plan.front=front;}
+ const pixels=holes.map(p=>({...p,z:front?p.surface.y:p.z,
+  radius:(p.diameter+p.clearance)/2,wireAngle:topY===null?(p.rotation??0):180-(p.rotation??0)}));
+ const supportOutline=front?.outline??recipe.serialSupport.outline;
+ const outline=supportOutline.map(([x,z])=>({x,z}));
  const undersized=pixels.findIndex(p=>p.radius<2.1);
  if(undersized>=0){
   plan.reason='P'+(undersized+1)+' needs a bore diameter of at least 4.2 mm for serial routing.';return plan;
@@ -231,9 +252,10 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
    cut.position=[0,topY-depth,0];
    sideStock.position=cut.position;
   }
-  return {...cut,junctionIds:link.ends,sideStock};
+  return {...(front?frontRouteExtrude(cut,front):cut),junctionIds:link.ends,
+   sideStock:front?frontRouteExtrude(sideStock,front):sideStock};
  });
- if(plan.ready&&plan.enabled)plan.roofStock={outline:recipe.serialSupport.outline,thickness:roof};
+ if(plan.ready&&plan.enabled)plan.roofStock={outline:supportOutline,thickness:roof};
  for(const link of plan.links){delete link.dense;delete link.ends;}
  return plan;
 }

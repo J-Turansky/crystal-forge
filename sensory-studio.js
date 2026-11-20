@@ -1111,22 +1111,25 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    const others=holes.filter(hole=>hole.id!==id);
    gesture.issue=mounts?mountIssue(gesture.model,candidate,others):pixelIssue(gesture.model,candidate,others,gesture.recipe);
    if(!gesture.issue)gesture.candidate=candidate;
-   movePixelMarker(gesture.model,gesture.marker,candidate.x,candidate.z,hit.point.y+(underside?-.3:.3));
+   const markerPoint=new THREE.Vector3(candidate.x,hit.point.y,candidate.z);
+   if(current.socketProfile)markerPoint.addScaledVector(hit.normal,.3);
+   else markerPoint.y+=underside?-.3:.3;
+   movePixelMarker(gesture.model,gesture.marker,markerPoint);
   }
   gesture.marker.material.color.setHex(gesture.issue?0xff3c59:0x48e4f1);
  },true);
- function movePixelMarker(model,marker,x,z,y=marker.position.y){
-  const lift=y-marker.position.y;
-  marker.position.set(x,y,z);
+ function movePixelMarker(model,marker,position){
+  const delta=position.clone().sub(marker.position);
+  marker.position.copy(position);
   const id=marker.userData.pixelId||marker.userData.mountId;
   for(const part of cache.get(model.id)?.group?.children||[]){
-   if(part.userData.pixelPort===id||part.userData.pixelLabel===id||part.userData.mountLabel===id){part.position.x=x;part.position.y+=lift;part.position.z=z;}
+   if(part.userData.pixelPort===id||part.userData.pixelLabel===id||part.userData.mountLabel===id)part.position.add(delta);
   }
  }
  function cancelPixelGesture(){
   const gesture=pixelGesture;pixelGesture=null;
   if(!gesture)return;
-  if(gesture.origin)movePixelMarker(gesture.model,gesture.marker,gesture.origin.x,gesture.origin.z,gesture.origin.y);
+  if(gesture.origin)movePixelMarker(gesture.model,gesture.marker,gesture.origin);
   refreshPixelMarkers(gesture.model);
   if(viewport.hasPointerCapture(gesture.id))viewport.releasePointerCapture(gesture.id);
  }

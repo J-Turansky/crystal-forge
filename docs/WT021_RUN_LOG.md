@@ -85,3 +85,9 @@
 
 - Base `439fc789bd8a5c903c89271caf464795248fe50c`. The unified Chromium suite passed with Gear top placement, rejected drag rollback, physical routing after reload and real STL/3MF downloads. An isolated server port resolved the local test connection failure.
 - Added a failing side marker fixture, then fixed the marker position and normal to match the production seat. Catalogue Manifold/export regression passed. FIT-01/FIT-03 remain PARTIAL. Next add an accepted side placement and same-face drag using real viewport input.
+
+### 2026-11-20 - square Tile front-wall routes and browser drag
+
+- Base `2c68782d187be2725d38488b6fd09707d0129696`. An initially failing front-route fixture now passes on the actual square Tile mesh. Guides and cutters share front-face coordinates. Manifold rejects inadequate surrounding stock and an adjacent side-wall cut.
+- Independently measured exported channel: 3.2 mm usable width, 1.8 mm depth and open passage through both apertures in STL and 3MF. Focused Chromium passed real side placement, held drag, reload, routing, preparation and downloads. FIT-01/FIT-03 remain PARTIAL.
+- Next place a short fitting on a genuinely curved Wave face and measure the accepted seat in both formats.

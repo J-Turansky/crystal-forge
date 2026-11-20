@@ -1307,6 +1307,62 @@ try{
   }
   await page.keyboard.press('Escape');
  }
+ // FIT-01: place and drag a shaped fitting on a real vertical Tile face.
+ {
+  await page.evaluate(()=>window.__sensoryStudio.addModel('tactile-tiles',{
+   width:100,depth:80,thickness:20,outline:'square',relief:2,pattern:'terraces',dualMaterial:false
+  },'FIT-01 Tile side'));
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await page.locator('[data-view=front]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await page.locator('[data-fit-profile=seed]').click();
+  await page.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+  const canvas=await page.locator('#viewport canvas').boundingBox();
+  await page.mouse.click(canvas.x+canvas.width/2,canvas.y+canvas.height/2+28);
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===1);
+  await page.keyboard.press('Escape');
+  const getSeat=()=>page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0]);
+  const seat=await getSeat();
+  assert.deepEqual(seat.surface.normal,[0,0,1]);
+  const marker=await page.evaluate(id=>window.__sensoryStudio.pixelMarkerScreen(id),seat.id);
+  assert(marker);
+  await page.mouse.move(marker.x,marker.y);
+  await page.mouse.down();
+  await page.waitForTimeout(225);
+  await page.mouse.move(marker.x+25,marker.y,{steps:6});
+  assert.deepEqual(await getSeat(),seat,'A side drag previews without changing the saved seat');
+  await page.mouse.up();
+  await page.waitForFunction(x=>window.__sensoryStudio.currentModel.build.pixelHoles[0].x>x+1,seat.x);
+  const moved=await getSeat();
+  assert.equal(moved.id,seat.id);
+  assert.equal(moved.z,seat.z);
+  assert.deepEqual(moved.surface.normal,seat.surface.normal);
+  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+  await page.reload();
+  await page.waitForFunction(()=>window.__sensoryStudio?.currentModel?.build.pixelHoles?.length===1);
+  assert.deepEqual(await getSeat(),moved);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await page.locator('[data-view=front]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await page.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+  const sideMarker=await page.evaluate(id=>window.__sensoryStudio.pixelMarkerScreen(id),moved.id);
+  await page.mouse.click(sideMarker.x+125,sideMarker.y);
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===2);
+  await page.keyboard.press('Escape');
+  const sideSerial=page.locator('.sms-palette').getByRole('group',{name:'Serial LED string'});
+  const enable=sideSerial.locator('[data-native-route]');
+  assert(!(await enable.isDisabled()),await sideSerial.innerText());
+  await enable.check();
+  await sideSerial.getByText('Channels ready for preparation.').waitFor();
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  const sideJob=page.locator('#smsJobs article').filter({hasText:'FIT-01 Tile side'});
+  await sideJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const sidePack=zipEntries((await useDownload(sideJob.locator('[data-job-export]'))).bytes);
+  assert([...sidePack.keys()].some(name=>name.endsWith('.stl')));
+  assert.equal(JSON.parse(sidePack.get('print-job-manifest.json')).routing.channels.length,3);
+  assert(zipEntries((await useDownload(sideJob.locator('[data-job-3mf]'))).bytes).has('3D/3dmodel.model'));
+ }
  // FIT-02: actual Gear and Tile profile/cutter overlay UI parity.
  await page.evaluate(()=>window.__sensoryStudio.addModel('tactile-tiles',{
   pattern:'terraces',width:90,depth:90,thickness:20,relief:2,dualMaterial:false

@@ -454,7 +454,14 @@ export const characterGenerator=define('characters','Characters & Silhouettes','
 export const tileGenerator={...tactileTileGenerator,
  capabilities:{...tactileTileGenerator.capabilities,supportsStationaryFittingBacking:true},
  parameterSchema:tactileTileGenerator.parameterSchema.map(s=>({...s,label:s.label||s.key.replace(/[A-Z]/g,c=>' '+c.toLowerCase()),step:s.key==='seed'?1:s.key==='randomness'?.05:.5})),
- recipe(input){const r=generateTile(input);return {serialSupport:{outline:r.bodies[0].mesh.boreOutline,thickness:r.parameters.thickness},pixelBoreSupport:{outline:r.bodies[0].mesh.boreOutline,minThickness:r.parameters.thickness},positive:[{kind:'mesh',mesh:r.bodies[0].mesh}],partitioned:r.parameters.dualMaterial,secondary:r.bodies.length===2?[{kind:'mesh',mesh:r.bodies[1].mesh}]:[],negative:[],dualMaterial:r.parameters.dualMaterial,bounds:this.estimateBounds(input),warnings:['Tactile feel, cleanability and edge comfort require a printed sample.']};}};
+ recipe(input){
+  const r=generateTile(input),{outline,width,depth,thickness,dualMaterial}=r.parameters;
+  const boreOutline=r.bodies[0].mesh.boreOutline;
+  const front=outline==='square'?{z:depth/2,thickness:depth,outline:[[-width/2,0],[width/2,0],[width/2,thickness],[-width/2,thickness]]}:null;
+  return {serialSupport:{outline:boreOutline,thickness,front},pixelBoreSupport:{outline:boreOutline,minThickness:thickness},
+   positive:[{kind:'mesh',mesh:r.bodies[0].mesh}],partitioned:dualMaterial,secondary:dualMaterial?[{kind:'mesh',mesh:r.bodies[1].mesh}]:[],
+   negative:[],dualMaterial,bounds:this.estimateBounds(input),warnings:['Tactile feel, cleanability and edge comfort require a printed sample.']};
+ }};
 export const svgArtworkGenerator=define('svg-artwork','Imported SVG artwork','Imports',[],[],
  p=>buildSvgExtrusionRecipe(p.artwork),{supportsDualMaterial:false});
 export const generators=[tileGenerator,gearGenerator,waveGenerator,capGenerator,characterGenerator,pebbleGenerator];
@@ -568,7 +575,9 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
  addPixelHoleCuts(r,build.pixelHoles,{routed:routing.enabled&&routing.ready});
  if(routing.enabled&&routing.ready){
   r.negative.push(...routing.cutters);
-  r.warnings.push(routing.face==='top'
+  r.warnings.push(routing.face==='front'
+   ?'Serial grooves open on the front edge. Check cable seating and print orientation in Cura and on a physical print.'
+   :routing.face==='top'
    ?'Serial grooves open upward. Check cable seating and floor layers in Cura and on a physical print.'
    :'Serial grooves are underside-open. Check cable seating and roof layers in Cura and on a physical print.');
  }

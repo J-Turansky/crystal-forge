@@ -54,3 +54,9 @@ Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) co
 ### Side-face selection markers
 
 - The marker for a shaped socket now uses its actual point and normal. The catalogue suite reproduced the incorrect side marker and passed after the fix. Next exercise side placement and drag in Chromium before generalising route frames.
+
+### Square Tile front-wall serial routing
+
+- Base was `2c68782d187be2725d38488b6fd09707d0129696`. The browser fixture places and drags a shaped socket on the vertical Tile face, reloads the moved pose, places a second socket, enables routing, then prepares and downloads STL and 3MF. The focused Chromium run passed.
+- The catalogue Manifold suite verified a 3.2 mm wide and 1.8 mm deep channel with uninterrupted clearance through the front groove and both open ends in each independently decoded file. Preparation refuses a neighbouring cut that removes side stock.
+- Next prove curved-face seating and routing, then finish full family journeys and UX-01. Printed and Cura evidence remain with #10.
