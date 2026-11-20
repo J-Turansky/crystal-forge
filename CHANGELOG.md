@@ -4,6 +4,8 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
+- Crystal’s edge-tab editor shows automatic positions and offers an Add action when the manual list is empty.
+
 - Choose a native screw, magnet or threaded insert profile before placing a mount. Blind pockets have editable diameter and depth. Build checks the remaining stock before saving.
 
 - Native cable routes validate minimum bend-radius edits before saving, preserving the last valid setting when a bend cannot fit.

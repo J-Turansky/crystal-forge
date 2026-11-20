@@ -160,8 +160,12 @@ try{
  await page.locator('#wireRouteStatus').getByText(/ready|fit/i).first().waitFor();
  await page.locator('#advancedBtn').click();
  await (await reveal(page.locator('[data-state=mount]'))).selectOption('Edge fixing tabs');
- await (await reveal(page.locator('#placeTabBtn'))).click();
+ const autoTabs=await crystal();
+ const originalPositions=planHardware(autoTabs.editableState.crystals,autoTabs.parameters).tabs.map(tab=>tab.u);
+ const editTabs=page.getByRole('button',{name:'Make edge tabs editable'});
+ await (await reveal(editTabs)).click();
  await page.keyboard.press('Escape');
+ assert.deepEqual((await crystal()).parameters.manualEdgeTabs.map(tab=>tab.u),originalPositions);
  for(const [i,u] of [13,63].entries()){
   const tab=await reveal(page.locator('[data-tab-u="'+i+'"]'));
   await tab.fill(String(u));await tab.press('Tab');
@@ -307,7 +311,7 @@ try{
   const name='Crystal blind hardware presets';
   await page.evaluate(name=>window.__sensoryStudio.addModel('crystals',{
    seed:42,count:5,width:95,baseType:'integrated',baseStyle:'Square',baseHeight:16,baseWidth:32,baseDome:0,
-   cutSockets:false,lightingMode:'none',wireChannels:false,mount:'None',mountPlacement:'auto',mountSpacing:34
+   cutSockets:false,lightingMode:'none',wireChannels:false,mount:'None',mountPlacement:'auto',mountSpacing:34,manualEdgeTabs:null,tabCount:2,tabHolesPerTab:1
   },name),name);
   const build=page.locator('.sms-workspace-nav [data-tab=build]'),print=page.locator('.sms-workspace-nav [data-tab=print]');
   const preset=page.locator('[data-state=mount]'),job=page.locator('#smsJobs article').filter({hasText:name});
@@ -353,5 +357,33 @@ try{
    }
   }
   console.log('WT-021 Crystal magnet and insert preset sections verified');
+  await build.click();
+  await (await reveal(preset)).selectOption('Edge fixing tabs');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.parameters.mount==='Edge fixing tabs');
+  const automatic=await crystal();
+  assert.equal(automatic.parameters.manualEdgeTabs,null);
+  assert.equal(planHardware(automatic.editableState.crystals,automatic.parameters).tabs.length,2);
+  const edit=await reveal(page.locator('[data-edit-tab-positions]'));
+  assert.equal(await edit.textContent(),'Make edge tabs editable');
+  await edit.click();
+  await page.keyboard.press('Escape');
+  const count=(await crystal()).parameters.manualEdgeTabs.length;
+  assert(count>0);
+  for(let i=0;i<count;i++)await (await reveal(page.locator('[data-remove-tab="0"]'))).click();
+  assert.deepEqual((await crystal()).parameters.manualEdgeTabs,[]);
+  await page.locator('[data-view=top]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  const add=await reveal(page.locator('[data-edit-tab-positions]'));
+  assert.equal(await add.textContent(),'Add edge tab');
+  await add.click();
+  const before=await crystal(),polygon=planHardware(before.editableState.crystals,before.parameters).polygon;
+  const a=polygon[0],b=polygon[1];
+  const edge=await onBase(.4*(a.x+b.x),.4*(a.z+b.z));
+  assert((await sample(edge.x,edge.y)).valid);
+  await page.mouse.click(edge.x,edge.y);
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.parameters.manualEdgeTabs.length===1);
+  await page.keyboard.press('Escape');
+  await page.locator('[data-tab-u="0"]').waitFor({state:'attached'});
+  console.log('WT-021 Crystal empty tab list can place a new tab');
  }
 }finally{await browser.close();}
