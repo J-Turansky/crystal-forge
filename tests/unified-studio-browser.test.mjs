@@ -1021,6 +1021,15 @@ try{
  assert(dragged.x>changed[0].x+2,'Hold drag moves M1 along the solid face');
  assert.equal(dragged.entryFace,'top');
  await mountPalette.locator('[data-pixel-backing]').check();
+ const backingThickness=mountPalette.getByLabel('Fitting backing thickness (mm)');
+ assert.equal(await backingThickness.inputValue(),'4');
+ await backingThickness.fill('11');await backingThickness.press('Tab');
+ assert.equal(await backingThickness.inputValue(),'4','Rejects backing beyond the printable setting range');
+ await backingThickness.fill('8');await backingThickness.press('Tab');
+ assert.equal(await backingThickness.inputValue(),'8');
+ await mountPalette.getByRole('button',{name:'Reset backing thickness'}).click();
+ assert.equal(await backingThickness.inputValue(),'4');
+ await backingThickness.fill('8');await backingThickness.press('Tab');
  const addTab=mountPalette.getByRole('button',{name:'Add external tab',exact:true});
  await addTab.click();await addTab.click();
  const tabPosition=mountPalette.locator('[data-backing-tab="0"]');
@@ -1036,6 +1045,7 @@ try{
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
  assert(await page.locator('.sms-palette').getByRole('button',{name:'M1',exact:true}).isVisible());
  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.backingTabs),savedTabs);
+ assert.equal(await backingThickness.inputValue(),'8','Fitting backing thickness survives save and reload');
  const dimensions=page.locator('#smsModelDimensions');
  await dimensions.filter({hasText:'Design preview'}).waitFor();
  await page.getByRole('button',{name:'Render actual model',exact:true}).click();
@@ -1059,7 +1069,19 @@ try{
   min[axis]=Math.min(min[axis],value);max[axis]=Math.max(max[axis],value);
  }
  assert.deepEqual(displayedDimensions,max.map((value,i)=>Number((value-min[i]).toFixed(1))));
- assert(zipEntries((await useDownload(tabJob.locator('[data-job-3mf]'))).bytes).has('3D/3dmodel.model'));
+ const tileHalfWidth=await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.width/2);
+ const backingTop=(x,z)=>Math.abs(x)>tileHalfWidth+5&&Math.abs(z-8)<.001;
+ let stlBackingTop=false;
+ for(let facet=0;facet<facetCount;facet++)for(let vertex=0;vertex<3;vertex++){
+  const offset=96+facet*50+vertex*12;
+  if(backingTop(tabSTL.bytes.readFloatLE(offset),tabSTL.bytes.readFloatLE(offset+8)))stlBackingTop=true;
+ }
+ assert(stlBackingTop,'STL contains the edited 8 mm backing top outside the Tile footprint');
+ const modelXml=zipEntries((await useDownload(tabJob.locator('[data-job-3mf]'))).bytes).get('3D/3dmodel.model');
+ assert(modelXml);
+ assert([...modelXml.toString().matchAll(/<vertex x="([^"]+)" y="[^"]+" z="([^"]+)"\/>/g)]
+  .some(([,x,z])=>backingTop(Number(x),Number(z))),
+  '3MF contains the same edited 8 mm backing top outside the Tile footprint');
 
 
  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();

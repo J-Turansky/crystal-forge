@@ -962,7 +962,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(normal.y<-.999&&Math.abs(point.y)<.01)return undefined;
   return {y:point.y,normal:normal.toArray()};
  }
- function checkAndSaveSeat(model,holes,hole,onSaved){
+ function checkFittingBuild(model,build,onValidated){
   if(seatCheck||model.link)return;
   const revision=model.revision;
   const worker=new Worker(new URL('./studio-model-worker.js',import.meta.url),{type:'module'});
@@ -973,7 +973,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    seatCheck=null;
    if(active()?.id!==model.id||model.revision!==revision||!canEditPixels(model))return;
    if(message){pixelStatus(model,message);return;}
-   if(savePixels(model,holes,hole.id))onSaved?.();
+   onValidated();
   };
   worker.onmessage=({data})=>{
    if(data.type==='complete')finish();
@@ -982,7 +982,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   worker.onerror=event=>{event.preventDefault();finish(event.message||'Socket validation could not start.');};
   worker.onmessageerror=()=>finish('Socket validation returned an unreadable result.');
   pixelStatus(model,'Checking socket walls, insertion opening and collisions…');
-  worker.postMessage({ticket:{model:{...model,build:{...model.build,pixelHoles:holes,pixelBuilderVersion:1}}}});
+  worker.postMessage({ticket:{model:{...model,build}}});
+ }
+ function checkAndSaveSeat(model,holes,hole,onSaved){
+  checkFittingBuild(model,{...model.build,pixelHoles:holes,pixelBuilderVersion:1},()=>{
+   if(savePixels(model,holes,hole.id))onSaved?.();
+  });
  }
  function placeFittingAt(model,{point,normal},duplicate=null,onSaved){
   const holes=pixelHoles(model);
@@ -1469,6 +1474,8 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   root.innerHTML='<h3>Pixel fittings</h3><div class="sms-actions"><button type="button" data-pixel-profile-editor>Create / edit pixel profile</button></div>'+
    '<p>Choose a saved measured profile before placing. A profile selection with P1/P2 selected updates <strong>only that fitting</strong>; otherwise it chooses the next fitting. Plain bores open on both faces. Select a fitting to enable a measured blind socket on its installation face. Cable cuts open on the underside. Print a coupon to check fit.</p>'+
    '<label><input type="checkbox" data-pixel-backing'+(model.build.pixelBacking?' checked':'')+disabled+'> Add fitting backing (12 mm of additional material around each edge)</label>'+
+   (model.build.pixelBacking?'<label>Fitting backing thickness (mm)<input type="number" min="3" max="10" step="0.1" data-pixel-backing-thickness value="'+
+    esc(model.build.pixelBackingThickness??4)+'"'+disabled+'></label><button type="button" data-reset-pixel-backing-thickness'+disabled+'>Reset backing thickness</button>':'')+
    '<p>Fitting bores need continuous solid material. Thin walls, cavities and narrow rims can block placement.</p>'+
    '<label><input type="checkbox" data-native-fit-preview'+(nativeFitPreviewChoices.get(model.id)?' checked':'')+'> Show physical pixels and socket cutters</label>'+
    '<output role="status" data-native-fit-preview-status>'+esc(nativeFitPreviewMessages.get(model.id)||'')+'</output>'+
@@ -1510,6 +1517,24 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    }
    renderEditor();
   };
+  const backingThickness=root.querySelector('[data-pixel-backing-thickness]');
+  if(backingThickness){
+   const changeThickness=value=>{
+    const previous=model.build.pixelBackingThickness??4;
+    backingThickness.value=previous;
+    if(!Number.isFinite(value)||value<3||value>10){
+     pixelStatus(model,'Choose 3–10 mm fitting backing thickness.');
+     return;
+    }
+    if(value===previous)return;
+    const build={...model.build,pixelBackingThickness:value};
+    const apply=()=>{if(commit({build}))renderEditor();};
+    if(holes.some(hole=>hole.socketProfile)||build.serialRouting?.enabled)checkFittingBuild(model,build,apply);
+    else apply();
+   };
+   backingThickness.onchange=()=>changeThickness(backingThickness.valueAsNumber);
+   root.querySelector('[data-reset-pixel-backing-thickness]').onclick=()=>changeThickness(4);
+  }
   root.querySelectorAll('[data-fit-profile]').forEach(button=>button.onclick=()=>{
    const profileId=button.dataset.fitProfile;
    if(selected>=0&&!editPixel(model,selected,applyPixelFittingProfile(holes[selected],profileId,adapter.pixelFitProfiles())))return;
