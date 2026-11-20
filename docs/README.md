@@ -38,6 +38,7 @@ This index groups existing documents by purpose **without moving their original 
 ## 5. Historical plans and PR acceptance guides
 
 - [Historical PR guide index](history/README.md) — PR5–PR14 plans, physical test guides and release notes.
+- [Archived README milestone descriptions](history/LEGACY_README_NOTES.md) — old PR5–PR7/v0.8.0 details, retained for reference.
 - [Original prompt archive](../prompts/archive/README.md) — WT-000–WT-021 historical prompts, with retained original paths.
 
 **Status convention:** A specification describes intent; a passing targeted regression supports only its tested fixture. Only the completion register's full feature-specific acceptance evidence can justify a **VERIFIED** status. Draft PR #102 is not production.

@@ -17,5 +17,6 @@ These files remain at their established `docs/` paths. This page groups them for
 - [PR11 — hardening](../PR11_HARDENING_TEST_GUIDE.md)
 - [PR12 — cable geometry](../PR12_CABLE_GEOMETRY_TEST_GUIDE.md)
 - [PR14 — pixel spacing acceptance](../PR14_PIXEL_SPACING_ACCEPTANCE.md)
+- [Original README notes: PR5–PR7 and v0.8.0](LEGACY_README_NOTES.md) — preserved historical narrative
 
 For **current** seven-builder release requirements, use the [WT-021 completion register](../WT021_COMPLETION_REGISTER.md), [Codex handover](../WT021_CODEX_HANDOFF.md), and [source prompt](../../prompts/021-complete-seven-builder-manufacturing-parity.md). These historical files are not evidence that every listed feature was completed or physically printed.
