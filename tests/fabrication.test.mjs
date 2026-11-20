@@ -41,7 +41,7 @@ const wasm=await Module();wasm.setup();
 {
  const settings={pixelProfileId:'wide-flange',pixelDiameter:8,pixelFit:.25,pixelRetentionLip:.2,
   pixelProfiles:[{id:'wide-flange',name:'Wide flange',kind:'gumdrop',bodyDiameter:8,flangeDiameter:12,
-   bodyHeight:12,flangeHeight:2,capHeight:2,wireHeight:1,wireWidth:3,wireDepth:1}]};
+   bodyHeight:12,flangeHeight:2,capHeight:2,wireWidth:3,wireDepth:1}]};
  const profile=resolvePixelProfile(settings),owned=[],hold=solid=>(owned.push(solid),solid);
  const bore=(options,roof=30)=>putSocket(wasm,hold,{x:0,z:0},6,roof,-3,profile,options);
  try{
@@ -515,7 +515,7 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
   assert(Math.abs(apex-socket.tipY)<.001,format+' full-model conical apex');
   assert(Math.abs(apex-ceiling(socket.x+2,socket.z)-2)<.001,format+' conical roof falls 2 mm over 2 mm');
   const profile=resolvePixelProfile(installation);
-  const rise=installation===taperedVault?.25:0;
+  const rise=installation===taperedVault ? .25 : 0;
   const throatHeight=Math.max(1.9,profile.flangeHeight+.8)+.7+rise;
   if(rise)assert(Math.abs(apex-profile.bodyHeight-profile.boreDiameter/2-rise)<.001);
   for(const [height,width] of [[throatHeight,profile.boreDiameter-2*profile.retentionLip],[8,profile.boreDiameter]]){

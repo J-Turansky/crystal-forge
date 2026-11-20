@@ -2549,7 +2549,7 @@ try{
  {
   const name='Tapered Gear socket';
   await page.evaluate(name=>window.__sensoryStudio.addModel('gears',{mode:'Decorative',
-   wheelStyle:'Rounded lobes',webStyle:'Solid',diameter:100,thickness:34,bore:0,reliefStyle:'None',dualMaterial:false},name),name);
+   wheelStyle:'Rounded lobes',webStyle:'Solid',diameter:100,thickness:25,bore:0,reliefStyle:'None',dualMaterial:false},name),name);
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
   const palette=page.locator('.sms-palette');
   await palette.locator('[data-fit-profile=bullet]').click();
