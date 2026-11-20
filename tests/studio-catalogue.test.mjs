@@ -3,6 +3,7 @@ import {PIXEL_PRESETS} from '../pixel-profiles.js';
 import {pixelBoreIssue} from '../studio-pixel-bore-validation.js';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
+import {STLLoader} from 'three/addons/loaders/STLLoader.js';
 import Module from 'manifold-3d';
 import {waveGenerator,tileGenerator,gearGenerator,capGenerator,characterGenerator,pebbleGenerator,generators,applyBuildModules} from '../studio-catalogue.js';
 import {findPixelPosition,newPixel} from '../studio-pixel-builder.js';
@@ -357,7 +358,49 @@ assert.equal(pinned.nativeRouting.cutters.length,3,'Pinned openings retain both 
 assert(pinned.nativeRouting.links[0].path.length>2,'Offset IN is a smooth curved path');
 assert(prepareRecipe(THREE,wasm,pinned).bodies[0].volume>0);
 const vaultedStock=applyBuildModules(flatStock,{...flatBuild,serialRouting:{...serial,vaulted:true}});
-assert(prepareRecipe(THREE,wasm,vaultedStock).bodies[0].volume>0);
+const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,vaultedStock));
+{
+ const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
+ const stlGeometry=new STLLoader().parse(stl.buffer);
+ const zip=Buffer.from(vaultedNativeFiles.threeMF);
+ let xml='';
+ for(let i=0;zip.readUInt32LE(i)===0x04034b50;){
+  const nameLength=zip.readUInt16LE(i+26),start=i+30+nameLength+zip.readUInt16LE(i+28),size=zip.readUInt32LE(i+18);
+  if(zip.toString('utf8',i+30,i+30+nameLength)==='3D/3dmodel.model'){
+   assert.equal(zip.readUInt16LE(i+8),0);
+   xml=zip.toString('utf8',start,start+size);break;
+  }
+  i=start+size;
+ }
+ assert.match(xml,/<model unit="millimeter"/);
+ const vertices=[...xml.matchAll(/<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"\/>/g)].flatMap(m=>m.slice(1).map(Number));
+ const indices=[...xml.matchAll(/<triangle v1="(\d+)" v2="(\d+)" v3="(\d+)"/g)].flatMap(m=>m.slice(1).map(Number));
+ const threeMFGeometry=new THREE.BufferGeometry();
+ threeMFGeometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+ threeMFGeometry.setIndex(indices);
+ for(const [format,geometry] of [['STL',stlGeometry],['3MF',threeMFGeometry]]){
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(geometry,material);
+  const hit=(origin,direction)=>new THREE.Raycaster(new THREE.Vector3(...origin),new THREE.Vector3(...direction)).intersectObject(mesh)[0]?.point;
+  for(const x of [-34.99,-25,0,25,34.99]){
+   const left=hit([x,0,1],[0,-1,0]);
+   const right=hit([x,0,1],[0,1,0]);
+   assert(left&&right,format+' has two side-wall intersections near '+x);
+   assert(Math.abs(right.y-left.y-3.2)<.005,format+' full wire width near '+x);
+   const ceiling=hit([x,.2,-1],[0,0,1]);
+   assert(ceiling&&Math.abs(ceiling.z-(1.8+1.4/.9))<.005,format+' vaulted roof near '+x);
+  }
+  for(const x of [-35.2,35.2]){
+   const direction=x<0?1:-1;
+   assert.equal(hit([x,0,1],[direction,0,0]),undefined,format+' cable aperture stays open through both outer faces');
+   const wall=hit([x,2,1],[direction,0,0]);
+   assert(wall&&Math.abs(Math.abs(wall.x)-35)<.005,format+' stock remains beside the cable opening');
+  }
+  geometry.dispose();
+  material.dispose();
+ }
+ console.log('WT-021 native vaulted STL/3MF sections: 3.2 mm side walls and both open apertures');
+}
 const shallowActualStock={...vaultedStock,positive:[{kind:'box',size:[70,4,40],position:[0,2,0]}]};
 assert.throws(()=>prepareRecipe(THREE,wasm,shallowActualStock),/lacks continuous material above the channel/);
 const roofObstruction={...vaultedStock,negative:[...vaultedStock.negative,
