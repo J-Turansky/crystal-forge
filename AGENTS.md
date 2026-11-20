@@ -2,6 +2,14 @@
 
 **Read this file first, then `docs/AI_HANDOVER.md`.** For a new feature or geometry change, also read `docs/PROJECT_VISION.md`, `docs/FEATURE_SPECIFICATIONS.md`, `docs/DESIGN_DECISIONS.md` and `docs/TESTING.md`. These are project-specific instructions for both ChatGPT and Codex; they complement the source code and never override a newer explicit user request.
 
+## Active WT-021 handoff and branch exception (20 November 2026)
+
+The owner has explicitly authorised continuing WT-021 **only in existing draft PR #102**, on `wt021/integrated-release`. This **overrides the general new-task / separate-PR branching advice below for WT-021 only**. Do not open a new PR, merge, deploy, make PR #102 ready for review, or push to `main`. `main` triggers GitHub Pages deployment.
+
+Read in order: [`prompts/START_HERE.md`](prompts/START_HERE.md) → [`prompts/021-complete-seven-builder-manufacturing-parity.md`](prompts/021-complete-seven-builder-manufacturing-parity.md) (original approved source archived from planning) → [`docs/WT021_CODEX_HANDOFF.md`](docs/WT021_CODEX_HANDOFF.md) → [`docs/WT021_COMPLETION_REGISTER.md`](docs/WT021_COMPLETION_REGISTER.md) → [`docs/WT021_INDEPENDENT_AUDIT.md`](docs/WT021_INDEPENDENT_AUDIT.md). Confirm exact-head CI before claiming acceptance. The full [historical prompt archive](prompts/README.md) and [documentation hub](docs/README.md) are accessible on the same branch.
+
+Preserve #79 for unfinished software parity, #10 for owner's Cura/real-print evidence and #90 separately. Green CI on current implemented fixtures **does not** verify the outstanding seven-family acceptance requirements.
+
 ## Mission and invariants
 
 Crystal Forge is a browser-based editor for designing **stylised, touch-considerate, 3D-printable illuminated crystal clusters** for a participatory creative installation. It must be approachable to a visual maker, interactive and reproducible, and must not silently sacrifice printability or illumination for appearance.

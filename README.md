@@ -2,11 +2,17 @@
 
 [Open the browser app](https://connorturansky-svg.github.io/crystal-forge/).
 
+## Current development — WT-021 (draft PR #102)
+
+**For Codex and collaborators:** [Start here: WT-021 active prompt](prompts/START_HERE.md) → [complete owner-approved WT-021 specification](prompts/021-complete-seven-builder-manufacturing-parity.md) → [verified handover](docs/WT021_CODEX_HANDOFF.md) → [23-item acceptance register](docs/WT021_COMPLETION_REGISTER.md).
+
+The [complete milestone prompt library](prompts/README.md) has been copied from the dedicated `planning/prompts` branch for easier access. The planning source remains an independently versioned historical archive. **Active implementation is confined to existing draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102); do not open another PR, merge, or deploy.** `main` hosts the production app and does not contain draft-only features. See the [documentation hub](docs/README.md) for architecture, tests, print guidance, acceptance and historical plans.
+
 Design seven model families, including Crystal Clusters, Tactile Tiles, Gears, Waves, Control Caps, Characters, and Light Pods. Build adds measured LED fittings on suitable material. Print Centre prepares valid geometry through Manifold and exports STL and 3MF. SVG artwork and validated STL/OBJ solids can enter the same workspace. Open or invalid meshes remain available for preview with an explanation.
 
 Projects save locally. Use Library to save reusable models and export a backup, or connect a private GitHub repository for optional cross-device recovery.
 
-Source baseline `7ad5326` includes WT-018 and the first Gear placement and wire-guide changes from [#84](https://github.com/connorturansky-svg/crystal-forge/pull/84). [Software parity and acceptance](docs/MODEL_BUILDER_PARITY.md) tracks what is evidenced across the seven families. [Software work #79](https://github.com/connorturansky-svg/crystal-forge/issues/79) and [physical QA #10](https://github.com/connorturansky-svg/crystal-forge/issues/10) remain active.
+[Software parity and acceptance](docs/MODEL_BUILDER_PARITY.md) tracks evidence across all seven families. [Software work #79](https://github.com/connorturansky-svg/crystal-forge/issues/79) and [physical Cura/print QA #10](https://github.com/connorturansky-svg/crystal-forge/issues/10) remain active. For current branch and CI state, use the [draft PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) rather than a hard-coded historical SHA.
 
 ## Source visibility and reuse
 
@@ -121,7 +127,7 @@ The older `app.js` file is an unreferenced archive of the first demonstration.
 
 ## Working across ChatGPT Chat and Codex Desktop
 
-Start with [AGENTS.md](AGENTS.md) followed by [AI handover](docs/AI_HANDOVER.md). The [project vision](docs/PROJECT_VISION.md), [feature contracts](docs/FEATURE_SPECIFICATIONS.md), [design decision log](docs/DESIGN_DECISIONS.md), [architecture](docs/ARCHITECTURE.md), [development history](docs/DEVELOPMENT_HISTORY.md), [roadmap](docs/ROADMAP.md), [testing guide](docs/TESTING.md) and [collaboration workflow](docs/COLLABORATION.md) provide persistent intent and implementation context. GitHub is the canonical committed source; develop features on task branches and review PRs before merging to production main.
+For WT-021, begin with [the active Codex prompt](prompts/START_HERE.md) and [WT-021 handover](docs/WT021_CODEX_HANDOFF.md). For the standing project rules, read [AGENTS.md](AGENTS.md) followed by [AI handover](docs/AI_HANDOVER.md). The [project vision](docs/PROJECT_VISION.md), [feature contracts](docs/FEATURE_SPECIFICATIONS.md), [design decision log](docs/DESIGN_DECISIONS.md), [architecture](docs/ARCHITECTURE.md), [development history](docs/DEVELOPMENT_HISTORY.md), [roadmap](docs/ROADMAP.md), [testing guide](docs/TESTING.md) and [collaboration workflow](docs/COLLABORATION.md) provide persistent intent and implementation context. GitHub is the canonical committed source; develop features on task branches and review PRs before merging to production main.
 
 Lightweight syntax/wiring checks: `npm run test:static`. Existing representative Manifold tests: `npm test`. Chromium smoke tests: `npm run test:browser` (start local web server first). Timing sample: `npm run test:benchmark`. These checks do not replace Cura or physical prints.
 
