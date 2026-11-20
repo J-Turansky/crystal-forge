@@ -341,8 +341,10 @@ try{
  await page.locator('[data-state="mount"]').selectOption('Edge fixing tabs');
  assert(await page.locator('#edgeTabSettings').isVisible(),'Edge tab controls are visible');
  await page.locator('#placeTabBtn').click();
- assert((await page.locator('#manualHardwareList').innerText()).includes('Editable edge tabs'),'Tabs become individually editable');
- const existingTabs=await page.locator('[data-remove-tab]').count();
+ const tabList=page.locator('#manualHardwareList');
+ const existingTabs=await tabList.locator('[data-remove-tab]').count();
+ if(existingTabs)assert.equal(await tabList.locator('[data-tab-u]').count(),existingTabs,'Each tab has its own position control');
+ else assert(await tabList.getByRole('button',{name:'Add edge tab',exact:true}).isVisible(),'Empty manual list offers placement');
  if(existingTabs>0){
   await page.locator('[data-remove-tab]').first().click();
   const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('crystal-forge-v3')).settings);
