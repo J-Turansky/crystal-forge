@@ -44,3 +44,9 @@ Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) co
 - Draft head before this checkpoint was `960f9c90e4bbe486929aca11ec7ef825aa72bb10`, with static, Chromium and Manifold checks green. This report is committed alongside the side-wall change.
 - Native preparation now checks actual side stock along the channel shoulders and refuses nearby cuts that erode it. The catalogue Manifold suite passed, including false stock and encroaching-cut fixtures. Independent STL and 3MF measurements found at least 0.55 mm of continuous side stock at sampled straight and pinned curved sections.
 - These are underside channel fixtures. Next add a planar top route and measure its exported clearances and perimeter openings before extending routing to side and curved placement. The seven complete journeys, UX-01 and owner Cura/printed checks are still open.
+
+### Flat top routes on solid decorative Gears
+
+- This checkpoint follows side-wall commit `efe7b9a291b922700db5e887c172b4c77a332fd6`.
+- Build can plan and cut open top-face serial grooves between coplanar shaped seats on eligible Gears. The catalogue Manifold suite passed. The independent rectangular witness showed a 3.2 mm opening, 1.8 mm depth and both open ends in STL and 3MF. Mixed normals and top vaulting are rejected.
+- Local Chromium could launch but timed out connecting to the local server. The draft PR runs browser tests. Continue with a Gear top Build-and-export browser case, then generalise route frames to eligible side and curved installations.

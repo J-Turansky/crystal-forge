@@ -4,6 +4,7 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
+- Suitable solid decorative Gears can route flat serial grooves between shaped top-face pixel sockets. Preparation checks the floor and side walls.
 - Native underside route preparation checks for continuous material above and beside the actual channel and catches intersecting cuts outside its socket junctions.
 - Build now exposes 3–10 mm fitting backing thickness with a 4 mm reset. Existing shaped sockets and enabled cable routes are checked before the thickness change is saved.
 - Build fitting previews now show insertion obstruction and insufficient surrounding stock from manufacturing checks, warn about nearby cut conflicts, and report overlap between the measured pixel and wire cuts.

@@ -74,3 +74,9 @@
 - Base `960f9c90e4bbe486929aca11ec7ef825aa72bb10`; all three required GitHub workflows passed at that base.
 - Production Manifold checks a 0.55 mm side envelope against real stock and neighbouring cuts. A side-cut regression failed before the implementation. The catalogue suite then passed with that case, thin actual stock, and independently decoded STL/3MF straight and curved side-wall probes. FIT-02 and FIT-03 remain PARTIAL.
 - Next: create a physically cut planar top fixture in tests/studio-catalogue.test.mjs and measure the route and outlets in both exports.
+
+### 2026-11-20 - flat top serial routes
+
+- Base `efe7b9a291b922700db5e887c172b4c77a332fd6`. Shaped coplanar top seats on eligible solid decorative Gears now have a checked physical upward-opening channel. The route follows the installed fitting rotation and protects the channel floor and side stock.
+- Added a failing top route fixture, then passed the catalogue Manifold suite with a solid Gear and a rectangular STL/3MF witness measuring width, depth, side stock and both open ends. Tilted/mixed faces and top vaulting are rejected. FIT-03 remains PARTIAL. Chromium local server was unreachable; exact-head Actions will cover the existing browser suite.
+- Next extend tests/unified-studio-browser.test.mjs with the Gear top route, saved state and actual downloads.

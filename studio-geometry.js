@@ -116,7 +116,8 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
  }
  for(const link of recipe.nativeRouting?.links||[]){
   if(link.path.length<2)continue;
-  const points=[],point=p=>new THREE.Vector3(p.x,.15,p.z);
+  const guideY=(recipe.nativeRouting.surfaceY??0)+.15;
+  const points=[],point=p=>new THREE.Vector3(p.x,guideY,p.z);
   for(let i=1;i<link.path.length;i++)points.push(point(link.path[i-1]),point(link.path[i]));
   const k=Math.floor((link.path.length-1)/2),a=point(link.path[k]),b=point(link.path[k+1]);
   const d=b.clone().sub(a).normalize(),tip=a.clone().lerp(b,.63),back=tip.clone().addScaledVector(d,-2.5);
@@ -231,14 +232,15 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{},inspectFittin
    const tolerance=.0001,cuts=[];
    total=hold(total.setTolerance(tolerance));
    const roofStock=recipe.nativeRouting.roofStock;
-   const routeFootprint=roofStock?convert({kind:'extrude',outline:roofStock.outline,height:total.boundingBox().max[1]+1}):null;
+   const routeFootprint=roofStock?convert({kind:'extrude',outline:roofStock.outline,height:recipe.nativeRouting.surfaceY??(total.boundingBox().max[1]+1)}):null;
    for(const part of recipe.negative){
     const cut=hold(convert(part).setTolerance(tolerance));
     if(hold(total.intersect(cut)).volume()<.1)
      throw Error((part.pixelHole||part.mountHole||part.tabHole||part.wireChannel||'Cut')+' does not cut the model.');
     if(routeFootprint&&part.wireChannel&&part.junctionIds){
-     const raised=hold(cut.translate([0,roofStock.thickness,0]));
-     const stockChecks=[[raised,'above']];
+     const top=recipe.nativeRouting.face==='top';
+     const inward=hold(cut.translate([0,top?-roofStock.thickness:roofStock.thickness,0]));
+     const stockChecks=[[inward,top?'below':'above']];
      if(part.sideStock)stockChecks.push([convert(part.sideStock),'beside']);
      for(const [envelope,direction] of stockChecks){
       let guard=hold(hold(envelope.subtract(cut)).intersect(routeFootprint));

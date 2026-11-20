@@ -350,6 +350,22 @@ const curvePlan=applyBuildModules(tileRoute,curveBuild).nativeRouting;
 const flatStock={bounds:{width:70,depth:40,height:10},
  positive:[{kind:'box',size:[70,10,40],position:[0,5,0]}],negative:[],
  serialSupport:{outline:[[-35,-20],[35,-20],[35,20],[-35,20]],thickness:10}};
+// Route from the actual top seats, using their installed IN/OUT orientation.
+const topRouteBuild={pixelBuilderVersion:1,serialRouting:serial,pixelHoles:[-15,15].map((x,i)=>({
+ ...checked('top-'+i,x,0,180),entryFace:'top',surface:{y:10,normal:[0,1,0]},
+ socketProfile:{bodyHeight:4,capHeight:1,flangeDiameter:5,flangeHeight:.5,wireWidth:3.2,wireDepth:1.8,retentionLip:0}
+}))};
+const topRouteStock={...flatStock,serialSupport:{...flatStock.serialSupport,topY:10}};
+const topRouted=applyBuildModules(topRouteStock,topRouteBuild);
+assert.equal(topRouted.nativeRouting.face,'top');
+assert.equal(topRouted.nativeRouting.links[1].label,'P1 → P2');
+const gearTopStock=gearGenerator.recipe({mode:'Decorative',wheelStyle:'Rounded lobes',webStyle:'Solid',bore:0,diameter:100,teeth:12,thickness:10,reliefStyle:'None'});
+const gearTopRouted=applyBuildModules(gearTopStock,topRouteBuild,gearGenerator.capabilities);
+assert.equal(prepareRecipe(THREE,wasm,gearTopRouted).bodies.length,1);
+assert.throws(()=>applyBuildModules(flatStock,topRouteBuild),/planar top/);
+const tiltedSeat={...topRouteBuild.pixelHoles[1],surface:{y:10,normal:[.6,.8,0]}};
+assert.throws(()=>applyBuildModules(topRouteStock,{...topRouteBuild,pixelHoles:[topRouteBuild.pixelHoles[0],tiltedSeat]}),/shared flat underside or an eligible planar top/);
+assert.throws(()=>applyBuildModules(topRouteStock,{...topRouteBuild,serialRouting:{...serial,vaulted:true}}),/Turn off the vaulted option/);
 const flatBuild={...curveBuild,pixelHoles:[checked('left',-15),checked('right',15)],serialRouting:serial};
 const automatic=applyBuildModules(flatStock,flatBuild).nativeRouting;
 const pinnedBuild={...flatBuild,serialRouting:{...serial,inEdgePercent:automatic.edgePositions.in-2,outEdgePercent:automatic.edgePositions.out+2}};
@@ -359,7 +375,7 @@ assert(pinned.nativeRouting.links[0].path.length>2,'Offset IN is a smooth curved
 assert(prepareRecipe(THREE,wasm,pinned).bodies[0].volume>0);
 const vaultedStock=applyBuildModules(flatStock,{...flatBuild,serialRouting:{...serial,vaulted:true}});
 const pinnedVault=applyBuildModules(flatStock,{...pinnedBuild,serialRouting:{...pinnedBuild.serialRouting,vaulted:true}});
-for(const fixture of [vaultedStock,pinnedVault]){
+for(const fixture of [vaultedStock,pinnedVault,topRouted]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -392,7 +408,18 @@ for(const fixture of [vaultedStock,pinnedVault]){
     assert(outer&&outer.distance-inner.distance>=.55,format+' retains at least 0.55 mm of continuous side stock at '+label);
    }
   };
-  if(fixture===vaultedStock){
+  if(fixture===topRouted){
+   for(const x of [-34.99,-25,0,25,34.99]){
+    const origin=[x,0,9];
+    const left=hit(origin,[0,-1,0]),right=hit(origin,[0,1,0]);
+    assert(left&&right&&Math.abs(right.y-left.y-3.2)<.005,format+' top-route width at '+x);
+    assertSideStock(origin,{x:0,y:1},'top section '+x);
+    const floor=hit([x,0,11],[0,0,-1]);
+    assert(floor&&Math.abs(floor.z-8.2)<.005,format+' top-route depth at '+x);
+   }
+   assert.equal(hit([-36,0,9],[1,0,0]),undefined,format+' open top-route inlet');
+   assert.equal(hit([36,0,9],[-1,0,0]),undefined,format+' open top-route outlet');
+  }else if(fixture===vaultedStock){
    for(const x of [-34.99,-25,0,25,34.99]){
     const left=hit([x,0,1],[0,-1,0]);
     const right=hit([x,0,1],[0,1,0]);
@@ -436,7 +463,7 @@ for(const fixture of [vaultedStock,pinnedVault]){
   geometry.dispose();
   material.dispose();
  }
- console.log('WT-021 native vaulted STL/3MF sections: 3.2 mm width, roof and side stock, and open straight apertures');
+ console.log('WT-021 native STL/3MF sections: 3.2 mm width, surrounding stock and open apertures ('+(fixture===topRouted?'top':fixture===pinnedVault?'curved underside':'straight underside')+')');
 }
 const shallowActualStock={...vaultedStock,positive:[{kind:'box',size:[70,4,40],position:[0,2,0]}]};
 assert.throws(()=>prepareRecipe(THREE,wasm,shallowActualStock),/lacks continuous material above the channel/);

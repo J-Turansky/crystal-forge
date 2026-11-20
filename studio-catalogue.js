@@ -159,7 +159,7 @@ export const gearGenerator=define('gears','Cogs & Gears','Mechanical',[
    positive.push(extrusion(outer,height,[0,y,0],[inner]));
   }
  }
- const serialSupport=decorative&&p.webStyle==='Solid'&&p.wheelStyle!=='Pulley'&&!holes.length?{outline,thickness:p.thickness}:null;
+ const serialSupport=decorative&&p.webStyle==='Solid'&&p.wheelStyle!=='Pulley'&&!holes.length?{outline,thickness:p.thickness,...(!relief&&!inlay?{topY:p.thickness}:{})}:null;
  const serialReason='Use a solid decorative gear without a shaft bore, fixing holes, openwork or pulley recess.';
  if((creativeWeb||relief)&&!inlay)return {positive,serialSupport,serialReason,secondary:[],negative:[],materialSplitHeight:p.thickness-.8,materialSplitRole:'top',bounds:{width:diameter,depth:diameter,height:p.thickness+(relief?p.reliefHeight:0)},warnings:['Decorative wheel. Check wheel clearances before using moving parts.']};
  const secondary=[extrusion(inlay?circle(hubRadius):outline,.8,[0,p.thickness-.8,0],inlay?(p.bore?[circle(p.bore/2)]:[circle(hubRadius*.55)]):holes)];
@@ -568,7 +568,9 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
  addPixelHoleCuts(r,build.pixelHoles,{routed:routing.enabled&&routing.ready});
  if(routing.enabled&&routing.ready){
   r.negative.push(...routing.cutters);
-  r.warnings.push('Serial grooves are underside-open. Check cable seating and roof layers in Cura and on a physical print.');
+  r.warnings.push(routing.face==='top'
+   ?'Serial grooves open upward. Check cable seating and floor layers in Cura and on a physical print.'
+   :'Serial grooves are underside-open. Check cable seating and roof layers in Cura and on a physical print.');
  }
  addBackingTabs(r,build,routing);
  r.nativeRouting=routing;

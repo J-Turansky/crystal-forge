@@ -112,9 +112,23 @@ function channelSize(build){
   depth:Math.max(depth,...shaped.map(hole=>hole.socketProfile.wireDepth))};
 }
 
+function topRouteHeight(recipe,holes){
+ const y=recipe.serialSupport?.topY;
+ if(Number.isFinite(y)&&holes.length&&holes.every(hole=>{
+  const normal=hole.surface?.normal;
+  return hole.socketProfile&&normal&&Math.abs(hole.surface.y-y)<.01&&
+   Math.hypot(normal[0],normal[1]-1,normal[2])<.00001;
+ }))return y;
+ return null;
+}
+
 export function nativeRouteEligibility(recipe,build){
- if((build.pixelHoles||[]).some(hole=>hole.socketProfile&&hole.surface))
-  return 'Physical grooves require sockets on the flat underside backing. Disable physical routing or move the sockets to that backing.';
+ const holes=build.pixelHoles||[];
+ const topY=topRouteHeight(recipe,holes);
+ if(holes.some(hole=>hole.socketProfile&&hole.surface)&&topY===null)
+  return 'Physical grooves require a shared flat underside or an eligible planar top. Move the sockets to the same supported face.';
+ if(topY!==null&&build.serialRouting?.vaulted)
+  return 'Top grooves open upward. Turn off the vaulted option for a planar top route.';
  const requested=build.serialRouting?.channelWidthMm;
  if(requested!=null&&(!Number.isFinite(requested)||requested<1.5||requested>12))
   return 'Wire-track width must be between 1.5 and 12 mm.';
@@ -147,7 +161,9 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
   new Set(holes.map(p=>p.id)).size!==holes.length){
   plan.reason='Place 1 to 16 checked pixel fittings in Build before routing.';return plan;
  }
- const pixels=holes.map(p=>({...p,radius:(p.diameter+p.clearance)/2,wireAngle:p.rotation??0}));
+ const topY=topRouteHeight(recipe,holes);
+ if(topY!==null){plan.face='top';plan.surfaceY=topY;}
+ const pixels=holes.map(p=>({...p,radius:(p.diameter+p.clearance)/2,wireAngle:topY===null?(p.rotation??0):180-(p.rotation??0)}));
  const outline=recipe.serialSupport.outline.map(([x,z])=>({x,z}));
  const undersized=pixels.findIndex(p=>p.radius<2.1);
  if(undersized>=0){
@@ -209,8 +225,13 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
   const points=link.path.slice();
   if(i===0)points.unshift(add(entry.point,entry.outward,4));
   if(i===plan.links.length-1)points.push(add(exit.point,exit.outward,4));
-  return {...cutter(points,link.label,radius,depth,settings.vaulted===true),junctionIds:link.ends,
-   sideStock:cutter(points,link.label,radius+routeSideStock,depth,false)};
+  const cut=cutter(points,link.label,radius,depth,settings.vaulted===true);
+  const sideStock=cutter(points,link.label,radius+routeSideStock,depth,false);
+  if(topY!==null){
+   cut.position=[0,topY-depth,0];
+   sideStock.position=cut.position;
+  }
+  return {...cut,junctionIds:link.ends,sideStock};
  });
  if(plan.ready&&plan.enabled)plan.roofStock={outline:recipe.serialSupport.outline,thickness:roof};
  for(const link of plan.links){delete link.dense;delete link.ends;}
