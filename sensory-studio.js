@@ -832,6 +832,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  function editPixel(model,index,hole,focus,onSaved){
   const holes=pixelHoles(model),previous=holes[index];
   if(!previous||model.link)return false;
+  const moved=hole.x!==previous.x||hole.z!==previous.z;
+  if(hole.socketProfile&&moved){
+   const updated=relocateShapedSocket(model,previous,hole);
+   if(!updated){pixelStatus(model,'Move along the current installation face, or drag the socket onto another solid face.');return false;}
+   hole=updated;
+  }
   const issue=pixelIssue(model,hole,holes.filter((_,i)=>i!==index));
   if(issue){pixelStatus(model,pixelPlacementAdvice(model,issue));return false;}
   holes[index]={...hole,checked:true};
@@ -840,7 +846,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    if(saved)onSaved?.();
    return saved;
   };
-  if(hole.socketProfile&&(hole.socketProfile!==previous.socketProfile||
+  if(hole.socketProfile&&(moved||hole.socketProfile!==previous.socketProfile||
      hole.diameter!==previous.diameter||hole.clearance!==previous.clearance)){
    checkFittingBuild(model,{...model.build,pixelHoles:holes,pixelBuilderVersion:1},save);
    return false;
@@ -929,6 +935,21 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const bounds=new THREE.Box3();
   for(const mesh of meshes??fittingMeshes(model))bounds.expandByObject(mesh);
   return bounds;
+ }
+ function relocateShapedSocket(model,previous,desired){
+  const meshes=fittingMeshes(model),bounds=nativeModelBounds(meshes);
+  if(!bounds||bounds.isEmpty())return null;
+  const normal=new THREE.Vector3(...(previous.surface?.normal??[0,-1,0]));
+  const axis=Math.abs(normal.y)>=.5?'y':Math.abs(normal.x)>=Math.abs(normal.z)?'x':'z';
+  const origin=new THREE.Vector3(desired.x,previous.surface?.y??0,desired.z),direction=new THREE.Vector3();
+  const positive=normal[axis]>0;
+  origin[axis]=positive?bounds.max[axis]+1:bounds.min[axis]-1;
+  direction[axis]=positive?-1:1;
+  const hit=new THREE.Raycaster(origin,direction).intersectObjects(meshes,false)[0];
+  if(!hit?.face||Math.abs(hit.point.x-desired.x)>.02||Math.abs(hit.point.z-desired.z)>.02)return null;
+  const hitNormal=hit.face.normal.clone().applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld));
+  if(normal.dot(hitNormal)<.7)return null;
+  return {...desired,surface:socketSurface(hit.point,hitNormal),entryFace:hitNormal.y<0?'underside':'top'};
  }
  function fittingPointScreen(x,z,face){
   const model=active(), meshes=model?fittingMeshes(model):[];

@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** PAR-02, verify exact keyboard and numeric movement on shaped native sockets.
+- **Target:** PAR-02 and FIT-03, validate shaped socket rotation against enabled cable routes.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Native snapshot and Crystal imported/local calibration checks passed. Next verify numeric X/Z edits and keyboard nudges keep the current installation face and correct normal, and refuse moves that leave solid stock.
+- **Next test:** Wave and vertical Tile proved exact placement and safe numeric motion. Next attempt a blocked rotation with a prepared route, verify the saved job remains valid, then prepare and measure a valid rotation.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

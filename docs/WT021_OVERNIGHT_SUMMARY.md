@@ -1,9 +1,10 @@
 # WT-021 overnight checkpoint
 
-[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `52d38c7ad05f798d387e766fac7bed8af5007ff5`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
+[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `25a6f14e9cc282859a5041dbbdab2e8868a81b2c`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
 
 ## Latest checkpoint
 
+- Exact typed coordinates and keyboard nudges resolve shaped sockets against the real surface before saving. Chromium verified curved Wave movement and tangent movement along a vertical Tile face, plus rollback when the move would leave the face.
 - Crystal Chromium tests verified measured profile imports and preserved local overrides. The revised import produced a 5.60 mm bore in both formats, while the original retained its locally adjusted 5.30 mm bore.
 - Original and revised native project snapshots reopened and prepared independently. Their decoded exports preserve the original 4.85 mm and revised 5.10 mm following fit, while the local fit remains 4.85 mm.
 - Focused Chromium measured a flanged Gear before and after independent clearance and retention edits. STL and 3MF agree on the flange, bore, throat and 9 mm depth. The full Chromium rerun passed, including rollback of an oversized conical diameter. The existing calibration journeys wait for production validation before making the next edit.

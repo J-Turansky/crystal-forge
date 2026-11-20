@@ -224,3 +224,7 @@
 ### 2026-11-20 - Crystal measured fit imports
 
 - Both Crystal profile selectors initialise newly selected measured profiles from their tested nominal bore and preserve existing local values. Import keeps the model’s stored profile data. The full Crystal dimensional browser test passed, including 5.60 mm on the imported copy and 5.30 mm on the locally adjusted original in both downloaded formats. CAL-02 is verified.
+
+### 2026-11-20 - exact shaped socket movement
+
+- Numeric movement and keyboard nudges raycast the intended installation face and use production validation before saving. Fixed a numeric step mismatch left by fractional drag coordinates. Chromium verified a nudge and exact Wave move, a tangent move on a vertical Tile, and rejection of off-surface motion.

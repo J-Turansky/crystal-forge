@@ -4,6 +4,8 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
+- Numeric movement and keyboard nudges for shaped fittings recheck the installation surface and preserve the last accepted position if stock is missing.
+
 - Crystal uses the measured clearance when selecting an imported profile for the first time. A locally adjusted clearance stays with its existing profile.
 
 - Shaped socket profile and bore size edits are checked against the manufactured geometry before saving.
