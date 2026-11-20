@@ -10,7 +10,7 @@ Run `node tests/studio-help-diagnostics-browser.mjs` to exercise the in-app Help
 | --- | --- | --- | --- |
 | Tool Finder | Down reached only the first result; Escape from a result did not return to search | Arrow traversal, Escape reset and Cura destination focus tested in all seven builders | Widths/themes are sampled across families, not a full cross-product |
 | Help troubleshooting | Static guidance only | Live browser capability checks, offline feedback and a minimal downloadable report | No asset probe, save test or write to local storage |
-| Rejected exact values | Transient browser validation bubble | Persistent inline error, associated with the field; focus and previous value stay put until the correction is applied | Covers numeric range validation, not fabrication constraints |
+| Rejected exact values | Transient browser validation bubble; a shared key could select a hidden Crystal slider instead of the current builder's slider | The editor uses its own control's range and keeps focus and the previous value on rejection. Chromium checks rejection, correction and reload in all seven builders | Covers numeric range validation, not fabrication constraints |
 | Library backup restore | The global stylesheet hid the file field and removed it from keyboard navigation | A visible native file field opens from the keyboard, and Escape from review returns to it | `node tests/studio-backup-keyboard-browser.mjs` verifies this at 390 px, plus invalid JSON and unchanged active project |
 
 The Studio Chromium suite (`node tests/studio-browser.test.mjs`) checks that shared keyboard help adds to an existing control description and that pressing Escape dismisses the tooltip without removing that description or moving focus.

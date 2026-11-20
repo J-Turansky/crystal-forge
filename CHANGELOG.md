@@ -63,6 +63,7 @@ Only in the draft integration branch; **not a production release**. Owner approv
 - Move between Studio tool search results with the arrow keys. Escape clears the search and returns focus to the search field.
 - Help includes safe troubleshooting steps and a downloadable browser report that excludes projects and account details.
 - Invalid exact-value edits show the accepted range without changing the saved value or moving keyboard focus.
+- Precision editors use the selected builder's own controls when different model families share a setting name.
 - Library shows a keyboard-accessible file chooser for restoring a backup or older Crystal project.
 
 ## v0.16.0-dev.35.17 — Keyboard tooltip accessibility

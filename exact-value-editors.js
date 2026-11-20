@@ -20,7 +20,8 @@ export function installExactValueEditors(root=document){
   for(const output of root.querySelectorAll('output[data-out],output[data-value-for]')){
    if(output.dataset.exactReady)continue;
    const key=output.dataset.out||output.dataset.valueFor;
-   const slider=root.querySelector('input[type="range"][data-state="'+key+'"],input[type="range"][data-model-param="'+key+'"]');
+   const selector='input[type="range"]['+(output.dataset.out?'data-state':'data-model-param')+'="'+key+'"]';
+   const slider=output.closest('.sms-model-control')?.querySelector(selector)||root.querySelector(selector);
    if(!slider)continue;
    const label=output.closest('label')?.cloneNode(true);
    label?.querySelector('output')?.remove();

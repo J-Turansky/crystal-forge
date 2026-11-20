@@ -5,12 +5,12 @@ import {chromium} from 'playwright';
 const browser=await chromium.launch({executablePath:process.env.CRYSTAL_FORGE_BROWSER_EXECUTABLE||undefined});
 const url=process.env.CRYSTAL_FORGE_URL||'http://127.0.0.1:4321';
 const cases=[
- ['crystals',390,false],['tactile-tiles',768,true],['gears',1440,false],
- ['waves',390,true],['control-caps',768,false],['characters',1440,true],['light-pods',390,false]
+ ['crystals',390,false,'count'],['tactile-tiles',768,true,'width'],['gears',1440,false,'diameter'],
+ ['waves',390,true,'amplitude'],['control-caps',768,false,'diameter'],['characters',1440,true,'width'],['light-pods',390,false,'width']
 ];
 try{
  await mkdir('qa',{recursive:true});
- for(const [family,width,dark] of cases){
+ for(const [family,width,dark,key] of cases){
   const page=await browser.newPage({viewport:{width,height:900},hasTouch:width===390});
   try{
    await page.goto(url,{waitUntil:'domcontentloaded'});
@@ -45,6 +45,23 @@ try{
    }
    await page.waitForFunction(()=>document.activeElement?.id==='smsCura');
    await page.locator('.sms-workspace-nav [data-tab=design]').click();
+   const slider=page.locator(family==='crystals'?`input[type="range"][data-state="${key}"]`:`#smsEditor input[type="range"][data-model-param="${key}"]`);
+   const exact=page.locator(family==='crystals'?`output[data-out="${key}"]`:`#smsEditor output[data-value-for="${key}"]`);
+   const closed=exact.locator('xpath=ancestor::details[not(@open)][1]/summary');
+   if(await closed.count())await closed.click();
+   const original=Number(await slider.inputValue());
+   const max=Number(await slider.getAttribute('max'));
+   const updated=original+1<=max?original+1:original-1;
+   await exact.waitFor({state:'visible',timeout:5000});
+   await exact.press('Enter');
+   const editor=page.locator(`[data-exact-input="${key}"]`);
+   await editor.fill(String(max+1));
+   await editor.press('Enter');
+   assert.match(await page.getByRole('alert').filter({hasText:'The previous value is unchanged'}).innerText(),/Enter a value from/);
+   assert.equal(Number(await slider.inputValue()),original);
+   await editor.fill(String(updated));
+   await editor.press('Enter');
+   assert.equal(Number(await slider.inputValue()),updated);
    const title=page.getByRole('textbox',{name:'Project name'});
    const projectName=`UX-02 fixture: ${family}`;
    await title.fill(projectName);
@@ -54,6 +71,7 @@ try{
    await page.locator('.sms-workspace-nav [data-tab=design]').click();
    assert.equal(await title.inputValue(),projectName,`${family}: project name survived reload`);
    assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.generator.typeId),family);
+   assert.equal(Number(await slider.inputValue()),updated,`${family}: accepted value survived reload`);
    console.log(`Tool finder: ${family}, ${width}px, ${dark?'dark':'light'}`);
   }finally{
    await page.close();
