@@ -1578,6 +1578,9 @@ try{
   await page.evaluate(()=>window.__sensoryStudio.addModel('waves',{
    width:160,depth:100,thickness:15,amplitude:1,frequency:.5,variation:0,direction:0,dualMaterial:false
   },'FIT-03 gentle Wave'));
+  await page.locator('.sms-workspace-nav [data-tab=design]').click();
+  await page.locator('.sms-palette [data-palette-key=width]').press('ArrowRight');
+  assert(await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.width)>160);
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
   await page.locator('[data-view=top]').click();
   await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
@@ -1592,6 +1595,25 @@ try{
   }
   await page.keyboard.press('Escape');
   const seats=await getSeats();
+  await page.locator('.sms-palette').getByRole('button',{name:'P1',exact:true}).click();
+  const dragPoints=await page.evaluate(id=>[
+   window.__sensoryStudio.pixelMarkerScreen(id),window.__sensoryStudio.fittingPointScreen(-44,0,'top')
+  ],seats[0].id);
+  assert(dragPoints.every(Boolean));
+  await page.mouse.move(dragPoints[0].x,dragPoints[0].y);
+  await page.mouse.down();
+  await page.waitForTimeout(225);
+  await page.mouse.move(dragPoints[1].x,dragPoints[1].y,{steps:6});
+  await page.mouse.up();
+  await page.waitForFunction(x=>window.__sensoryStudio.currentModel.build.pixelHoles[0].x<x-2,seats[0].x);
+  const beforeConvexFit=await getSeats();
+  await page.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+  const curvedFailure=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(40,0,'top'));
+  assert(curvedFailure);
+  await page.mouse.click(curvedFailure.x,curvedFailure.y);
+  await page.locator('.sms-palette [data-pixel-status]').filter({hasText:/continuous stock/}).waitFor();
+  await page.keyboard.press('Escape');
+  assert.deepEqual(await getSeats(),beforeConvexFit);
   assert(seats.every(hole=>Math.abs(hole.surface.normal[0])>.005));
   assert.notDeepEqual(seats[0].surface.normal,seats[1].surface.normal);
   const wavePalette=page.locator('.sms-palette');
@@ -1606,14 +1628,58 @@ try{
   assert(!(await machine.isDisabled()),await waveSerial.innerText());
   await machine.check();
   await waveSerial.getByText('Channels ready for preparation.').waitFor();
-  await page.locator('.sms-workspace-nav [data-tab=print]').click();
-  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
-  const waveJob=page.locator('#smsJobs article').filter({hasText:'FIT-03 gentle Wave'});
-  await waveJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
-  const wavePack=zipEntries((await useDownload(waveJob.locator('[data-job-export]'))).bytes);
-  assert([...wavePack.keys()].some(name=>name.endsWith('.stl')));
-  assert.equal(JSON.parse(wavePack.get('print-job-manifest.json')).routing.channels.length,3);
-  assert(zipEntries((await useDownload(waveJob.locator('[data-job-3mf]'))).bytes).has('3D/3dmodel.model'));
+  await wavePalette.locator('[data-pixel-backing]').check();
+  const addTab=wavePalette.getByRole('button',{name:'Add external tab',exact:true});
+  await addTab.click();
+  await addTab.click();
+  for(const [index,position] of [13,63].entries()){
+   const perimeter=wavePalette.locator('[data-backing-tab="'+index+'"]');
+   await perimeter.fill(String(position));
+   await perimeter.press('Tab');
+  }
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.backingTabs),[{u:.13},{u:.63}]);
+  await wavePalette.getByRole('button',{name:'Place mounting hole in 3D'}).click();
+  for(const [index,x] of [-20,20].entries()){
+   const target=await page.evaluate(x=>window.__sensoryStudio.fittingPointScreen(x,-20,'top'),x);
+   assert(target);
+   await page.mouse.click(target.x,target.y);
+   await page.waitForFunction(n=>window.__sensoryStudio.currentModel.build.manualMountHoles?.length===n,index+1);
+  }
+  await page.keyboard.press('Escape');
+  const mountZ=wavePalette.locator('[data-mount-field=z]');
+  await mountZ.fill('-22');
+  await mountZ.press('Tab');
+  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[1].z),-22);
+  await wavePalette.getByRole('button',{name:'P1',exact:true}).click();
+  await wavePalette.getByText('Record measured fit',{exact:true}).click();
+  const calibration=wavePalette.locator('[data-fit-calibration]');
+  await calibration.locator('[name=printedBoreDiameter]').fill('5.4');
+  await calibration.getByRole('button',{name:'Save measured fit'}).click();
+  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].clearance),.4);
+  const {parameters,build,geometries}=await finishNativeJourney('FIT-03 gentle Wave');
+  const [a,b]=build.pixelHoles;
+  const width=parameters.width+24,depth=parameters.depth+24;
+  const tabX=-width/2+.13*2*(width+depth);
+  const tabY=depth/2+5.05;
+  for(const [format,geometry] of geometries){
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+   const mesh=new THREE.Mesh(geometry,material);
+   const hit=(origin,direction)=>new THREE.Raycaster(new THREE.Vector3(...origin),new THREE.Vector3(...direction)).intersectObject(mesh)[0]?.point;
+   const [nx,ny,nz]=a.surface.normal;
+   const bore=[a.x-4*nx,-a.z+4*nz,a.surface.y-4*ny];
+   const left=hit(bore,[0,-1,0]),right=hit(bore,[0,1,0]);
+   assert(left&&right&&Math.abs(left.distanceTo(right)-5.4)<.02,format+' calibrated seat follows the curved face normal');
+   const route=[(a.x+b.x)/2,-(a.z+b.z)/2,(a.surface.y+b.surface.y)/2-1];
+   const first=hit(route,[0,-1,0]),last=hit(route,[0,1,0]);
+   assert(first&&last&&Math.abs(first.distanceTo(last)-3.2)<.03,format+' Wave routing retains its width');
+   for(const hole of build.manualMountHoles)assert.equal(hit([hole.x,-hole.z,-1],[0,0,1]),undefined);
+   for(const sign of [-1,1]){
+    const x=sign*tabX,y=sign*tabY;
+    assert.equal(hit([x,y,-1],[0,0,1]),undefined,format+' Wave tab fixing hole cuts through');
+    assert(Math.abs((hit([x+2.5,y,10],[0,0,-1])?.z??0)-4)<.01,format+' Wave backing tab retains 4 mm of stock');
+   }
+   material.dispose();geometry.dispose();
+  }
  }
  // FIT-02: actual Gear and Tile profile/cutter overlay UI parity.
  await page.evaluate(()=>window.__sensoryStudio.addModel('tactile-tiles',{

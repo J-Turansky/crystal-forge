@@ -114,3 +114,8 @@
 - Base `0b57821548d17823fccb3e869019faa376198a26`. Restored front routing with external-tab backing and verified an unsafe backing edit is refused. Both real Manifold and focused Chromium passed.
 - Both parsed app downloads retained the 5.5 mm calibrated seat, 3.2 mm routed width, two manual through-holes and two 4 mm external tabs with through-holes. Standalone STL/Cura bytes match the ZIP. E2E-T exact-head checks remain pending.
 - Next complete the gentle Wave journey with curved drag, mounting, calibration and matched downloads.
+
+### 2026-11-20 - independent Wave acceptance journey
+
+- Base `eb58e32dd235706e6318e55595e4977a96b6900f`. Focused Chromium passed the gentle Wave width edit, two distinct socket normals, accepted drag, rejected convex seat and the complete routing/mounting/calibration/Library/Print sequence. Independent actual STL/3MF measured the 5.4 mm seat, 3.2 mm route, four open holes and 4 mm external tab thickness. E2E-W exact-head checks pending.
+- Next exercise Character and solid Pod backed layouts with a compact A–G profile.

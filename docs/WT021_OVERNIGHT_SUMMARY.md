@@ -83,3 +83,9 @@ Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) co
 - Base was `0b57821548d17823fccb3e869019faa376198a26`. External-tab backing now preserves a square Tile’s front wall route where the channel clears the backing. The browser rejected a conflicting backing thickness while retaining the model revision.
 - Focused Chromium passed the full Tile sequence with two shaped sockets, two manual mounts, two edited external tabs, calibrated fit, Library snapshot and backup, inspection and four Print Centre downloads. Independent STL and 3MF sections measured a 5.5 mm socket, 3.2 mm route, four through-holes and 4 mm tab stock.
 - Next complete the gentle Wave browser sequence and its independent export measurements.
+
+### Wave design-to-download acceptance journey
+
+- Base was `eb58e32dd235706e6318e55595e4977a96b6900f`. Focused Chromium passed Design width editing, two curved sockets, accepted curved drag and rejected convex seating, followed by routing, two real tabs, two mounts, calibration, backup/reload and prepared cutaway.
+- Actual browser downloads included matching STL, Cura, production ZIP and independently decoded 3MF. Both models measured a 5.4 mm calibrated seat, 3.2 mm groove, four through-holes and 4 mm tab stock.
+- Next complete Character and solid Pod journeys on their backed underside, then Crystal and rotary Cap.

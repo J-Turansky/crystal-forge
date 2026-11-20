@@ -10,10 +10,10 @@
 
 ## Next executable step
 
-- **Target:** complete the independent Wave journey, including curved routing, real attached tabs and mechanical mounting.
-- **Checkpoint:** the Gear top and square Tile front-wall journeys passed local Chromium through calibrated fit, visible cutaway, Library backup and measured STL/3MF/Cura/ZIP downloads. Exact-head acceptance remains pending.
-- **Next test:** extend the existing gentle Wave browser case in tests/unified-studio-browser.test.mjs to use the actual Design width control, accepted curved-seat drag, two mounts and tabs, calibration, Library snapshot/backup, reload, prepared cutaway and independent measurements. Preserve the original route perimeter with backing.
-- **Then:** finish the Crystal, compulsory rotary Cap, Character and Pod journeys. Continue general side/curved routing, mounting and dimensional acceptance under #79.
+- **Target:** complete the Character and solid Pod backed underside journeys before the Crystal and rotary Cap fixtures.
+- **Checkpoint:** the Gear top, square Tile front-wall and gentle Wave surface journeys passed local Chromium through calibrated fit, visible cutaway, Library backup and measured STL/3MF/Cura/ZIP downloads. Exact-head acceptance remains pending.
+- **Next test:** add independent Character and solid Beacon Pod cases in tests/unified-studio-browser.test.mjs. Use a short measured profile with 10 mm fitting backing, place two real underside sockets and verify routed tabs, mounts, calibration, saved state and measured exports.
+- **Then:** finish the Crystal and compulsory rotary Cap journeys. Continue general side/curved routing, mounting and dimensional acceptance under #79.
 - **UX-01:** implement the approved catalogue after P0 work. Keep #10 for Cura and printed proof.
 
 ## Resume instruction
