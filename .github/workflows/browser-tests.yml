@@ -108,7 +108,11 @@ jobs:
         run: |
           mkdir -p qa
           set +e
-          npm run test:browser > browser-run.log 2>&1
+          {
+            node tests/exact-value-accessibility-browser.mjs &&
+            node tests/studio-tool-finder-browser.mjs &&
+            npm run test:browser
+          } > browser-run.log 2>&1
           status=$?
           cat browser-run.log
           exit "$status"
@@ -126,6 +130,7 @@ jobs:
           path: |
             qa/browser-smoke.png
             qa/unified-*.png
+            qa/ux02-*.png
           if-no-files-found: ignore
       - name: Fail on browser errors
         if: steps.install.outcome != 'success' || steps.browser.outcome != 'success'

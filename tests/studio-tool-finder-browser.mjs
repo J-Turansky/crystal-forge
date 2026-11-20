@@ -1,0 +1,54 @@
+import assert from 'node:assert/strict';
+import {mkdir} from 'node:fs/promises';
+import {chromium} from 'playwright';
+
+const browser=await chromium.launch({executablePath:process.env.CRYSTAL_FORGE_BROWSER_EXECUTABLE||undefined});
+const url=process.env.CRYSTAL_FORGE_URL||'http://127.0.0.1:4321';
+const cases=[
+ ['crystals',390,false],['tactile-tiles',768,true],['gears',1440,false],
+ ['waves',390,true],['control-caps',768,false],['characters',1440,true],['light-pods',390,false]
+];
+try{
+ await mkdir('qa',{recursive:true});
+ for(const [family,width,dark] of cases){
+  const page=await browser.newPage({viewport:{width,height:900},hasTouch:width===390});
+  try{
+   await page.goto(url,{waitUntil:'domcontentloaded'});
+   await page.locator('#smsHomeNew').click();
+   await page.locator(`#smsPicker [data-generator="${family}"]`).click();
+   if(dark)await page.locator('#themeBtn').click();
+   const search=page.getByRole('searchbox',{name:'Find tools and downloads'});
+   const results=page.getByRole('group',{name:'Matching tool shortcuts'}).getByRole('button');
+   await search.fill('open');
+   await page.keyboard.press('ArrowDown');
+   const focused=locator=>locator.evaluate(el=>el===document.activeElement);
+   assert(await focused(results.first()),`${family}: Down enters results`);
+   await page.keyboard.press('ArrowDown');
+   assert(await focused(results.nth(1)),`${family}: Down advances`);
+   await page.keyboard.press('ArrowUp');
+   await page.keyboard.press('ArrowUp');
+   assert(await focused(search),`${family}: Up from first result returns to search`);
+   await page.keyboard.press('ArrowDown');
+   await page.keyboard.press('Escape');
+   assert(await focused(search),`${family}: Escape returns focus to search`);
+   assert.equal(await search.inputValue(),'');
+   assert.equal(await results.count(),0);
+   await search.fill('no matching tool 123');
+   assert.match(await page.locator('.sms-tool-finder [role=status]').innerText(),/No matching tools/);
+   await search.fill('Cura');
+   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`${family}: no page-level horizontal overflow`);
+   if(family==='waves'||family==='gears')await page.screenshot({path:`qa/ux02-finder-${family}-${width}.png`});
+   if(width===390)await results.first().tap();
+   else{
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+   }
+   await page.waitForFunction(()=>document.activeElement?.id==='smsCura');
+   console.log(`Tool finder: ${family}, ${width}px, ${dark?'dark':'light'}`);
+  }finally{
+   await page.close();
+  }
+ }
+}finally{
+ await browser.close();
+}

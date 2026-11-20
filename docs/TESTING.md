@@ -1,5 +1,9 @@
 # Crystal Forge — verification strategy and commands
 
+## UX-02 keyboard regression checks
+
+With the same local server as `npm run test:browser`, run `node tests/exact-value-accessibility-browser.mjs` and `node tests/studio-tool-finder-browser.mjs`. Browser CI runs both before the existing suite. The finder test uses the real Studio model picker for all seven built-in families, verifies arrow navigation, Escape focus restoration, no-match feedback, and the Cura shortcut (keyboard and emulated touch). It samples light and dark at 390, 768 and 1440 px; screenshots are uploaded with browser CI. This checks shared navigation, not keyboard alternatives for editing 3D geometry.
+
 The Studio Chromium suite (`node tests/studio-browser.test.mjs`) checks that shared keyboard help adds to an existing control description and that pressing Escape dismisses the tooltip without removing that description or moving focus.
 
 ## WT-016 backup recovery
