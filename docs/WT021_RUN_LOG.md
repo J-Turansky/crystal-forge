@@ -131,3 +131,9 @@
 - Added explicit manual Crystal through-holes alongside external tabs. Unit regression verifies existing saved mounts do not activate implicitly. The full Crystal Chromium fixture passes a real held drag, routing, two tabs and two mounts, calibration and rollback, reload, preparation/cutaway and four downloads. Independently decoded STL/3MF measure 5.4 mm bore, 3.2 mm track, four open holes and 5 mm tab stock.
 - Reused the Help dialog for Features. The local Chromium feature script verifies filters, seven picker destinations, real workspace navigation, accessible keyboard focus, no model edits, compact layout and both themes. Generated history and displayed version match CHANGELOG.md.
 - Next DIM-03/CAL-01 with successive independently measured physical profile cuts.
+
+### 2026-11-20 - retention and independent calibration
+
+- Exact-head static, Chromium and Manifold passed at `8083c547b76b5b1df4b547ffccc3ceb6b5765439`.
+- Export probes distinguish bore clearance, retention and wire width in four physical variants. Previously a requested lip could be omitted silently on a short body. Build now validates the production cut before saving.
+- Next CAL-02 linked/copy export evidence.

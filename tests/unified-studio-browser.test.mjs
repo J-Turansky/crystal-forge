@@ -1397,6 +1397,9 @@ try{
    const calibration=gearPalette.locator('[data-fit-calibration]');
    await calibration.locator('[name=printedBoreDiameter]').fill('12.5');
    await calibration.getByRole('button',{name:'Save measured fit'}).click();
+   const retention=gearPalette.getByLabel('Retention lip (mm)');
+   await retention.fill('.2');await retention.press('Tab');
+   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].socketProfile.retentionLip===.2);
    const calibratedBuild=await page.evaluate(()=>window.__sensoryStudio.currentModel.build);
    assert.equal(calibratedBuild.pixelHoles[0].clearance,.5);
    await page.locator('#smsProjectTitle').fill('WT-021 Gear manufacturing journey');
@@ -1739,6 +1742,11 @@ try{
   const [,second]=await seats();
   assert.equal(second.entryFace,'underside');
   assert.equal(second.socketProfile.bodyHeight,6);
+  const beforeRetention=await seats();
+  const retention=palette.getByLabel('Retention lip (mm)');
+  await retention.fill('.4');await retention.press('Tab');
+  await palette.locator('[data-pixel-status]').filter({hasText:/Cannot cut the selected retention lip/}).waitFor();
+  assert.deepEqual(await seats(),beforeRetention);
   const drag=await page.evaluate(id=>[window.__sensoryStudio.pixelMarkerScreen(id),
    window.__sensoryStudio.fittingPointScreen(20,0,'underside')],second.id);
   assert(drag.every(Boolean));

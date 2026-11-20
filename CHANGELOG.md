@@ -4,6 +4,7 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
+- Build validates socket retention before saving. Profiles without enough straight body stock show how to adjust the setting.
 - Open the Features tab from Help or What’s New to search all seven model builders and open the relevant workspace.
 - What’s New takes its version, current notes, unreleased changes and earlier releases directly from this changelog.
 - Rotary Caps support an explicit Stationary display mode for fixed external tabs. The moving-control mode refuses attached fixing ears.

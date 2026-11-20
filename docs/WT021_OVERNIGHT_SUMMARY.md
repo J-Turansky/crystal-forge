@@ -101,3 +101,9 @@ Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) co
 - Crystal can add independent manual through-holes while edge tabs are enabled. Its full local Chromium journey passed Design, fitting placement and held drag, rejected coordinate rollback, routing, two mounts, two tabs, calibration, Library backup/reload, prepared cutaway and real STL, 3MF, Cura and ZIP downloads. The model files measured a 5.4 mm seat, 3.2 mm groove, four through-holes and 5 mm tab stock.
 - The searchable Features tab links to all seven real family pickers and to Design, Build, Library and Print Centre without changing the model. Local Chromium passed keyboard, mobile, both themes and lazy graphics. Version and release notes are generated from CHANGELOG.md and checked for drift.
 - All seven independent browser journeys now have local evidence. Exact-head CI remains required. Next finish the calibrated flange, bore, retention and wire-dimension evidence, then remaining software acceptance rows. Cura slicing and physical prints remain under #10.
+
+### Exact-head checks and retention calibration
+
+- Static, Chromium and Manifold passed at `8083c547b76b5b1df4b547ffccc3ceb6b5765439`. All seven independent browser journeys and the Features catalogue have exact-head evidence.
+- A four-variant Manifold fixture independently measured bore, flange, retention throat, roof depth and groove width in STL and 3MF. Build refuses retention where the body cannot support the lip.
+- Next verify linked and copied profile behaviour in exported files.

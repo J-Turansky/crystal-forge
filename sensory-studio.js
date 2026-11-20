@@ -1563,8 +1563,13 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   };
   const lip=root.querySelector('[data-seat-retention]');
   if(lip)lip.onchange=()=>{
-   if(!lip.value||!lip.checkValidity()||!editPixel(model,selected,{...hole,
-    socketProfile:{...hole.socketProfile,retentionLip:lip.valueAsNumber}}))lip.value=hole.socketProfile.retentionLip;
+   const value=lip.valueAsNumber;
+   const valid=lip.checkValidity()&&Number.isFinite(value);
+   lip.value=hole.socketProfile.retentionLip;
+   if(!valid||value===hole.socketProfile.retentionLip)return;
+   const next={...hole,socketProfile:{...hole.socketProfile,retentionLip:value}};
+   const candidates=holes.map((item,index)=>index===selected?next:item);
+   checkAndSaveSeat(model,candidates,next);
   };
   const armPlacement=(duplicate,shaped=false)=>{
    if(!duplicate&&!chosenProfile(model)){pixelStatus(model,'Import the missing profile or select another before placing.');return;}

@@ -1,5 +1,6 @@
 import {makeRoutedSocketSpecimen} from '../studio-catalogue.js';
 import {PIXEL_PRESETS} from '../pixel-profiles.js';
+import {makePixelReplicaRecipe} from '../pixel-replica.js';
 import {pixelBoreIssue} from '../studio-pixel-bore-validation.js';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -429,7 +430,22 @@ assert(pinned.nativeRouting.links[0].path.length>2,'Offset IN is a smooth curved
 assert(prepareRecipe(THREE,wasm,pinned).bodies[0].volume>0);
 const vaultedStock=applyBuildModules(flatStock,{...flatBuild,serialRouting:{...serial,vaulted:true}});
 const pinnedVault=applyBuildModules(flatStock,{...pinnedBuild,serialRouting:{...pinnedBuild.serialRouting,vaulted:true}});
-for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute]){
+const measuredProfile={kind:'gumdrop',bodyDiameter:8,bodyHeight:9,capHeight:1.2,flangeDiameter:9,flangeHeight:1.2,wireWidth:2.4,wireDepth:1.6,retentionLip:0};
+const calibrationStock={...flatStock,bounds:{...flatStock.bounds,height:15},
+ positive:[{kind:'box',size:[70,15,40],position:[0,7.5,0]}],serialSupport:{...flatStock.serialSupport,thickness:15}};
+const calibratedCut=({clearance=.3,retentionLip=0,channelWidthMm=3.2,bodyHeight=9}={})=>applyBuildModules(calibrationStock,{
+ ...flatBuild,serialRouting:{...serial,channelWidthMm},pixelHoles:flatBuild.pixelHoles.map(hole=>({...hole,
+  profileId:'measured-sample',entryFace:'underside',diameter:8,clearance,socketProfile:{...measuredProfile,retentionLip,bodyHeight}}))
+});
+assert.throws(()=>prepareRecipe(THREE,wasm,calibratedCut({bodyHeight:4,retentionLip:.4})),/Cannot cut the selected retention lip/);
+const measuredReplica=makePixelReplicaRecipe(measuredProfile);
+const dimensionFixtures=new Map([
+ [calibratedCut(),{name:'baseline',bore:8.3,flange:9.3,throat:8.3,width:3.2}],
+ [calibratedCut({clearance:.6}),{name:'bore only',bore:8.6,flange:9.6,throat:8.6,width:3.2}],
+ [calibratedCut({retentionLip:.4}),{name:'retention only',bore:8.3,flange:9.3,throat:7.5,width:3.2}],
+ [calibratedCut({channelWidthMm:6}),{name:'wire width only',bore:8.3,flange:9.3,throat:8.3,width:6}]
+]);
+for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -462,7 +478,25 @@ for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOn
     assert(outer&&outer.distance-inner.distance>=.55,format+' retains at least 0.55 mm of continuous side stock at '+label);
    }
   };
-  if(fixture===safelyMountedRoute){
+  const dimensions=dimensionFixtures.get(fixture);
+  if(dimensions){
+   const span=(centre)=>{
+    const left=hit(centre,[0,-1,0]),right=hit(centre,[0,1,0]);
+    assert(left&&right,format+' cavity side walls exist');
+    return Math.abs(right.y-left.y);
+   };
+   for(const [height,expected] of [[.7,dimensions.flange],[2.8,dimensions.throat],[4.5,dimensions.bore]])
+    assert(Math.abs(span([-15,0,height])-expected)<.02,format+' '+dimensions.name+' section at '+height+' mm');
+   assert(Math.abs(span([0,0,.8])-dimensions.width)<.02,format+' '+dimensions.name+' route width');
+   const apex=hit([-15,0,-1],[0,0,1]);
+   assert(apex&&Math.abs(apex.z-9)<.01,format+' shaped socket roof stays at the measured 9 mm body length');
+  }else if(fixture===measuredReplica){
+   const apex=hit([0,0,12],[0,0,-1]);
+   const flange=hit([0,8,.7],[0,-1,0]),shaft=hit([0,8,4.5],[0,-1,0]);
+   assert(apex&&Math.abs(apex.z-9)<.01,format+' positive measured length');
+   assert(flange&&Math.abs(flange.y-4.5)<.01,format+' positive 9 mm flange');
+   assert(shaft&&Math.abs(shaft.y-4)<.01,format+' positive 8 mm body');
+  }else if(fixture===safelyMountedRoute){
    assert.equal(hit([0,-12,-1],[0,0,1]),undefined,format+' mount remains a through-hole');
    const left=hit([0,-12,4],[-1,0,0]),right=hit([0,-12,4],[1,0,0]);
    assert(left&&right&&Math.abs(left.distanceTo(right)-3.4)<.005,format+' calibrated mounting-hole diameter');
@@ -556,6 +590,7 @@ for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOn
   geometry.dispose();
   material.dispose();
  }
+ if(fixture===measuredReplica||dimensionFixtures.has(fixture))continue;
  if(fixture===curvedSeatOnly){
   console.log('WT-021 curved Wave seat STL/3MF: 9 mm depth, 5.3 mm diameter, measured stock behind the seat');
   continue;

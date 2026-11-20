@@ -165,7 +165,9 @@ export function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLo
  let relievedDepth=0;
  const lip=Math.min(.7,Math.max(0,Number(p.retentionLip)||0));
  const lipFrom=Math.max(1.9,Number(p.flangeHeight||0)+.8),lipWidth=1.4;
- const hasLip=lip>0&&depth>lipFrom-start+lipWidth+2&&bodyRadius-lip>1.4;
+ const hasLip=lip>0;
+ if(hasLip&&(depth<=lipFrom-start+lipWidth+2||bodyRadius-lip<=1.4))
+  throw Error('Cannot cut the selected retention lip. Choose a longer or wider straight fitting body, or set retention to zero.');
  const hasFlange=p.kind!=='seed'&&p.flangeHeight>.1&&p.maxDiameter>p.boreDiameter+.1;
  if(hasFlange&&shaftEnd<p.flangeHeight+.1)
   throw Error('Pixel socket needs enough stock for the complete flange and roof.');
