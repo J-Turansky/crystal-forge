@@ -7,8 +7,8 @@
 ## Codex reading order (do not skip)
 
 1. [Active execution instruction](active/WT021_EXECUTION.md) — concise ready-to-copy continuation, including the overnight operating protocol.
-4. [Overnight autonomous execution / access preflight / quota recovery](active/WT021_OVERNIGHT_RUNBOOK.md) — front-load essential permissions, continue without ordinary questions, checkpoint after each milestone.
-5. [Durable run log](../docs/WT021_RUN_LOG.md) — read before resuming any interrupted Codex session.
+2. [Overnight autonomous execution / access preflight / quota recovery](active/WT021_OVERNIGHT_RUNBOOK.md) — front-load essential permissions, continue without ordinary questions, checkpoint after each milestone.
+3. [Durable run log](../docs/WT021_RUN_LOG.md) — read before resuming any interrupted Codex session.
 4. [Original owner-authorised WT-021 specification](021-complete-seven-builder-manufacturing-parity.md) — **full 65 KB contract**; do not substitute a summary.
 5. [Codex engineering handover](../docs/WT021_CODEX_HANDOFF.md) — last tested head, diagnosed geometry defects and implementation map.
 6. [23-row acceptance register](../docs/WT021_COMPLETION_REGISTER.md) — **authoritative status**; each row is PARTIAL until all independent gates pass.
