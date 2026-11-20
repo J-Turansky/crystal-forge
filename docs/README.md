@@ -27,6 +27,7 @@ This index groups existing documents by purpose **without moving their original 
 
 ## 3. Manufacturing, print and independent QA
 
+- [Back up and recover your Studio workspace](BACKUP_RECOVERY.md) — download a backup, review before restoring, and troubleshoot recovery.
 - [Testing guide](TESTING.md) — local and CI commands, release gates.
 - [Model-builder parity](MODEL_BUILDER_PARITY.md) — cross-family testing context; consult the newer WT-021 register for current acceptance.
 - [Cura profile generator](CURA_PROFILE_GENERATOR.md) — compatible machine/nozzle/material profile guidance.
