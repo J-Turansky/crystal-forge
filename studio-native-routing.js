@@ -207,6 +207,11 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
  if(!plan.enabled&&!guide)return plan;
  if(settings.version!==1){plan.reason='This serial route version is unsupported. Turn routing off to prepare bores only.';return plan;}
  if(plan.reason)return plan;
+ const minBendRadius=settings.minBendRadius??5;
+ if(!Number.isFinite(minBendRadius)||minBendRadius<1||minBendRadius>60){
+  plan.reason='Enter a minimum bend radius between 1 and 60 mm.';return plan;
+ }
+ const bendOptions={minBendRadius};
  const holes=build.pixelHoles||[],pitch=Number(settings.pitch),inTail=Number(settings.inTail??settings.tail??200),outTail=Number(settings.outTail??settings.tail??200);
  if(![pitch,inTail,outTail].every(value=>Number.isFinite(value)&&value>=5&&value<=250)){
   plan.reason='Enter a cable pitch and tail budget between 5 and 250 mm.';return plan;
@@ -281,7 +286,7 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
   }
   const chosen=perimeter.pin(percent);
   if(!chosen||!outside(chosen.point,chosen.outward))return null;
-  const path=sampleCableCurve(port,chosen.point,axis,chosen.outward);
+  const path=sampleCableCurve(port,chosen.point,axis,chosen.outward,bendOptions);
   return path?{...chosen,path}:null;
  };
  const entry=tail(inPort,{x:-inAxis.x,z:-inAxis.z},settings.inEdgePercent);
@@ -293,7 +298,7 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
  for(let i=0;i<pixels.length-1;i++){
   const a=pixels[i],b=pixels[i+1],p=pixelStringPort(a,'output'),q=pixelStringPort(b,'input');
   const forward=unit(sub(q,p)),from=pixelStringAxis(a),to=pixelStringAxis(b);
-  const curve=dot(from,forward)>.65&&dot(to,forward)>.65?sampleCableCurve(p,q,from,to):null;
+  const curve=dot(from,forward)>.65&&dot(to,forward)>.65?sampleCableCurve(p,q,from,to,bendOptions):null;
   // Include the in-bore distance at each end for physical centre-to-centre pitch.
   addLink('P'+(i+1)+' → P'+(i+2),curve,[a.id,b.id],pitch,null,gap(a,p)+gap(b,q));
  }

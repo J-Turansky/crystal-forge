@@ -112,3 +112,8 @@ Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) co
 
 - Browser downloads independently measured a library-linked bore changing from 4.85 to 5.10 mm after a profile edit. A local 4.85 mm fit on another model retained its geometry, and the linked model’s stale STL and 3MF were disabled until preparation.
 - Next measure the actual bend radius and centreline length in the exported route.
+
+### Native cable bends
+
+- Build has an editable minimum bend radius, and incompatible pin and radius combinations are rejected during preparation. Independent STL and 3MF probes matched the sampled curved-span lengths within 0.06 mm and found radii of at least 4.75 mm for the 5 mm fixture.
+- Next measure the complete path through fitting junctions and apertures.

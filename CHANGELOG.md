@@ -4,6 +4,7 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
+- Native serial routing accepts a minimum bend radius from 1 to 60 mm. Preparation refuses routes that cannot meet the bend constraint.
 - Build validates socket retention before saving. Profiles without enough straight body stock show how to adjust the setting.
 - Open the Features tab from Help or What’s New to search all seven model builders and open the relevant workspace.
 - What’s New takes its version, current notes, unreleased changes and earlier releases directly from this changelog.

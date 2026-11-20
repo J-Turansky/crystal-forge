@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** DIM-04 and FIT-03, verify minimum bend radius and measured route length in exported geometry.
+- **Target:** DIM-04 and FIT-03, trace the exported channel through the fitting junctions and exterior apertures.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Independently reconstruct the centreline in STL and 3MF at a pinned bend. Compare its radius and length with the route settings and confirm that an incompatible requested radius blocks fabrication.
+- **Next test:** Extend the pinned channel export test beyond the interior bend samples. Independently measure the complete usable path, its clearance at both seat junctions, and its exterior openings.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

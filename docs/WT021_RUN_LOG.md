@@ -142,3 +142,7 @@
 
 - Compared downloaded STL and 3MF before and after a library edit. The following fitting changed from 4.85 to 5.10 mm and invalidated its previous preparation. The local fit stayed 4.85 mm. CAL-02 remains partial across projects and Crystal.
 - Next measure bend radius and centreline length independently.
+
+### 2026-11-20 - native bend constraints and export probes
+
+- Added the 1–60 mm bend control and used the setting for internal links and pinned tails. A 60 mm constraint fails the test fixture with tight pinned bends. STL and 3MF radius and sampled span-length probes passed. DIM-04 and FIT-03 remain partial.

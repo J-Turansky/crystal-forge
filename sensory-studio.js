@@ -1387,6 +1387,16 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   };
   bindNumber(block.querySelector('[data-native-in-tail]'),'inTail');
   bindNumber(block.querySelector('[data-native-out-tail]'),'outTail');
+  const bend=document.createElement('label');
+  bend.textContent='Minimum bend radius (mm) ';
+  const bendInput=document.createElement('input');
+  bendInput.type='number';bendInput.min='1';bendInput.max='60';bendInput.step='any';
+  bendInput.value=settings.minBendRadius??5;bendInput.disabled=!!model.link;
+  bendInput.onchange=()=>{
+   if(!bendInput.value||!bendInput.checkValidity()){bendInput.reportValidity();bendInput.value=settings.minBendRadius??5;return;}
+   change({minBendRadius:bendInput.valueAsNumber});
+  };
+  bend.append(bendInput);block.append(bend);
   if(pitch.value==='custom'){
    pitch.parentElement.insertAdjacentHTML('afterend','<label>Custom pitch (mm)<input data-native-custom type="number" min="5" max="250" value="'+esc(settings.pitch)+'"'+disabled+'></label>');
    bindNumber(block.querySelector('[data-native-custom]'),'pitch');

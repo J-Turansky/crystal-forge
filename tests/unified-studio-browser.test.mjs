@@ -1476,7 +1476,10 @@ try{
    const retention=gearPalette.getByLabel('Retention lip (mm)');
    await retention.fill('.2');await retention.press('Tab');
    await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].socketProfile.retentionLip===.2);
+   const bendRadius=gearPalette.getByLabel('Minimum bend radius (mm)');
+   await bendRadius.fill('5.5');await bendRadius.press('Tab');
    const calibratedBuild=await page.evaluate(()=>window.__sensoryStudio.currentModel.build);
+   assert.equal(calibratedBuild.serialRouting.minBendRadius,5.5);
    assert.equal(calibratedBuild.pixelHoles[0].clearance,.5);
    await page.locator('#smsProjectTitle').fill('WT-021 Gear manufacturing journey');
    await page.locator('#smsProjectTitle').press('Tab');

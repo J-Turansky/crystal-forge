@@ -429,6 +429,8 @@ assert.equal(pinned.nativeRouting.cutters.length,3,'Pinned openings retain both 
 assert(pinned.nativeRouting.links[0].path.length>2,'Offset IN is a smooth curved path');
 assert(prepareRecipe(THREE,wasm,pinned).bodies[0].volume>0);
 const vaultedStock=applyBuildModules(flatStock,{...flatBuild,serialRouting:{...serial,vaulted:true}});
+assert.throws(()=>applyBuildModules(flatStock,{...pinnedBuild,serialRouting:{...pinnedBuild.serialRouting,minBendRadius:61}}),/minimum bend radius/);
+assert.throws(()=>applyBuildModules(flatStock,{...pinnedBuild,serialRouting:{...pinnedBuild.serialRouting,minBendRadius:60}}),/Chosen IN edge|Chosen OUT edge/);
 const pinnedVault=applyBuildModules(flatStock,{...pinnedBuild,serialRouting:{...pinnedBuild.serialRouting,vaulted:true}});
 const measuredProfile={kind:'gumdrop',bodyDiameter:8,bodyHeight:9,capHeight:1.2,flangeDiameter:9,flangeHeight:1.2,wireWidth:2.4,wireDepth:1.6,retentionLip:0};
 const calibrationStock={...flatStock,bounds:{...flatStock.bounds,height:15},
@@ -566,6 +568,7 @@ for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOn
    const curvedLinks=[fixture.nativeRouting.links[0],fixture.nativeRouting.links.at(-1)];
    for(const link of curvedLinks){
     let sections=0;
+    const measured=[],planned=[];
     for(let i=0;i<link.path.length-1;i++){
      const a=link.path[i],b=link.path[i+1];
      const x=(a.x+b.x)/2,y=-(a.z+b.z)/2;
@@ -579,12 +582,26 @@ for(const fixture of [vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOn
      assert(left&&right,format+' curved wire walls at '+link.label+' section '+i);
      assert(Math.abs(left.distanceTo(right)-3.2)<.06,format+' curved width at '+link.label+' section '+i);
      assertSideStock(origin,normal,link.label+' section '+i);
+     measured.push(left.clone().lerp(right,.5));
+     planned.push(new THREE.Vector3(x,y,1));
      const upper=hit([x,y,11],[0,0,-1]);
      const ceiling=hit([x,y,-1],[0,0,1]);
      assert(ceiling&&upper&&upper.z-ceiling.z>6,format+' continuous roof stock at '+link.label+' section '+i);
      sections++;
     }
     assert(sections>=3,format+' sampled multiple curved cross-sections at '+link.label);
+    const length=points=>points.slice(1).reduce((sum,p,i)=>sum+p.distanceTo(points[i]),0);
+    assert(Math.abs(length(measured)-length(planned))<.06,format+' sampled centreline length matches the planned span');
+    let bentSections=0;
+    for(let i=1;i<measured.length-1;i++){
+     const a=measured[i].clone().sub(measured[i-1]),b=measured[i+1].clone().sub(measured[i]);
+     const area2=a.clone().cross(b).length();
+     if(area2<.005)continue;
+     const radius=a.length()*b.length()*a.clone().add(b).length()/(2*area2);
+     assert(radius>=4.75,format+' sampled channel centreline bend radius: '+radius);
+     bentSections++;
+    }
+    assert(bentSections>0,format+' centreline measurements include a bend');
    }
   }
   geometry.dispose();
