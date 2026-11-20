@@ -451,6 +451,8 @@ assert.throws(()=>applyBuildModules(conicalStock,{pixelHoles:[{...conicalStud,en
 const surfacedConical=applyBuildModules(calibrationStock,{pixelHoles:[{...conicalStud,surface:{y:0,normal:[0,-1,0]}}]});
 assert.throws(()=>prepareRecipe(THREE,wasm,surfacedConical),/continuous stock on its installation face/);
 const shortConeProfile={...measuredProfile,bodyDiameter:5,bodyHeight:4,capHeight:1,flangeDiameter:6,flangeHeight:.5};
+const conicalCoupon=makeRoutedSocketSpecimen(measuredProfile,{clearance:.3,retentionLip:.4,conical:true});
+assert.equal(conicalCoupon.nativeRouting.links.length,3);
 const familyConeFixtures=new Map();
 for(const [family,parameters] of [
  [gearGenerator,{mode:'Decorative',wheelStyle:'Rounded lobes',webStyle:'Solid',diameter:80,bore:0,reliefStyle:'None'}],
@@ -512,7 +514,7 @@ for(const [fixture] of fixingFixtures){
  const interrupted={...fixture,negative:[...fixture.negative,{kind:'box',size:[1,2,2],position:[18.5,1,0]}]};
  assert.throws(()=>prepareRecipe(THREE,wasm,interrupted),/too close to another cut/);
 }
-for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),conicalRecipe,tabRecessRecipe,topRecessRecipe,vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
+for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),conicalRecipe,conicalCoupon,tabRecessRecipe,topRecessRecipe,vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -598,7 +600,7 @@ for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),coni
    const left=hit([0,0,5],[0,-1,0]),right=hit([0,0,5],[0,1,0]);
    assert(apex&&Math.abs(apex.z-6.65)<.01,format+' '+name+' conical apex');
    assert(left&&right&&Math.abs(left.distanceTo(right)-3.3)<.01,format+' '+name+' conical slope');
-  }else if(fixture===conicalRecipe){
+  }else if(fixture===conicalRecipe||fixture===conicalCoupon){
    const apex=hit([-15,0,-1],[0,0,1]);
    assert(apex&&Math.abs(apex.z-13.15)<.01,format+' conical ceiling adds 4.15 mm above the measured 9 mm body');
    for(const [height,diameter] of [[.6,9.3],[2.8,7.5],[5,8.3],[10,6.3],[12,2.3]]){

@@ -1579,7 +1579,12 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    nativeFitPreviewChoices.set(model.id,event.target.checked);
    refreshNativeFittingPreview(model);
   };
-  root.querySelector('[data-pixel-profile-editor]').onclick=()=>adapter.openPixelProfileEditor(chosenProfile(model)?.id,false);
+  root.querySelector('[data-pixel-profile-editor]').onclick=()=>{
+   const seat=selected>=0&&hole.socketProfile;
+   adapter.openPixelProfileEditor(seat?hole.profileId:chosenProfile(model)?.id,false,seat?{
+    measurements:{...seat,bodyDiameter:hole.diameter},clearance:hole.clearance,retentionLip:seat.retentionLip,conical:!!hole.conical
+   }:undefined);
+  };
   root.querySelector('[data-pixel-backing]').onchange=event=>{
    if(!commit({build:{...model.build,pixelBacking:event.target.checked}})){
     event.target.checked=!!model.build.pixelBacking;return;

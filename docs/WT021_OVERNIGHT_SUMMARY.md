@@ -4,7 +4,7 @@
 
 ## Latest checkpoint
 
-- All six native families passed Manifold containment for a backed underside conical socket, and both exported formats matched the apex and slope for each family. Native conical test coupons still need parity with the installed socket.
+- All six native families passed Manifold containment for a backed underside conical socket, and both exported formats matched the apex and slope for each family. Routed native test coupons carry the selected fitting’s geometry and fit settings. Chromium confirmed matching apex in both coupon and full model files.
 - Native shaped pixel sockets offer conical roofs on level underside faces. Chromium rejects a 13 mm Gear without changing its model and exports the eligible 18 mm Gear. Manifold and both formats verify bore, taper, flange and retention. The Wave direct-drag journey also passed exact position and normal restoration with undo and redo.
 - The full unified Chromium suite passed with a 3.2 mm curved Wave route measured at the same cutaway plane in the viewport, STL and 3MF. Focused Chromium verified exact undo and redo of a Gear tab-depth edit and disabled downloads from the old revision.
 - Native journey tests compare prepared X and Z section ranges with fresh STL and 3MF coordinates. Moving the section slider on the revised linked Gear leaves the saved model untouched. A valid recess edit hides the previous cutaway and disables both prior downloads until preparation. At the same clipping plane, the rendered Gear pilot and countersink agree with the STL and 3MF mesh walls at three heights.

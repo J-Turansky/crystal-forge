@@ -1155,18 +1155,21 @@ $('pixelProfileDiagram').addEventListener('click',e=>{
  if(field&&PIXEL_DIMENSIONS.some(dim=>dim.field===field))$(field).focus();
 });
 function closePixelEditor(){$('pixelProfileOverlay').hidden=true;$('editPixelProfileBtn').focus()}
-let editingPixelProfileId=null;
-function openPixelProfileEditor(id,duplicate=false){
+let editingPixelProfileId=null,routedCouponRetention;
+function openPixelProfileEditor(id,duplicate=false,fit){
  const profiles=allPixelProfiles({pixelProfiles:readPixelFitProfiles()});
- const p=profiles.find(profile=>profile.id===id);
+ const savedProfile=profiles.find(profile=>profile.id===id);
+ const p=fit?.measurements?{...savedProfile,...fit.measurements,id}:savedProfile;
  if(!p){setStatus('Import the missing pixel profile or choose another profile.');return;}
  editingPixelProfileId=duplicate?null:p.id;
 
  for(const [k,id] of Object.entries(pixelFields))$(id).value=p[k];
  if(duplicate)$('pixelName').value=p.name+' copy';
  updatePixelProfileDiagram();
- $('pixelSocketClearance').value=p.measuredFit
-  ?(p.measuredFit.printedBoreDiameter-p.measuredFit.bodyDiameter).toFixed(2):s.pixelFit;
+ $('pixelSocketClearance').value=fit?.clearance??(p.measuredFit
+  ?(p.measuredFit.printedBoreDiameter-p.measuredFit.bodyDiameter).toFixed(2):s.pixelFit);
+ $('routeSpecimenConical').checked=fit?.conical??false;
+ routedCouponRetention=fit?.retentionLip;
  $('pixelSocketStatus').textContent='';
  $('pixelProfileOverlay').hidden=false;$('pixelName').focus();
 }
@@ -1233,7 +1236,8 @@ for(const format of ['stl','3mf']){
    const values=Object.fromEntries(Object.entries(pixelFields).map(([key,id])=>
     [key,key==='name'||key==='kind'?$(id).value:$(id).valueAsNumber]));
    const profile=normalisePixelProfile(values),clearance=socketFitFromEditor();
-   const recipe=makeRoutedSocketSpecimen(profile,{clearance,retentionLip:s.pixelRetentionLip});
+   const recipe=makeRoutedSocketSpecimen(profile,{clearance,retentionLip:routedCouponRetention??s.pixelRetentionLip,
+    conical:$('routeSpecimenConical').checked});
    const files=exportMaterialBodies(prepareRecipe(THREE,await loadManifold(),recipe),{name:'two-pixel-route-test'});
    download(new Blob([format==='stl'?files.stls[0].bytes:files.threeMF],
     {type:format==='stl'?'model/stl':'model/3mf'}),'two-pixel-route-test.'+format);

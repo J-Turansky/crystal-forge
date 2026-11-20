@@ -2278,6 +2278,20 @@ try{
    continue;
   }
   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].conical===true);
+  await palette.getByRole('button',{name:'Create / edit pixel profile'}).click();
+  assert(await page.locator('#routeSpecimenConical').isChecked());
+  assert.equal(Number(await page.locator('#pixelSocketClearance').inputValue()),before.build.pixelHoles[0].clearance);
+  const couponSTL=await useDownload(page.locator('#routeSpecimenSTL'));
+  const couponMF=await useDownload(page.locator('#routeSpecimen3MF'));
+  await page.locator('#closePixelProfileBtn').click();
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(couponSTL.bytes).buffer),
+   read3MFGeometry(zipEntries(couponMF.bytes).get('3D/3dmodel.model').toString())]){
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),mesh=new THREE.Mesh(geometry,material);
+   const apex=new THREE.Raycaster(new THREE.Vector3(-15,0,-1),new THREE.Vector3(0,0,1)).intersectObject(mesh)[0]?.point.z;
+   const installed=before.build.pixelHoles[0];
+   assert(Math.abs(apex-installed.socketProfile.bodyHeight-(installed.diameter+installed.clearance)/2)<.01);
+   geometry.dispose();material.dispose();
+  }
   await page.locator('.sms-workspace-nav [data-tab=print]').click();
   await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
   const job=page.locator('#smsJobs article').filter({hasText:name});
