@@ -80,3 +80,8 @@
 - Base `efe7b9a291b922700db5e887c172b4c77a332fd6`. Shaped coplanar top seats on eligible solid decorative Gears now have a checked physical upward-opening channel. The route follows the installed fitting rotation and protects the channel floor and side stock.
 - Added a failing top route fixture, then passed the catalogue Manifold suite with a solid Gear and a rectangular STL/3MF witness measuring width, depth, side stock and both open ends. Tilted/mixed faces and top vaulting are rejected. FIT-03 remains PARTIAL. Chromium local server was unreachable; exact-head Actions will cover the existing browser suite.
 - Next extend tests/unified-studio-browser.test.mjs with the Gear top route, saved state and actual downloads.
+
+### 2026-11-20 - Gear top Chromium and side markers
+
+- Base `439fc789bd8a5c903c89271caf464795248fe50c`. The unified Chromium suite passed with Gear top placement, rejected drag rollback, physical routing after reload and real STL/3MF downloads. An isolated server port resolved the local test connection failure.
+- Added a failing side marker fixture, then fixed the marker position and normal to match the production seat. Catalogue Manifold/export regression passed. FIT-01/FIT-03 remain PARTIAL. Next add an accepted side placement and same-face drag using real viewport input.

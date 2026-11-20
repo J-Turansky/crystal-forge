@@ -1205,7 +1205,7 @@ try{
  // Direct placement validates with the same worker as Print Centre before saving.
  for(const thickness of [25,3]){
   await page.evaluate(thickness=>window.__sensoryStudio.addModel('gears',{
-   diameter:120,bore:0,thickness,wheelStyle:'Cam',dualMaterial:false
+   diameter:120,bore:0,thickness,wheelStyle:'Cam',webStyle:'Solid',dualMaterial:false
   },'Direct socket '+thickness),thickness);
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
   await page.locator('[data-view=top]').click();
@@ -1276,6 +1276,31 @@ try{
    await page.waitForFunction(()=>window.__sensoryStudio?.currentModel?.build.pixelHoles?.length===2);
    assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles),prior,
     'Rejected drag preserves both fitted poses, orientations and installation normals after reload');
+   await page.locator('.sms-workspace-nav [data-tab=build]').click();
+   const gearPalette=page.locator('.sms-palette');
+   for(const number of [1,2]){
+    await gearPalette.getByRole('button',{name:'P'+number,exact:true}).click();
+    const angle=gearPalette.locator('[data-pixel-field=rotation]');
+    await angle.fill('180');
+    await angle.press('Tab');
+   }
+   const gearSerial=gearPalette.getByRole('group',{name:'Serial LED string'});
+   const cutSerial=gearSerial.locator('[data-native-route]');
+   assert(!(await cutSerial.isDisabled()),await gearSerial.innerText());
+   await cutSerial.check();
+   await gearSerial.getByText('Channels ready for preparation.').waitFor();
+   await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+   await page.reload();
+   await page.waitForFunction(()=>window.__sensoryStudio?.currentModel?.build.serialRouting?.enabled);
+   await page.locator('.sms-workspace-nav [data-tab=print]').click();
+   await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+   const gearJob=page.locator('#smsJobs article').filter({hasText:'Direct socket 25'});
+   await gearJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+   const gearPack=zipEntries((await useDownload(gearJob.locator('[data-job-export]'))).bytes);
+   assert([...gearPack.keys()].some(name=>name.endsWith('.stl')));
+   assert.equal(JSON.parse(gearPack.get('print-job-manifest.json')).routing.channels.length,3);
+   const gear3mf=zipEntries((await useDownload(gearJob.locator('[data-job-3mf]'))).bytes);
+   assert(gear3mf.has('3D/3dmodel.model'));
   }else{
    await page.locator('[data-pixel-status]').filter({hasText:/continuous stock/}).waitFor();
    assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length??0),0);

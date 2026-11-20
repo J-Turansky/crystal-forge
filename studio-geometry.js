@@ -66,12 +66,19 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
  for(const hole of recipe.negative||[])if(hole.pixelHole){
   const ring=new THREE.Mesh(new THREE.TorusGeometry(hole.radius,.18,6,48),
    new THREE.MeshBasicMaterial({color:0xffbe47,depthTest:false}));
-  ring.rotation.x=-Math.PI/2;
   const [x,,z]=hole.position;
   const underside=hole.pixelEntryFace==='underside';
-  surfaceRay.set(new THREE.Vector3(x,underside?-100:recipe.bounds.height+100,z),new THREE.Vector3(0,underside?1:-1,0));
-  const surface=surfaceRay.intersectObjects(solidSurfaces,false)[0];
-  ring.position.set(x,(surface?.point.y??(underside?0:recipe.bounds.height))+(underside?-.3:.3),z);
+  const outward=new THREE.Vector3(0,underside?-1:1,0);
+  if(hole.surface){
+   outward.fromArray(hole.surface.normal);
+   ring.position.set(x,hole.surface.y,z);
+  }else{
+   surfaceRay.set(new THREE.Vector3(x,underside?-100:recipe.bounds.height+100,z),new THREE.Vector3(0,underside?1:-1,0));
+   const surface=surfaceRay.intersectObjects(solidSurfaces,false)[0];
+   ring.position.set(x,surface?.point.y??(underside?0:recipe.bounds.height),z);
+  }
+  ring.position.addScaledVector(outward,.3);
+  ring.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),outward);
   ring.renderOrder=5;
   ring.userData.previewOnly=true;
   ring.userData.pixelId=hole.pixelId;
@@ -90,7 +97,7 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
    text.fillStyle='#193146';text.fillRect(0,0,96,48);text.fillStyle='#fff9db';text.font='bold 32px sans-serif';text.textAlign='center';
    text.fillText('P'+hole.pixelHole.split(' ').at(-1),48,36);
    const tag=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthTest:false}));
-   tag.position.copy(ring.position);tag.position.y+=underside?-2:2;tag.scale.set(6,3,1);tag.renderOrder=6;
+   tag.position.copy(ring.position).addScaledVector(outward,2);tag.scale.set(6,3,1);tag.renderOrder=6;
    tag.userData.previewOnly=true;tag.userData.pixelLabel=hole.pixelId;group.add(tag);
   }
  }

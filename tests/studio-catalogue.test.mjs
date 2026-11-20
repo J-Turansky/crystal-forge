@@ -657,6 +657,15 @@ const topSeat={...sourceSeat,position:[0,0,0],surface:{y:30,normal:[0,1,0]}};
 const sideSeat={...sourceSeat,position:[35,0,0],surface:{y:15,normal:[1,0,0]}};
 const solidBlock=prepareRecipe(THREE,wasm,{...faceBlock,negative:[]}).bodies[0];
 for(const seat of [topSeat,sideSeat]){
+ const preview=previewRecipe(THREE,{...faceBlock,negative:[seat]});
+ try{
+  const marker=preview.children.find(child=>child.userData.pixelId===seat.pixelId);
+  const outward=new THREE.Vector3(...seat.surface.normal);
+  const position=new THREE.Vector3(seat.position[0],seat.surface.y,seat.position[2]).addScaledVector(outward,.3);
+  assert(marker.position.distanceTo(position)<1e-6,'The selectable marker must sit on the actual socket opening');
+  assert(new THREE.Vector3(0,0,1).applyQuaternion(marker.quaternion).distanceTo(outward)<1e-6,
+   'The selectable marker must face the saved installation normal');
+ }finally{disposeGroup(preview);}
  const prepared=prepareRecipe(THREE,wasm,{...faceBlock,negative:[seat]});
  assert.equal(prepared.bodies.length,1);
  assert(solidBlock.volume-prepared.bodies[0].volume>1000);

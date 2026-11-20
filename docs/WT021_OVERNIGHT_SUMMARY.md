@@ -49,4 +49,8 @@ Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) co
 
 - This checkpoint follows side-wall commit `efe7b9a291b922700db5e887c172b4c77a332fd6`.
 - Build can plan and cut open top-face serial grooves between coplanar shaped seats on eligible Gears. The catalogue Manifold suite passed. The independent rectangular witness showed a 3.2 mm opening, 1.8 mm depth and both open ends in STL and 3MF. Mixed normals and top vaulting are rejected.
-- Local Chromium could launch but timed out connecting to the local server. The draft PR runs browser tests. Continue with a Gear top Build-and-export browser case, then generalise route frames to eligible side and curved installations.
+- The default local browser port was occupied. On a separate port, the unified Chromium suite passed the new Gear top Build-and-export journey, including reload, an STL print pack containing three serial links and a separate 3MF download.
+
+### Side-face selection markers
+
+- The marker for a shaped socket now uses its actual point and normal. The catalogue suite reproduced the incorrect side marker and passed after the fix. Next exercise side placement and drag in Chromium before generalising route frames.

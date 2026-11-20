@@ -4,6 +4,7 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
+- Shaped socket selection rings and port guides now follow the actual socket opening and installation normal on side and sloped surfaces.
 - Suitable solid decorative Gears can route flat serial grooves between shaped top-face pixel sockets. Preparation checks the floor and side walls.
 - Native underside route preparation checks for continuous material above and beside the actual channel and catches intersecting cuts outside its socket junctions.
 - Build now exposes 3–10 mm fitting backing thickness with a 4 mm reset. Existing shaped sockets and enabled cable routes are checked before the thickness change is saved.
