@@ -4,6 +4,7 @@
 
 ## Latest checkpoint
 
+- PAR-01 is verified. All six native builders nudged both blind mount profiles, reloaded those positions and measured the cuts in fresh files. Crystal converted its automatic tab list, edited it and added a new tab after deleting all entries.
 - DIM-05 is verified. Chromium switched Crystal from magnet to insert presets, disabled stale output and measured both downloaded cuts. Magnet pockets measure 10.2 mm across and 3.2 mm deep. Insert pilots measure 4.2 mm across and 6 mm deep. Both retain the expected base stock.
 - Native Build accepts a mounting profile before 3D placement. The Tile browser witness placed both blind profiles directly, rejected an overlapping placement and preserved the settings after reload. Both files reproduced the saved diameters and blind floors. The same workflow passed on Gear, Wave, Character, Light Pod and stationary Rotary Cap. The tool finder focuses the mounting-profile picker when opening a native mounting result.
 - Native manual mounts support blind magnet pockets and threaded insert pilots. All six families passed STL and 3MF diameter and floor checks. Chromium edited both profiles on a Tile and verified that excessive pocket depth rolled back.
@@ -32,7 +33,7 @@
 
 ## Current acceptance
 
-- The register has 11 VERIFIED and 13 PARTIAL rows. All seven model families have browser journey evidence and UX-01 was verified at `8083c547b76b5b1df4b547ffccc3ceb6b5765439`.
+- The register has 12 VERIFIED and 12 PARTIAL rows. All seven model families have browser journey evidence and UX-01 was verified at `8083c547b76b5b1df4b547ffccc3ceb6b5765439`.
 - Recess editing applies to supported native mounts and external tabs. Planar top recesses were verified on Gear. Crystal retains its existing mounting workflow. Moving Rotary Caps require Stationary display before adding external tabs.
 - [Next software check](WT021_NOW.md) and [full acceptance register](WT021_COMPLETION_REGISTER.md). Physical Cura and printed fit still require owner validation under [#10](https://github.com/connorturansky-svg/crystal-forge/issues/10).
 

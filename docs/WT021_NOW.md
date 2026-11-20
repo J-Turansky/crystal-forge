@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** PAR-01, verify attachment controls, real stock and saved edit rollback in the remaining mounting combinations.
+- **Target:** FAB-02, reconcile the conical socket checklist and verify any remaining applicable software cases.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Crystal automatic-to-manual tab conversion and adding from an empty list now pass Chromium. Next verify that native mounting edits survive cross-family keyboard nudge and export checks.
+- **Next test:** All six native mount nudges passed reload and paired exports, and Crystal tab conversion and recovery passed. Next audit and compare conical socket and routed coupon geometry, including retained bores.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

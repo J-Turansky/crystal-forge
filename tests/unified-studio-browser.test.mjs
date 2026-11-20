@@ -2881,6 +2881,9 @@ try{
   for(const [index,kind,width,targetDepth] of [[0,'Magnet pocket',6.2,3],[1,'Threaded insert pilot',4.1,4]]){
    await palette.getByRole('button',{name:'M'+(index+1),exact:true}).click();
    assert.equal((await model()).build.manualMountHoles[index].profile,kind);
+   const movedX=(await model()).build.manualMountHoles[index].x+1;
+   await page.locator('#viewport canvas').press('ArrowRight');
+   await page.waitForFunction(({index,movedX})=>window.__sensoryStudio.currentModel.build.manualMountHoles[index].x===movedX,{index,movedX});
    await diameter.fill(String(width));await diameter.press('Tab');
    await page.waitForFunction(({index,width})=>window.__sensoryStudio.currentModel.build.manualMountHoles[index].recessDiameter===width,{index,width});
    if(index===0){
