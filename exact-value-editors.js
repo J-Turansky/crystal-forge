@@ -21,7 +21,11 @@ export function installExactValueEditors(root=document){
    const key=output.dataset.out||output.dataset.valueFor;
    const slider=root.querySelector('input[type="range"][data-state="'+key+'"],input[type="range"][data-model-param="'+key+'"]');
    if(!slider)continue;
+   const label=output.closest('label')?.cloneNode(true);
+   label?.querySelector('output')?.remove();
+   const name=label?.textContent.trim().replace(/\s+/g,' ')||key;
    output.dataset.exactReady='true';output.tabIndex=0;output.setAttribute('role','button');
+   output.setAttribute('aria-label','Edit exact value for '+name);
    output.title='Click or press Enter to type an exact value. Enter applies; Escape cancels.';
    output.classList.add('exact-value');
    const begin=()=>{
@@ -29,7 +33,7 @@ export function installExactValueEditors(root=document){
     const input=document.createElement('input');input.type='text';input.inputMode='decimal';input.className='exact-value-input';
     const legacy=!!output.dataset.out;
     input.value=String(Number((legacy?displayedNumber(key,Number(slider.value)):Number(slider.value)).toFixed(6)));
-    input.setAttribute('aria-label','Exact '+key+' value');input.dataset.exactInput=key;
+    input.setAttribute('aria-label','Exact value for '+name);input.dataset.exactInput=key;
     output.hidden=true;output.after(input);active={output,input};input.focus();input.select();
     input.addEventListener('click',event=>event.stopPropagation());
     input.addEventListener('keydown',event=>{
