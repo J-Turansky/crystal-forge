@@ -44,7 +44,14 @@ try{
     await page.keyboard.press('Enter');
    }
    await page.waitForFunction(()=>document.activeElement?.id==='smsCura');
-   await page.locator('.sms-workspace-nav [data-tab=design]').click();
+   const nav=page.locator('.sms-workspace-nav');
+   for(const [view,selector] of [['home','#smsHome'],['library','#smsLibrary'],
+    ['print','[data-tab=print]'],['build','[data-tab=build]'],['design','[data-tab=design]']]){
+    const control=nav.locator(selector);
+    await control.press('Enter');
+    assert(await focused(control),`${family}: keyboard focus is retained on ${view}`);
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`${family}: ${view} fits without page-level horizontal overflow`);
+   }
    const slider=page.locator(family==='crystals'?`input[type="range"][data-state="${key}"]`:`#smsEditor input[type="range"][data-model-param="${key}"]`);
    const exact=page.locator(family==='crystals'?`output[data-out="${key}"]`:`#smsEditor output[data-value-for="${key}"]`);
    const closed=exact.locator('xpath=ancestor::details[not(@open)][1]/summary');

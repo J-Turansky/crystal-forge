@@ -12,6 +12,10 @@ try{
  const help=page.locator('#helpBtn');
  await help.press('Enter');
  const dialog=page.getByRole('dialog',{name:/Crystal Forge.*Help/});
+ assert(await dialog.getByRole('heading',{name:'From a new model to a print file'}).isVisible());
+ assert(await dialog.getByRole('heading',{name:'Getting started with Crystal Clusters'}).isVisible());
+ await mkdir('qa',{recursive:true});
+ await page.screenshot({path:'qa/ux02-help-onboarding-390.png'});
  const run=dialog.getByRole('button',{name:'Run browser checks'});
  const report=dialog.getByRole('link',{name:/Download browser report/});
  await run.press('Enter');
@@ -21,7 +25,6 @@ try{
  const results=dialog.locator('#studioDiagnosticResults');
  assert.match(await results.innerText(),/Browser reports it is offline/);
  assert.match(await results.innerText(),/Saving and backup integrity were not tested/);
- await mkdir('qa',{recursive:true});
  await page.screenshot({path:'qa/ux02-help-diagnostics-390.png'});
  const [download]=await Promise.all([page.waitForEvent('download'),report.press('Enter')]);
  assert.equal(download.suggestedFilename(),'crystal-forge-diagnostics.json');
