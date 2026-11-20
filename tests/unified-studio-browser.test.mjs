@@ -1582,6 +1582,7 @@ try{
    await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].socketProfile.retentionLip===.2);
    const bendRadius=gearPalette.getByLabel('Minimum bend radius (mm)');
    await bendRadius.fill('5.5');await bendRadius.press('Tab');
+   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.serialRouting.minBendRadius===5.5);
    const wireWidth=gearPalette.getByLabel('Requested wire-track width (mm)');
    await wireWidth.fill('6');await wireWidth.press('Tab');
    const calibratedBuild=await page.evaluate(()=>window.__sensoryStudio.currentModel.build);
@@ -2710,8 +2711,20 @@ try{
    await rotation.fill('180');await rotation.press('Tab');
   }
   const serial=palette.getByRole('group',{name:'Serial LED string'});
+  await serial.getByRole('button',{name:'Pin automatic IN opening'}).click();
+  const edge=serial.getByLabel('IN perimeter position (%)');
+  const originalEdge=Number(await edge.inputValue());
+  await edge.fill(String(originalEdge+2));await edge.press('Tab');
   await serial.getByLabel('Cut serial channels').check();
   await serial.getByText('Channels ready for preparation.').waitFor();
+  const accepted=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  const minBend=serial.getByLabel('Minimum bend radius (mm)');
+  await minBend.fill('60');await minBend.press('Tab');
+  await page.locator('#smsModelError').getByText(/Chosen IN edge/).waitFor();
+  assert.equal(Number(await minBend.inputValue()),5);
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),accepted);
+  await minBend.fill('6');await minBend.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.serialRouting.minBendRadius===6);
   await page.locator('.sms-workspace-nav [data-tab=print]').click();
   await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
   const job=page.locator('#smsJobs article').filter({hasText:name});
@@ -2725,7 +2738,7 @@ try{
    const span=[-1,1].reduce((sum,sign)=>sum+new THREE.Raycaster(new THREE.Vector3(0,18,14.5),
     new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0].distance,0);
    assert(Math.abs(span-3.2)<.03);
-   const lead=new THREE.Raycaster(new THREE.Vector3(-81,18,14.5),new THREE.Vector3(1,0,0),0,162);
+   const lead=new THREE.Raycaster(new THREE.Vector3(-39,18,14.5),new THREE.Vector3(1,0,0),0,120);
    assert.equal(lead.intersectObject(mesh).length,0);
    geometry.dispose();
   }

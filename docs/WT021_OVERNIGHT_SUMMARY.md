@@ -1,9 +1,10 @@
 # WT-021 overnight checkpoint
 
-[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `56f6e95f13a723b2dfe3030f8efdccdd481f24a1`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
+[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `771e9663a044e14d3ee497c647e20769dab0527c`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
 
 ## Latest checkpoint
 
+- A pinned two-axis Wave channel matches the planned three-dimensional span and passes sampled bend checks in both export formats. Chromium refused a 60 mm radius that could not fit and prepared both files after a valid 6 mm edit.
 - Gentle Wave routes now follow the triangulated surface in both horizontal directions. Chromium and Manifold verified real socket normals, open apertures and a 3.2 mm track in both export formats. A steep Wave is refused.
 - The left and right Tile walls now share the same stock and export checks as the front and rear. Focused Chromium placed sockets directly on each new wall, and Manifold plus independent STL/3MF probes verified 3.2 mm width, 1.8 mm depth and clear apertures.
 - Rectangular Tile routes now support shaped sockets on the rear wall. Manifold and Chromium verify 3.2 mm width, 1.8 mm depth and both apertures in STL and 3MF. Mixed faces and a nearby cut that removes surrounding stock are rejected.

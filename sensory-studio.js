@@ -1366,8 +1366,8 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     if(!commit({build}))return false;
     redrawPixelEditor();return true;
    };
-   if(serialRouting.enabled&&serialRouting.vaulted){
-    checkFittingBuild(model,build,apply,{pending:'Checking the vaulted channel clearance and roof stock…'});
+   if(serialRouting.enabled&&(serialRouting.vaulted||Object.hasOwn(fields,'minBendRadius'))){
+    checkFittingBuild(model,build,apply,{pending:'Checking the cable path and surrounding material…'});
     return false;
    }
    return apply();

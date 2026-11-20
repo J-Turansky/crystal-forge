@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** FIT-03, verify physical length and bend-radius handling for routes on eligible two-axis Wave surfaces.
+- **Target:** DIM-02, audit model-frame bounds and stale-export checks for edited backing and tab geometry across families.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Two-axis Wave placement, floor height, width and apertures passed Manifold and Chromium. Next compare three-dimensional exported path length and bend samples with the saved values, including a rejected radius.
+- **Next test:** The pinned two-axis Wave length and bend probes passed. Next change a native backing or tab dimension after preparation, verify stale state, and compare independent STL and 3MF bounds with the new prepared view.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

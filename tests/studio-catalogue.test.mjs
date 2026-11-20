@@ -451,6 +451,11 @@ const biaxialHoles=[-40,-20].map(x=>{
 assert(biaxialHoles.every(hole=>Math.abs(hole.surface.normal[0])>.001&&Math.abs(hole.surface.normal[2])>.001));
 const biaxialRoute=applyBuildModules(biaxialStock,{...waveRouteBuild,pixelHoles:biaxialHoles},waveGenerator.capabilities);
 assert.equal(biaxialRoute.nativeRouting.face,'wave');
+const biaxialPins={...serial,minBendRadius:5,inEdgePercent:biaxialRoute.nativeRouting.edgePositions.in+2,
+ outEdgePercent:biaxialRoute.nativeRouting.edgePositions.out-1};
+const biaxialPinned=applyBuildModules(biaxialStock,{...waveRouteBuild,pixelHoles:biaxialHoles,serialRouting:biaxialPins},waveGenerator.capabilities);
+assert.throws(()=>applyBuildModules(biaxialStock,{...waveRouteBuild,pixelHoles:biaxialHoles,
+ serialRouting:{...biaxialPins,minBendRadius:60}},waveGenerator.capabilities),/Chosen IN edge/);
 const biaxialSections=[-60,-30,0,60].map(x=>[x,waveAt(x,-18).point.y]);
 disposeGroup(biaxialMesh);
 const steepWave=waveGenerator.recipe({width:160,depth:100,thickness:15,amplitude:12,frequency:2,variation:.1,direction:12});
@@ -549,7 +554,7 @@ for(const [fixture] of fixingFixtures){
  const interrupted={...fixture,negative:[...fixture.negative,{kind:'box',size:[1,2,2],position:[18.5,1,0]}]};
  assert.throws(()=>prepareRecipe(THREE,wasm,interrupted),/too close to another cut/);
 }
-for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),conicalRecipe,conicalCoupon,tabRecessRecipe,topRecessRecipe,wideVault,vaultedStock,pinnedVault,topRouted,sideRouted,rearRouted,...perpendicularRoutes,curvedSeatOnly,curvedWaveRoute,biaxialRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
+for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),conicalRecipe,conicalCoupon,tabRecessRecipe,topRecessRecipe,wideVault,vaultedStock,pinnedVault,topRouted,sideRouted,rearRouted,...perpendicularRoutes,curvedSeatOnly,curvedWaveRoute,biaxialRoute,biaxialPinned,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -680,6 +685,34 @@ for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),coni
    assert(left&&right&&Math.abs(left.distanceTo(right)-5.3)<.02,format+' curved seat diametral clearance');
    const rear=hit([apex.x,apex.y,-1],[0,0,1]);
    assert(rear&&apex.z-rear.z>2.8,format+' leaves more than 2.8 mm of actual material behind the seat');
+  }else if(fixture===biaxialPinned){
+   const [link]=fixture.nativeRouting.links;
+   const expected=[],measured=[];
+   for(let i=0;i<link.path.length-1;i++){
+    const a=link.path[i],b=link.path[i+1],x=(a.x+b.x)/2,y=-(a.z+b.z)/2,height=(a.y+b.y)/2;
+    if(x< -77||x> -47)continue;
+    const across=new THREE.Vector2(b.z-a.z,b.x-a.x).normalize();
+    const left=hit([x,y,height-1],[-across.x,-across.y,0]);
+    const right=hit([x,y,height-1],[across.x,across.y,0]);
+    assert(left&&right&&Math.abs(left.distanceTo(right)-3.2)<.025,format+' curved Wave walls');
+    const centre=left.clone().lerp(right,.5);
+    const floor=hit([centre.x,centre.y,height+1],[0,0,-1]);
+    assert(floor,format+' curved Wave floor is present');
+    expected.push(new THREE.Vector3(x,y,height));
+    measured.push(new THREE.Vector3(centre.x,centre.y,floor.z+1.8));
+   }
+   const length=points=>points.slice(1).reduce((sum,point,i)=>sum+point.distanceTo(points[i]),0);
+   assert(measured.length>=8&&Math.abs(length(measured)-length(expected))<.05,format+' actual 3D span matches the plan');
+   let bends=0;
+   for(let i=2;i<measured.length-2;i+=2){
+    const a=measured[i].clone().sub(measured[i-2]),b=measured[i+2].clone().sub(measured[i]);
+    const cross=a.clone().cross(b).length();
+    if(cross<.02)continue;
+    const radius=a.length()*b.length()*a.clone().add(b).length()/(2*cross);
+    assert(radius>=4.8,format+' actual 3D bend radius '+radius);
+    bends++;
+   }
+   assert(bends>0,format+' samples include an actual bend');
   }else if(fixture===biaxialRoute){
    for(const [x,height] of biaxialSections){
     const origin=[x,18,height-1];

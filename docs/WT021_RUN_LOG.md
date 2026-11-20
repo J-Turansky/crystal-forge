@@ -248,3 +248,7 @@
 ### 2026-11-20 - two-axis Wave routing
 
 - The Wave cutter and stock guards sample the same triangulated heightfield as the manufactured model. Unit probes compare exported floor height against independently raycast source stock. Focused Chromium placed two sockets with nonzero slope in both directions and verified a 3.2 mm channel and both open apertures in STL and 3MF.
+
+### 2026-11-20 - two-axis Wave bend and measured length
+
+- The pinned two-axis Wave fixture measures an exported 3D centreline span within 0.05 mm of the plan and preserves the sampled bend radius within mesh tolerances. Build uses production validation for active bend-radius edits. Focused Chromium rejects 60 mm without a saved revision change and accepts 6 mm with fresh STL and 3MF.
