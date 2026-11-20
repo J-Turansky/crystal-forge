@@ -962,7 +962,9 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(normal.y<-.999&&Math.abs(point.y)<.01)return undefined;
   return {y:point.y,normal:normal.toArray()};
  }
- function checkFittingBuild(model,build,onValidated){
+ function checkFittingBuild(model,build,onValidated,{
+  report=message=>pixelStatus(model,message),pending='Checking socket walls, insertion opening and collisions…'
+ }={}){
   if(seatCheck||model.link)return;
   const revision=model.revision;
   const worker=new Worker(new URL('./studio-model-worker.js',import.meta.url),{type:'module'});
@@ -972,16 +974,16 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    if(seatCheck!==worker)return;
    seatCheck=null;
    if(active()?.id!==model.id||model.revision!==revision||!canEditPixels(model))return;
-   if(message){pixelStatus(model,message);return;}
+   if(message){report(message);return;}
    onValidated();
   };
   worker.onmessage=({data})=>{
    if(data.type==='complete')finish();
    if(data.type==='error')finish(data.message);
   };
-  worker.onerror=event=>{event.preventDefault();finish(event.message||'Socket validation could not start.');};
-  worker.onmessageerror=()=>finish('Socket validation returned an unreadable result.');
-  pixelStatus(model,'Checking socket walls, insertion opening and collisions…');
+  worker.onerror=event=>{event.preventDefault();finish(event.message||'Geometry validation could not start.');};
+  worker.onmessageerror=()=>finish('Geometry validation returned an unreadable result.');
+  report(pending);
   worker.postMessage({ticket:{model:{...model,build}}});
  }
  function checkAndSaveSeat(model,holes,hole,onSaved){
@@ -1933,17 +1935,24 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   panel.querySelectorAll('[data-build]').forEach(input=>{
    const checkbox=input.type==='checkbox';
    let accepted=checkbox?input.checked:input.value;
+   const restore=()=>{if(checkbox)input.checked=accepted;else input.value=accepted;};
    input.onchange=()=>{
     const value=checkbox?input.checked:input.value;
     const valid=input.type!=='number'||(Number.isFinite(input.valueAsNumber)&&
      !input.validity.rangeUnderflow&&!input.validity.rangeOverflow);
     if(!valid){
      $('smsModelError').textContent=input.validationMessage||'Enter a number within the allowed range.';
-    }else if(commit({build:{...model.build,[input.dataset.build]:input.type==='number'?input.valueAsNumber:value}})){
-     accepted=value;
-     return;
+     restore();return;
     }
-    if(checkbox)input.checked=accepted;else input.value=accepted;
+    const build={...model.build,[input.dataset.build]:input.type==='number'?input.valueAsNumber:value};
+    const apply=()=>{if(commit({build}))accepted=value;restore();};
+    if(build.mounting&&g.capabilities.supportsMounting&&['Underside counterbores','Underside countersinks'].includes(build.mountStyle)){
+     restore();
+     checkFittingBuild(model,build,apply,{
+      report:message=>{$('smsModelError').textContent=message;},
+      pending:'Checking material around the recessed fixings…'
+     });
+    }else apply();
    };
   });
   bindPartEditor(model);

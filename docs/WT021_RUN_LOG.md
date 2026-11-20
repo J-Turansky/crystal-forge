@@ -155,3 +155,8 @@
 ### 2026-11-20 - recessed fixing edit and stale output
 
 - Chromium and independent export probes passed for the Gear counterbore edit. Diameter 9 mm is refused without editing the model, and a valid 5.05 mm edit invalidates its previous job. The 1.4 mm recess and 8.6 mm residual stock remain measurable. The geometry planner rejects non-finite diameters and spacing.
+
+### 2026-11-20 - native recessed fixing stock guard
+
+- Manifold validates continuous stock around each recessed fixing and rejects unrelated cuts that breach that stock. Build uses the same fabrication worker to validate edits before committing. Focused Chromium passed the solid Gear exports and thin Wave rejection.
+- Next verify individually positioned recessed mounts and depth adjustment.

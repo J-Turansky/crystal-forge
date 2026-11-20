@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** DIM-05 and PAR-01, protect the actual remaining stock around native recessed fixings.
+- **Target:** DIM-05 and PAR-01, extend native recessed fixings to individually placed mounts.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Reproduce an automatic recessed fixing on inadequate or interrupted real stock. Validate the 3D seat and surrounding material before preparation can enable downloads, while preserving the tested solid Gear fixture.
+- **Next test:** Add a selectable recessed profile to a manual mount on an eligible solid face, preserve its own diameter and depth, and reuse the measured 3D stock and collision checks. Verify safe and rejected edits plus both exports in Chromium.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

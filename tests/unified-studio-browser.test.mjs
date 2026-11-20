@@ -1936,8 +1936,10 @@ try{
   await enabled.evaluate(node=>{for(let p=node.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS')p.open=true;});
   await enabled.check();
   await page.locator('[data-build=mountStyle]').selectOption('Underside counterbores');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.mountStyle==='Underside counterbores');
   const diameter=page.locator('[data-build=holeDiameter]');
   await diameter.fill('4');await diameter.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.holeDiameter===4);
   const job=page.locator('#smsJobs article').filter({hasText:witness});
   const measureFixing=async expected=>{
    await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
@@ -1970,12 +1972,26 @@ try{
   assert.equal(Number(await diameter.inputValue()),4);
   assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),prior);
   await diameter.fill('5.05');await diameter.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.holeDiameter===5.05);
   await printTab.click();
   await job.getByText('Stale',{exact:true}).waitFor();
   assert(await job.locator('[data-job-stl]').isDisabled());
   assert(await job.locator('[data-job-3mf]').isDisabled());
   await job.locator('[data-job-prepare]').click();
   await measureFixing(5.05);
+ }
+ {
+  await page.evaluate(()=>window.__sensoryStudio.addModel('waves',{width:100,depth:70,thickness:2,amplitude:1,variation:0},'Thin fixing witness'));
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  const mounting=page.locator('[data-build=mounting]');
+  await mounting.evaluate(node=>{for(let p=node.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS')p.open=true;});
+  await mounting.check();
+  const beforeFixing=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
+  const profile=page.locator('[data-build=mountStyle]');
+  await profile.selectOption('Underside countersinks');
+  await page.locator('#smsModelError').getByText(/needs continuous underside stock/).waitFor();
+  assert.equal(await profile.inputValue(),'Through holes');
+  assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),beforeFixing);
  }
  assert.deepEqual(errors,[]);
  console.log('Unified Home, Design, Build, Library and Quick Print screenshots captured.');

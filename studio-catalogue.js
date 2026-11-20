@@ -546,11 +546,13 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
   const spacing=Math.min(build.spacing??b.width*.55,b.width*.65),diameter=build.holeDiameter??3.4;
   if(!Number.isFinite(spacing)||!Number.isFinite(diameter)||diameter<2||diameter>8||spacing<diameter*3)throw Error('Mounting hole spacing or diameter is unsafe.');
   const style=build.mountStyle||'Through holes';
-  for(const x of [-spacing/2,spacing/2]){
-   r.negative.push(cylinder(diameter/2,b.height+4,[x,b.height/2,0]));
-   if(style==='Underside counterbores')r.negative.push(cylinder(diameter*.75,1.6,[x,.6,0]));
-   if(style==='Underside countersinks'){
-    r.negative.push({...cylinder(diameter*.75,1.6,[x,.6,0]),topRadius:diameter/2});
+  for(const [index,x] of [-spacing/2,spacing/2].entries()){
+   const fixingId='automatic-fixing-'+(index+1);
+   r.negative.push({...cylinder(diameter/2,b.height+4,[x,b.height/2,0]),fixingId});
+   if(style==='Underside counterbores'||style==='Underside countersinks'){
+    const recess=cylinder(diameter*.75,1.6,[x,.6,0]);
+    if(style==='Underside countersinks')recess.topRadius=diameter/2;
+    r.negative.push({...recess,fixingId,fixingRecess:'Fixing '+(index+1)+' recess'});
    }
   }
   r.warnings.push('Through mounting holes are un-rated; test actual mounting loads.');

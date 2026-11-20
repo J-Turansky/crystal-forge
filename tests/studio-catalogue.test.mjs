@@ -453,6 +453,12 @@ assert.throws(()=>applyBuildModules(flatStock,{mounting:true,holeDiameter:4,spac
 const fixingFixtures=new Map(['Underside counterbores','Underside countersinks'].map(style=>[
  applyBuildModules(flatStock,{mounting:true,mountStyle:style,spacing:30,holeDiameter:4},{supportsMounting:true}),style
 ]));
+for(const [fixture] of fixingFixtures){
+ const thin={...fixture,positive:[{kind:'box',size:[70,2.8,40],position:[0,1.4,0]}]};
+ assert.throws(()=>prepareRecipe(THREE,wasm,thin),/needs continuous underside stock/);
+ const interrupted={...fixture,negative:[...fixture.negative,{kind:'box',size:[1,2,2],position:[18.5,1,0]}]};
+ assert.throws(()=>prepareRecipe(THREE,wasm,interrupted),/too close to another cut/);
+}
 for(const fixture of [...fixingFixtures.keys(),vaultedStock,pinnedVault,topRouted,sideRouted,curvedSeatOnly,curvedWaveRoute,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);

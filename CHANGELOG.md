@@ -4,6 +4,7 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
+- Build checks the actual material around recessed screw fixings before saving. Thin stock and nearby cuts that remove the supporting material are refused.
 - Build restores the last accepted fixing diameter after an out-of-range edit and preserves exact fractional diameters.
 - Native serial routing accepts a minimum bend radius from 1 to 60 mm. Preparation refuses routes that cannot meet the bend constraint.
 - Build validates socket retention before saving. Profiles without enough straight body stock show how to adjust the setting.

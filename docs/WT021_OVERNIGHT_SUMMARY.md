@@ -127,3 +127,8 @@ Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) co
 
 - Chromium edited a solid Gear’s bore from 4 to 5.05 mm and measured both revisions in the downloaded STL and 3MF. The recess remained 1.4 mm deep with 8.6 mm of remaining stock. An out-of-range edit kept the preceding model revision and restored the displayed number. The accepted edit disabled both stale downloads.
 - Next validate the actual remaining stock for fixings on interrupted and thin bodies.
+
+### Recessed fixing stock validation
+
+- Build checks the actual Manifold solid before saving an automatic counterbore or countersink. The guard protects 1 mm around the recess and 1.6 mm behind it, and detects nearby cuts that remove that stock.
+- The catalogue suite rejected thin and interrupted fixtures and kept the measured solid case. Chromium rejected a thin Wave countersink without changing the accepted control, Build settings or revision. Next add independently placed recessed mounts.

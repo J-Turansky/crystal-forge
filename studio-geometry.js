@@ -233,6 +233,21 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{},inspectFittin
    }
   }
   if(inspectFittings)return previews;
+  for(const recess of recipe.negative||[]){
+   if(!recess.fixingRecess)continue;
+   const [x,y,z]=recess.position;
+   // Protect 1 mm around the recess and 1.6 mm behind its shoulder.
+   const stockDepth=y+recess.height/2+1.6,stockRadius=recess.radius+1;
+   const envelope=hold(hold(wasm.Manifold.cylinder(stockDepth,stockRadius,stockRadius,48))
+    .rotate([-90,0,0]).translate([x,0,z]));
+   if(envelope.volume()-hold(total.intersect(envelope)).volume()>.05)
+    throw Error(recess.fixingRecess+' needs continuous underside stock, with 1 mm around the cut and 1.6 mm behind it.');
+   for(const cut of recipe.negative){
+    if(cut.fixingId===recess.fixingId)continue;
+    if(hold(envelope.intersect(convert(cut))).volume()>.05)
+     throw Error(recess.fixingRecess+' is too close to another cut. Increase the separation or change the fixing profile.');
+   }
+  }
   if(recipe.nativeRouting?.ready){
    onProgress('Cutting serial LED channels');
    // Collapse Boolean slivers below the precision of a printable channel.
