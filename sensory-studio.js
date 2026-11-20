@@ -1631,6 +1631,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const disabled=model.link?' disabled':'',noAdd=holes.length>=16?' disabled':disabled;
   const hole=holes[selected]||newPixel(chosenProfile(model));
   const fit=resolvePixelFitting(hole,adapter.pixelFitProfiles());
+  const underside=hole.surface?hole.surface.normal?.[1]<=-.9999:hole.entryFace==='underside';
   root.innerHTML='<h3>Pixel fittings</h3><div class="sms-actions"><button type="button" data-pixel-profile-editor>Create / edit pixel profile</button></div>'+
    '<p>Choose a saved measured profile before placing. A profile selection with P1/P2 selected updates <strong>only that fitting</strong>; otherwise it chooses the next fitting. Plain bores open on both faces. Select a fitting to enable a measured blind socket on its installation face. Cable cuts open on the underside. Print a coupon to check fit.</p>'+
    '<label><input type="checkbox" data-pixel-backing'+(model.build.pixelBacking?' checked':'')+disabled+'> Add fitting backing (12 mm of additional material around each edge)</label>'+
@@ -1651,8 +1652,11 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    (selected<0?'':pixelHoleMarkup(holes[selected],selected,esc,disabled,profiles)+
     '<label><input type="checkbox" data-shaped-socket'+(hole.socketProfile?' checked':'')+disabled+'> Shape a socket on the selected face from the measured profile</label>'+
     (hole.socketProfile?'<label>Retention lip (mm)<input type="number" data-seat-retention min="0" max=".7" step=".05" value="'+esc(hole.socketProfile.retentionLip)+'"'+disabled+'></label>'+
-     (hole.conical||(hole.surface?hole.surface.normal?.[1]<=-.9999:hole.entryFace==='underside')?
-      '<label><input type="checkbox" data-seat-conical'+(hole.conical?' checked':'')+disabled+'> Conical socket roof</label>':''):'')+
+     (hole.conical||underside?
+      '<label><input type="checkbox" data-seat-conical'+(hole.conical?' checked':'')+disabled+'> Conical socket roof</label>':'')+
+     (underside?'<label><input type="checkbox" data-seat-shoulders'+(hole.supportFreeShoulders?' checked':'')+disabled+'> Support-Free Shoulders</label>':'')+
+     (hole.supportFreeShoulders?'<label>Shoulder angle from horizontal (°)<input type="number" data-seat-shoulder-angle min="30" max="60" step="any" required value="'+
+      esc(hole.shoulderAngle??45)+'"'+disabled+'></label>':''):'')+
     '<div class="sms-actions"><button type="button" data-pixel-previous'+(selected===0?' disabled':disabled)+'>Move earlier</button><button type="button" data-pixel-next'+(selected===holes.length-1?' disabled':disabled)+'>Move later</button><button type="button" data-duplicate-pixel'+noAdd+'>Duplicate fitting in 3D</button></div>')+
    '<section aria-label="Test print"><h3>Test print</h3><p>'+esc(fit.profileName)+' · '+fit.nominalDiameter+' mm nominal · '+fit.diameter+' mm body · '+fit.boreDiameter+' mm bore · '+fit.clearance+' mm clearance.</p>'+
    '<p>'+esc(fit.warning)+' Print flat with the intended material and nozzle. Test the actual pixel and record the bore that fits.</p>'+
@@ -1675,8 +1679,9 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   root.querySelector('[data-pixel-profile-editor]').onclick=()=>{
    const seat=selected>=0&&hole.socketProfile;
    adapter.openPixelProfileEditor(seat?hole.profileId:chosenProfile(model)?.id,false,seat?{
-    measurements:{...seat,bodyDiameter:hole.diameter},clearance:hole.clearance,retentionLip:seat.retentionLip,conical:!!hole.conical
-   }:undefined);
+    measurements:{...seat,bodyDiameter:hole.diameter},clearance:hole.clearance,retentionLip:seat.retentionLip,conical:!!hole.conical,
+    shoulderAngle:hole.supportFreeShoulders?hole.shoulderAngle??45:null
+   }:{shoulderAngle:null});
   };
   root.querySelector('[data-pixel-backing]').onchange=event=>{
    if(!commit({build:{...model.build,pixelBacking:event.target.checked}})){
@@ -1723,6 +1728,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     next.surface=hole.hitSurface;
    }else{
     delete next.socketProfile;delete next.conical;
+    delete next.supportFreeShoulders;delete next.shoulderAngle;
     delete next.surface;
    }
    if(!editPixel(model,selected,next))shaped.checked=!!hole.socketProfile;
@@ -1731,6 +1737,23 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(conical)conical.onchange=()=>{
    const next={...hole,conical:conical.checked};
    conical.checked=!!hole.conical;
+   checkAndSaveSeat(model,holes.map((item,index)=>index===selected?next:item),next);
+  };
+  const shoulders=root.querySelector('[data-seat-shoulders]');
+  if(shoulders)shoulders.onchange=()=>{
+   const next={...hole,supportFreeShoulders:shoulders.checked};
+   shoulders.checked=!!hole.supportFreeShoulders;
+   checkAndSaveSeat(model,holes.map((item,index)=>index===selected?next:item),next);
+  };
+  const angle=root.querySelector('[data-seat-shoulder-angle]');
+  if(angle)angle.onchange=()=>{
+   const value=angle.valueAsNumber,valid=angle.checkValidity();
+   angle.value=hole.shoulderAngle??45;
+   if(!valid||!Number.isFinite(value)){
+    pixelStatus(model,'Choose a shoulder angle from 30 to 60 degrees from horizontal.');return;
+   }
+   if(value===Number(angle.value))return;
+   const next={...hole,shoulderAngle:value};
    checkAndSaveSeat(model,holes.map((item,index)=>index===selected?next:item),next);
   };
   const lip=root.querySelector('[data-seat-retention]');
@@ -1961,6 +1984,24 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     status.dataset.buildFitPreviewStatus='';status.setAttribute('aria-live','polite');
     status.textContent=$('pixelFittingPreviewStatus')?.textContent||'';
     controls.append(label,status);
+    const shoulderSetting=document.querySelector('[data-state="socketSupportFreeShoulders"]');
+    const shoulderLabel=document.createElement('label'),shoulderToggle=document.createElement('input');
+    shoulderToggle.type='checkbox';shoulderToggle.checked=shoulderSetting.checked;shoulderToggle.disabled=!!model.link;
+    shoulderToggle.onchange=()=>{
+     shoulderSetting.click();
+     renderPalette();
+     shell.palette.querySelector('[data-crystal-shoulders]')?.focus({preventScroll:true});
+    };
+    shoulderToggle.dataset.crystalShoulders='';
+    shoulderLabel.append(shoulderToggle,' Support-Free Shoulders');
+    controls.append(shoulderLabel);
+    if(shoulderSetting.checked){
+     const angle=document.querySelector('[data-state="socketShoulderAngle"]');
+     visualRange(controls,{key:'socketShoulderAngle',label:'Shoulder angle from horizontal',min:30,max:60,step:1,unit:'°'},angle.value,value=>{
+      angle.value=value;
+      angle.dispatchEvent(new Event('input',{bubbles:true}));angle.dispatchEvent(new Event('change',{bubbles:true}));
+     },!!model.link);
+    }
     renderCrystalPixelPalette(controls,model);
     renderCrystalWirePalette(controls);
    }else{

@@ -93,6 +93,18 @@ try{
  await fit.getByText(/insertion 22\.00 mm/).waitFor();
  assert.match(await fit.innerText(),/centre roof [\d.]+ mm/);
  assert.match(await fit.innerText(),/interfering with base/);
+ const shoulders=page.locator('.sms-palette').getByRole('checkbox',{name:'Support-Free Shoulders'});
+ assert.equal(await shoulders.isChecked(),false);
+ await shoulders.check();
+ const shoulderAngle=page.locator('.sms-palette').getByRole('slider',{name:'Shoulder angle from horizontal'});
+ assert.equal(await shoulderAngle.inputValue(),'45');
+ await fit.getByText(/insertion 22\.25 mm/).waitFor();
+ await shoulderAngle.press('End');
+ assert.equal(await shoulderAngle.inputValue(),'60');
+ await fit.getByText(/insertion 22\.43 mm/).waitFor();
+ assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.socketShoulderAngle),60);
+ await shoulders.uncheck();
+ await fit.getByText(/insertion 22\.00 mm/).waitFor();
  await toggle.uncheck();
  assert.equal(await fit.innerText(),'');
  console.log('WT-021 Crystal physical fitting preview toggled in Build');

@@ -33,6 +33,10 @@ The native planner identifies the numbered fitting that fails the diameter or ed
 
 Print Centre and production packs use the same bounding dimensions of the prepared mesh in its exported, Z-up frame. See [production review](PRODUCTION_REVIEW.md) for test scope, walkthrough and physical checks.
 
+## Support-Free Pixel Shoulders
+
+Crystal uses global socket settings and native shaped underside fittings use per-fitting settings. The shared Manifold cutter raises the shaft, optional retention ridge and original roof by the taper rise. Keep the flange start plane and wire cuts fixed. The native recipe, Crystal fitting overlay and shaped test samples use the same cutter. The fabrication tests section the taper and the unchanged flange and bore in both export formats. Physical slicing and fit remain a separate check.
+
 ## WT-017 — Consistent Build pixel tools and shared measured profiles
 
 All seven model families now show Add pixel and a shortcut to the existing A–G measured-dimensions profile editor before placement. Crystal uses the original `placePixelBtn`/Hardware Editor and retains its established automatic LEDs, P1 ordering, opposing IN/OUT ports, wire pitch and hand-edit state. Native families continue to use stable Pn IDs, click-place/hold-drag and safe automatic material search. Saving a custom measured profile broadcasts `studio-pixel-profile-saved` so the new profile is selected for the *next* native placement; an already placed fitting is never silently resized. Existing local pixel profiles and saved model IDs remain compatible.

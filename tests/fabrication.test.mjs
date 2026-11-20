@@ -38,6 +38,34 @@ const wasm=await Module();wasm.setup();
  console.log('WT-021 conical gumdrop: rounded cavity contained, thin stock rejected, coupon apex matched');
 }
 
+{
+ const settings={pixelProfileId:'wide-flange',pixelDiameter:8,pixelFit:.25,pixelRetentionLip:.2,
+  pixelProfiles:[{id:'wide-flange',name:'Wide flange',kind:'gumdrop',bodyDiameter:8,flangeDiameter:12,
+   bodyHeight:12,flangeHeight:2,capHeight:2,wireHeight:1,wireWidth:3,wireDepth:1}]};
+ const profile=resolvePixelProfile(settings),owned=[],hold=solid=>(owned.push(solid),solid);
+ const bore=(options,roof=30)=>putSocket(wasm,hold,{x:0,z:0},6,roof,-3,profile,options);
+ try{
+  const original=bore({conical:true});
+  for(const shoulderAngle of [30,45,60]){
+   const rise=2*Math.tan(shoulderAngle*Math.PI/180);
+   const tapered=bore({conical:true,shoulderAngle});
+   assert(Math.abs(tapered.tipY-original.tipY-rise)<1e-10);
+   assert(Math.abs(tapered.shaftEnd-original.shaftEnd-rise)<1e-10);
+   assert.equal(tapered.capRise,original.capRise);
+   assert.equal(tapered.retentionLip,original.retentionLip);
+   assert.equal(tapered.wireReliefDepth,original.wireReliefDepth);
+   const positions=tapered.solid.getMesh().vertProperties;
+   for(const [height,radius] of [[2,6.125],[2+rise,4.125],[2.8+rise,3.925]]){
+    assert(Array.from({length:positions.length/3},(_,i)=>i*3).some(i=>
+     Math.abs(positions[i+1]-height)<.001&&Math.abs(Math.hypot(positions[i],positions[i+2])-radius)<.001),
+     'Cutter retains the measured section at '+height+' mm');
+   }
+  }
+  assert.throws(()=>bore({shoulderAngle:45},16),/Tapered pixel shoulder needs 16.80 mm/);
+  assert.throws(()=>bore({shoulderAngle:29}),/30 to 60 degrees/);
+  assert.equal(bore({shoulderAngle:undefined}).solid.volume(),bore({}).solid.volume());
+ }finally{for(const solid of owned)solid.delete();}
+}
 
 {
  const block=wasm.Manifold.cube([10,10,10]);
@@ -463,7 +491,8 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
   }
   return inside;
  };
- for(const installation of [routedVault,asymmetric]){
+ const taperedVault={...routedVault,socketSupportFreeShoulders:true};
+ for(const installation of [routedVault,asymmetric,taperedVault]){
  const routed=prepareFabrication({wasm,...assembly(installation),settings:installation});
  const routes=routed.report.hardware.wirePlan.routes;
  const sockets=routed.report.socketCeilings;
@@ -486,7 +515,9 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
   assert(Math.abs(apex-socket.tipY)<.001,format+' full-model conical apex');
   assert(Math.abs(apex-ceiling(socket.x+2,socket.z)-2)<.001,format+' conical roof falls 2 mm over 2 mm');
   const profile=resolvePixelProfile(installation);
-  const throatHeight=Math.max(1.9,profile.flangeHeight+.8)+.7;
+  const rise=installation===taperedVault?.25:0;
+  const throatHeight=Math.max(1.9,profile.flangeHeight+.8)+.7+rise;
+  if(rise)assert(Math.abs(apex-profile.bodyHeight-profile.boreDiameter/2-rise)<.001);
   for(const [height,width] of [[throatHeight,profile.boreDiameter-2*profile.retentionLip],[8,profile.boreDiameter]]){
    const origin=new THREE.Vector3(socket.x,-socket.z,height);
    const walls=[-1,1].map(sign=>new THREE.Raycaster(origin,new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0]);

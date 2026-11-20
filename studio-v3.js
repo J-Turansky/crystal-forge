@@ -49,7 +49,7 @@ const defaults={
   tipFlat:.25,tipLength:.27,roundSteps:3,
   baseType:'integrated',baseHeight:25,baseDome:0,baseEdgeRadius:0,baseProfile:'Plinth + dome',domeFalloff:1.8,sideWall:100,baseWidth:3,baseStyle:'Fitted',undersideAccess:false,baseVault:false,vaultSupportPitch:25,wallThickness:1.2,lightPorts:false,lightPortDiameter:3.2,lightPortReach:55,
   wireAllowOverLength:false,
-  showPixels:false,pixelCount:1,pixelProfileId:'gumdrop',pixelProfiles:[],lightingMode:'single',glowPreview:false,glowColour:'0x77c4ff',pixelDiameter:12,pixelFit:.15,pixelRetentionLip:0,socketConical:false,fitCalibration:null,fitCouponLast:null,fitCouponStyle:'stepped',cutSockets:true,hollowCrystals:false,targetedLightPaths:false,lightBoreDiameter:4,lightReach:85,pixelPlacement:'auto',manualPixelHoles:[],mountPlacement:'auto',manualMountHoles:[],splitParts:false,autoBedSplit:false,splitX:0,splitAlignment:false,splitPinDiameter:5,splitPinDepth:7,splitPinClearance:.25,plateThickness:4,mountPlateThickness:4.5,mount:'None',mountHoleDiameter:4.5,mountHoleDepth:9,mountSpacing:40,wireChannels:false,wireExit:true,wireMode:'string',pixelStringSpacing:50,pixelSnapMaxMove:5,wireMinBendRadius:5,wireInputTailLength:0,wireOutputTailLength:0,wireDirectionArrows:true,wireShowLengths:true,wirePairSpacing:7,wireWidth:3,wireDepth:2,wireVaulted:false,wireSlack:0,manualEdgeTabs:null,edgeManualMounts:false,tabCount:4,tabHolesPerTab:2,tabHoleDiameter:4.5,tabThickness:5,tabWall:3,
+  showPixels:false,pixelCount:1,pixelProfileId:'gumdrop',pixelProfiles:[],lightingMode:'single',glowPreview:false,glowColour:'0x77c4ff',pixelDiameter:12,pixelFit:.15,pixelRetentionLip:0,socketConical:false,socketSupportFreeShoulders:false,socketShoulderAngle:45,fitCalibration:null,fitCouponLast:null,fitCouponStyle:'stepped',cutSockets:true,hollowCrystals:false,targetedLightPaths:false,lightBoreDiameter:4,lightReach:85,pixelPlacement:'auto',manualPixelHoles:[],mountPlacement:'auto',manualMountHoles:[],splitParts:false,autoBedSplit:false,splitX:0,splitAlignment:false,splitPinDiameter:5,splitPinDepth:7,splitPinClearance:.25,plateThickness:4,mountPlateThickness:4.5,mount:'None',mountHoleDiameter:4.5,mountHoleDepth:9,mountSpacing:40,wireChannels:false,wireExit:true,wireMode:'string',pixelStringSpacing:50,pixelSnapMaxMove:5,wireMinBendRadius:5,wireInputTailLength:0,wireOutputTailLength:0,wireDirectionArrows:true,wireShowLengths:true,wirePairSpacing:7,wireWidth:3,wireDepth:2,wireVaulted:false,wireSlack:0,manualEdgeTabs:null,edgeManualMounts:false,tabCount:4,tabHolesPerTab:2,tabHoleDiameter:4.5,tabThickness:5,tabWall:3,
   printer:'Ultimaker 3 Extended',printerX:220,printerY:220,printerZ:220,curaNozzle:.4,curaMaterial:'PLA',curaQuality:60,curaQualityType:'auto',curaIntent:'light',overhang:45,preserveLocked:true,snap:true,hardwareSnap:false,hardwareSnapStep:5,
   colour:0x8bbcff,mode:'simple',floatView:false,hardwareColourMode:false,evenLighting:true
 };
@@ -120,7 +120,7 @@ function format(k,v){
   if(['bottomScale','topScale'].includes(k)){const d=Math.round((Number(v)-1)*100);return (d>0?'+':'')+d+'%'}
   if(k==='tipLength')return Math.round(v*100)+'%';
  if(['mountHoleDiameter','mountHoleDepth','mountSpacing','mountPlateThickness','tabHoleDiameter','tabThickness','tabWall'].includes(k))return Number(v).toFixed(1)+' mm';
- if(k==='curaQuality')return v+'%';if(k==='lightPortReach')return v+'%';if(k==='hardwareSnapStep')return Number(v).toFixed(1)+' mm';if(k==='wireSlack')return v+'%';if(k==='sideWall')return v+'%';if(k==='domeFalloff')return Number(v).toFixed(1);if(k==='vaultSupportPitch')return v+' mm';if(k==='splitX')return v+' mm';if(['spacing','angleRandomness','leanAmount','widthRandomness'].includes(k))return v+'%';if(k==='overhang')return v+'°';return String(v);
+ if(k==='curaQuality')return v+'%';if(k==='lightPortReach')return v+'%';if(k==='hardwareSnapStep')return Number(v).toFixed(1)+' mm';if(k==='wireSlack')return v+'%';if(k==='sideWall')return v+'%';if(k==='domeFalloff')return Number(v).toFixed(1);if(k==='vaultSupportPitch')return v+' mm';if(k==='splitX')return v+' mm';if(['spacing','angleRandomness','leanAmount','widthRandomness'].includes(k))return v+'%';if(k==='overhang'||k==='socketShoulderAngle')return v+'°';return String(v);
 }
 const shapeKeys=new Set(['familyMix','bottomScale','topScale','cornerRadius','tipLength','tipFlat','tipRound','shoulderRound','roundSteps']);
 function selectedCrystal(){return crystals.find(c=>c.id===selectedId)||null}
@@ -209,6 +209,7 @@ function syncForm(){
   if(e.type==='checkbox')e.checked=!!s[k];
   else e.value=k==='pixelFit'?resolvePixelProfile(s).clearance:s[k]??'';
  }
+ $('socketShoulderAngleControl').hidden=!s.socketSupportFreeShoulders;
  const strictLight=document.querySelector('[data-state="requireAccessiblePassages"]');
  if(strictLight)strictLight.disabled=!s.requireAccessiblePassages&&!(s.cutSockets&&s.lightingMode!=='none'&&(s.targetedLightPaths||s.hollowCrystals||(s.baseVault&&s.lightPorts)));
  for(const e of document.querySelectorAll('[data-out]'))e.textContent=format(e.dataset.out,
@@ -823,6 +824,7 @@ document.querySelectorAll('[data-state]').forEach(e=>{
     applyCrystalPixelProfile(value);
     syncForm();
    }
+  if(key==='socketSupportFreeShoulders')$('socketShoulderAngleControl').hidden=!value;
   if(key==='mount'){$('edgeTabSettings').hidden=value!=='Edge fixing tabs';$('detachablePlateSettings').hidden=value!=='Detachable plate'}
    if(key==='printer')$('customPrinterSettings').hidden=value!=='Custom / other';
    if(key==='printer'||key.startsWith('cura'))updateCuraProfileSummary();
@@ -1166,7 +1168,7 @@ $('pixelProfileDiagram').addEventListener('click',e=>{
  if(field&&PIXEL_DIMENSIONS.some(dim=>dim.field===field))$(field).focus();
 });
 function closePixelEditor(){$('pixelProfileOverlay').hidden=true;$('editPixelProfileBtn').focus()}
-let editingPixelProfileId=null,routedCouponRetention;
+let editingPixelProfileId=null,routedCouponRetention,profileCouponShoulderAngle;
 function openPixelProfileEditor(id,duplicate=false,fit){
  const profiles=allPixelProfiles({pixelProfiles:readPixelFitProfiles()});
  const savedProfile=profiles.find(profile=>profile.id===id);
@@ -1181,8 +1183,13 @@ function openPixelProfileEditor(id,duplicate=false,fit){
   ?(p.measuredFit.printedBoreDiameter-p.measuredFit.bodyDiameter).toFixed(2):s.pixelFit);
  $('routeSpecimenConical').checked=fit?.conical??false;
  routedCouponRetention=fit?.retentionLip;
+ profileCouponShoulderAngle=fit?.shoulderAngle;
  $('pixelSocketStatus').textContent='';
  $('pixelProfileOverlay').hidden=false;$('pixelName').focus();
+}
+function fitEditorShoulderAngle(){
+ if(profileCouponShoulderAngle!==undefined)return profileCouponShoulderAngle??undefined;
+ return s.socketSupportFreeShoulders?s.socketShoulderAngle:undefined;
 }
 $('editPixelProfileBtn').onclick=()=>openPixelProfileEditor(s.pixelProfileId);
 for(const format of ['stl','3mf']){
@@ -1228,6 +1235,14 @@ for(const format of ['stl','3mf']){
     [key,key==='kind'||key==='name'?$(id).value:$(id).valueAsNumber])),id:'custom-test-socket'});
    const fit=socketFitFromEditor(),single=!$('pixelSocketPlate').checked;
    const settings={...s,pixelProfileId:profile.id,pixelProfiles:[profile],pixelDiameter:profile.bodyDiameter,pixelFit:fit,pixelClearanceByProfile:{}};
+   if(profileCouponShoulderAngle!==undefined){
+    settings.socketSupportFreeShoulders=profileCouponShoulderAngle!==null;
+    settings.socketShoulderAngle=profileCouponShoulderAngle??45;
+    if(settings.socketSupportFreeShoulders){
+     settings.socketConical=$('routeSpecimenConical').checked;
+     settings.pixelRetentionLip=routedCouponRetention??0;
+    }
+   }
    status.textContent='Preparing the negative test socket…';
    const coupon=makePixelSeatCoupon(await loadManifold(),settings,{single,openWireExits:!single});
    try{
@@ -1248,7 +1263,8 @@ for(const format of ['stl','3mf']){
     [key,key==='name'||key==='kind'?$(id).value:$(id).valueAsNumber]));
    const profile=normalisePixelProfile(values),clearance=socketFitFromEditor();
    const recipe=makeRoutedSocketSpecimen(profile,{clearance,retentionLip:routedCouponRetention??s.pixelRetentionLip,
-    conical:$('routeSpecimenConical').checked});
+    conical:$('routeSpecimenConical').checked,
+    shoulderAngle:fitEditorShoulderAngle()});
    const files=exportMaterialBodies(prepareRecipe(THREE,await loadManifold(),recipe),{name:'two-pixel-route-test'});
    download(new Blob([format==='stl'?files.stls[0].bytes:files.threeMF],
     {type:format==='stl'?'model/stl':'model/3mf'}),'two-pixel-route-test.'+format);
