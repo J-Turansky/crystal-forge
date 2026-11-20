@@ -10,10 +10,10 @@
 
 ## Next executable step
 
-- **Target:** FIT-02 P0, prove invalid native fitting edits preserve prior state in Chromium and verify route clearance outside intentional socket within surrounding stock.
-- **Checkpoint:** shared Manifold preview now shows insertion approach, stock and adjacent-cut warnings from fabrication checks and measures wire/positive overlap. Gear/Tile injected cut-solid cases pass. Wire overlap alone is informational because contact with the intended relief is normal.
-- **Next test:** extend the native Gear-top workflow in tests/unified-studio-browser.test.mjs with a rejected move toward an existing socket or mount, then reload and confirm the original pose. In studio-geometry.js and studio-native-routing.js, verify the actual routed cutter sections against surviving stock beyond intended junctions and exits.
-- **Then:** add Wave/Cap/Character/Pod physical previews and manufacturing proof, arbitrary-face drag, side/curved continuous routing and seven independent browser-to-STL/3MF journeys.
+- **Target:** FIT-02 / FIT-03 P0, verify route clearance outside intended socket reliefs against surrounding stock and add rejected-drag state preservation.
+- **Checkpoint:** shared Manifold preview now shows insertion approach, stock and adjacent-cut warnings from fabrication checks and measures wire/positive overlap. Gear/Tile and four additional compact backed-underside Manifold fixtures pass. Chromium proves adjacent Gear socket placement is rejected and the original fitting survives reload. Wire overlap alone is informational because contact with the intended relief is normal.
+- **Next test:** extend the adjacent Gear-top workflow in tests/unified-studio-browser.test.mjs to drag a second, separately accepted socket toward the first and verify rollback through reload. In studio-geometry.js and studio-native-routing.js, verify the actual routed cutter sections against surviving stock beyond intended junctions and exits.
+- **Then:** add Wave/Cap/Character/Pod interactive preview and export proof, arbitrary-face drag, side/curved continuous routing and seven independent browser-to-STL/3MF journeys.
 - **UX-01:** implement the approved catalogue after P0 work. Keep #10 for Cura and printed proof.
 
 ## Resume instruction

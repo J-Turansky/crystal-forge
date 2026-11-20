@@ -1214,6 +1214,18 @@ try{
    assert.equal(await nativePreview.innerText(),'');
    assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),gearStateBefore,
     'Toggling Gear physical overlays must not mutate fittings, dimensions or saved model revision');
+   await page.keyboard.press('Escape');
+   await page.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+   const conflict=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(4,0,'top'));
+   assert(conflict);
+   await page.mouse.click(conflict.x,conflict.y);
+   await page.locator('[data-pixel-status]').filter({hasText:/lacks clearance from another cut/}).waitFor();
+   assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),gearStateBefore,
+    'Rejected adjacent shaped socket must preserve the original fitting and model revision');
+   await page.reload();
+   await page.waitForFunction(()=>window.__sensoryStudio?.currentModel?.build.pixelHoles?.length===1);
+   assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles),[socket],
+    'The original fitting and installation normal must survive reload after a rejected placement');
   }else{
    await page.locator('[data-pixel-status]').filter({hasText:/continuous stock/}).waitFor();
    assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length??0),0);

@@ -203,10 +203,12 @@ for(const id of ['knob','selector']){
 }
 
 
-// FIT-02: Gear top and Tile underside share the production Manifold cutter,
+// FIT-02: Six native families share the production Manifold cutter,
 // its physical positive profile and the same placement transform as Print.
 {
  const gumdrop=PIXEL_PRESETS.find(item=>item.id==='gumdrop');
+ const compact={...gumdrop,bodyDiameter:5,bodyHeight:6,capHeight:1.2,flangeDiameter:6,
+  flangeHeight:1,wireWidth:2,wireDepth:1,retentionLip:0};
  const configs=[
   {type:'Gear top',family:gearGenerator,params:{diameter:80,bore:0,thickness:25,
    wheelStyle:'Cam',dualMaterial:false},
@@ -215,7 +217,14 @@ for(const id of ['knob','selector']){
    depth:90,thickness:20,relief:2,dualMaterial:false},
    // A smaller REAL profile fits this thinner tile. A 22 mm gumdrop
    // must be rejected without additional material and is not pretended to fit.
-   profile:{...gumdrop,bodyHeight:14,capHeight:2,flangeHeight:2,retentionLip:0},face:null}
+   profile:{...gumdrop,bodyHeight:14,capHeight:2,flangeHeight:2,retentionLip:0},face:null},
+  ...[
+   [waveGenerator,{flowStyle:'Parallel'}],
+   [capGenerator,{controlStyle:'Pushbutton',shaft:0}],
+   [characterGenerator,{character:'Cloud',construction:'Classic'}],
+   [pebbleGenerator,{shellForm:'Beacon',illuminated:false}]
+  ].map(([family,params])=>({type:family.typeId+' backed underside',family,
+   params:{...params,dualMaterial:false},profile:compact,face:null,pixelBacking:true}))
  ];
  for(const fixture of configs){
   const source=fixture.family.recipe(fixture.params);
@@ -223,7 +232,8 @@ for(const id of ['knob','selector']){
   const hole={id:'physical-preview',x:0,z:0,diameter:fixture.profile.bodyDiameter,clearance:.15,
    checked:true,rotation:17,entryFace:fixture.face?'top':'underside',profileId:'gumdrop',
    socketProfile:fixture.profile,...(fixture.face?{surface:fixture.face}:{})};
-  const recipe=applyBuildModules(source,{pixelBuilderVersion:1,pixelHoles:[hole]},fixture.family.capabilities);
+  const recipe=applyBuildModules(source,{pixelBuilderVersion:1,pixelHoles:[hole],
+   pixelBacking:fixture.pixelBacking,pixelBackingThickness:10},fixture.family.capabilities);
   const previews=nativeFittingPreviews(THREE,wasm,recipe);
   assert.equal(previews.length,1,fixture.type+' displays one real profile fitting');
   const preview=previews[0];
@@ -254,7 +264,7 @@ for(const id of ['knob','selector']){
     fixture.type+' actual production socket must enclose the full positive pixel; mismatch volume '+missingEnvelope.volume().toFixed(5)+' mm³, positive '+positiveSolid.volume().toFixed(5)+' mm³, cutter '+negativeSolid.volume().toFixed(5)+' mm³');
   }finally{missingEnvelope.delete();expected.delete();positiveSolid.delete();negativeSolid.delete();blankSolid.delete();}
  }
- console.log('FIT-02 native Gear top/Tile underside positive and negative overlays match manufactured cutter');
+ console.log('FIT-02 six native preview fixtures: real positive envelope and negative cutter match manufactured geometry');
 }
 const checked=(id,x,z=0,rotation=0)=>({id,x,z,rotation,checked:true,diameter:5,clearance:.3,profileId:'seed'});
 const serial={version:1,enabled:true,pitch:50,tail:200};
