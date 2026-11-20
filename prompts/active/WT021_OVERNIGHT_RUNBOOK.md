@@ -12,6 +12,17 @@
 4. If a permission is a **hard** platform/OS limit and the user cannot grant it immediately, do **not** repeatedly ask: clearly record the blocker and move to the highest-priority **independent** work still possible. If every valuable task is blocked, create a complete checkpoint and stop cleanly.
 5. The owner has **not** authorised: merge, deploy, creating another PR, changing `main`, changing branch protection/visibility, deleting or rewriting history, paying for services, or weakening fabrication/safety acceptance. The owner must explicitly approve any such operation; none is necessary for progressing software work on #102.
 
+## GitHub review and owner approval are NOT a development pause
+
+**Verified against the repository's actual GitHub API on 20 November 2026:**
+
+- Branch `wt021/integrated-release` is **not protected** and existing draft PR #102 remains open. No PR reviewer is requested and no review has been submitted.
+- The active `Protect main — reviewed releases` repository ruleset (ID `27557340`) targets **only the default branch**, not the WT-021 working branch. Its configured `required_approving_review_count` is **0** and `require_code_owner_review` is **false**; it does require the `static` status and resolved review threads for a merge to `main`. The `.github/CODEOWNERS` file does not separately enforce approval.
+- The `AI contributor contract` workflow is conditional on a PR title starting with `[WT-`. PR #102's current title does not match this pattern, so that job is **skipped**, not a request for owner approval.
+- **Therefore, DO NOT wait for owner approval, a PR review, a reviewer assignment, the draft PR to become "ready for review", or a merge between implementation milestones.** Continue creating tested commits on **the already-authorised draft PR #102 branch**. Successful checks are a signal to continue to the next software requirement, **not** a cue to ask the owner to merge.
+- Owner sign-off is reserved for **final review, merging and deployment**, none of which is in scope for the unattended software run. Ignore branch governance text that assumes every new phase requires a newly approved PR; the owner already approved continuation in #102.
+- Re-check current rules before acting if the repository protection changes. This is a **GitHub configuration finding**, not proof that the specific Codex session has valid push credentials. If Codex gets an actual `403`, authentication prompt or push rejection on #102, log the exact error, request necessary access once at the start, and continue independent tasks rather than pretending credentials or approvals are available.
+
 ## Stage 1 — Unattended execution loop (repeat until software acceptance is genuinely complete or the session ends)
 
 **Do not stop at the end of a phase, at a green CI run, or simply to ask "what next?"** Follow the ordered [active execution tasks](WT021_EXECUTION.md), moving from the next unverified register item to the next. Resolve ordinary design/implementation ambiguities using accepted requirements, measured fixtures and prior tests, and document the choice.

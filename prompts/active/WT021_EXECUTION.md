@@ -2,6 +2,8 @@
 
 > **This is the short execution prompt.** The full [owner-authorised WT-021 specification](../021-complete-seven-builder-manufacturing-parity.md), [Codex handover](../../docs/WT021_CODEX_HANDOFF.md) and [completion register](../../docs/WT021_COMPLETION_REGISTER.md) remain authoritative; read them in full rather than relying on this summary.
 
+**PR REVIEW IS NOT A STOP SIGNAL:** Existing PR #102 is deliberately draft. Continue pushing implementation to its unprotected working branch; do not pause for owner review, approval, or a merge between milestones. Owner approval applies to **final merge/deploy only**. Verify actual branch push credentials during preflight. See the [runbook's GitHub approval findings](WT021_OVERNIGHT_RUNBOOK.md).
+
 **OVERNIGHT / UNATTENDED DIRECTIVE:** Before intensive work, read [the overnight autonomous runbook](WT021_OVERNIGHT_RUNBOOK.md) and [durable recovery log](../../docs/WT021_RUN_LOG.md). Check permissions/tools and batch any truly unavoidable access requests **at the beginning**. Otherwise run the entire ordered queue **without stopping after each task or asking routine questions**. After each tested milestone, commit to #102 and append a resumable checkpoint. Continue until software acceptance is complete or the actual session limit prevents further work. Platform permission dialogs and quota limits cannot be bypassed; do not merge/deploy/create a PR.
 
 Work in `connorturansky-svg/crystal-forge`. **Continue only in existing draft PR #102**, branch `wt021/integrated-release`. **Do not open another PR, merge, deploy, mark ready for review or modify `main`.** Preserve tested history and avoid creating separate software issues; track all parity in #79, all Cura/printed manufacturing checks in #10, and #90 separately.
