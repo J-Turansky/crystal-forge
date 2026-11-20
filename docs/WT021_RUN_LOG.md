@@ -184,3 +184,7 @@
 ### 2026-11-20 - prepared Gear section profile
 
 - Focused Chromium sampled the actual rendered clipped Mesh through the planar top pilot and countersink. Rays at three heights matched the independently decoded STL and 3MF at the same plane.
+
+### 2026-11-20 - prepared Wave channel and Gear undo
+
+- Full unified Chromium passed. The rendered Wave cross-section and both exports agree on the 3.2 mm channel and both wall positions. Focused Chromium confirmed undo and redo restore the exact Gear tab depths and do not revive stale downloads.

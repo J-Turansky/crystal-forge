@@ -639,7 +639,42 @@ try{
   assert(Math.abs(X[0]-min.x)<.01&&Math.abs(X[1]-max.x)<.01,label+' section X matches the export');
   assert(Math.abs(Z[0]+max.y)<.01&&Math.abs(Z[1]+min.y)<.01,label+' section Z matches the export');
  }
- async function finishNativeJourney(name){
+ async function renderedXSection(inspector,x){
+  const position=inspector.getByRole('slider');
+  await inspector.getByLabel('Section axis').selectOption('X');
+  const sectionX=await position.evaluate((slider,x)=>{
+   slider.value=x;
+   slider.dispatchEvent(new Event('input',{bubbles:true}));
+   return Number(slider.value);
+  },x);
+  const section=await page.evaluate(async x=>{
+   const {Mesh}=await import('three');
+   const previous=Mesh.prototype.onBeforeRender;
+   return new Promise((resolve,reject)=>{
+    const timeout=setTimeout(()=>{
+     Mesh.prototype.onBeforeRender=previous;
+     reject(new Error('The prepared cutaway was not rendered at X='+x));
+    },5000);
+    Mesh.prototype.onBeforeRender=function(renderer,scene,camera,geometry,material,...rest){
+     previous.call(this,renderer,scene,camera,geometry,material,...rest);
+     const plane=material.clippingPlanes?.[0];
+     if(plane?.normal.x!==1||Math.abs(plane.constant+x)>.0001)return;
+     clearTimeout(timeout);
+     Mesh.prototype.onBeforeRender=previous;
+     resolve({positions:Array.from(geometry.attributes.position.array),indices:Array.from(geometry.index.array)});
+    };
+   });
+  },sectionX);
+  const viewportMesh=new THREE.BufferGeometry();
+  const printPositions=[];
+  for(let i=0;i<section.positions.length;i+=3)
+   printPositions.push(section.positions[i],-section.positions[i+2],section.positions[i+1]);
+  viewportMesh.setAttribute('position',new THREE.Float32BufferAttribute(printPositions,3));
+  viewportMesh.setIndex(section.indices);
+  return {sectionX,viewportMesh};
+ }
+ async function finishNativeJourney(name,{inspectCurvedRoute=false}={}){
+
   const {parameters,build}=await page.evaluate(()=>window.__sensoryStudio.currentModel);
   const title='WT-021 '+name+' manufacturing journey';
   await page.locator('#smsProjectTitle').fill(title);
@@ -658,6 +693,12 @@ try{
   const inspection=page.locator('#smsLightInspector');
   await inspection.getByText(/Prepared (?:manufacturing mesh|Light Pod)/).waitFor({timeout:120000});
   const ranges=await sectionRanges(inspection);
+  let routeSection;
+  if(inspectCurvedRoute){
+   const [a,b]=build.pixelHoles;
+   const {sectionX,viewportMesh}=await renderedXSection(inspection,(a.x+b.x)/2);
+   routeSection={viewportMesh,point:new THREE.Vector3(sectionX,-(a.z+b.z)/2,(a.surface.y+b.surface.y)/2-1)};
+  }
   await inspection.getByRole('button',{name:'Close inspection'}).click();
   await page.locator('.sms-workspace-nav [data-tab=print]').click();
   const job=page.locator('#smsJobs article').filter({hasText:name});
@@ -680,6 +721,20 @@ try{
   const mfGeometry=read3MFGeometry(xml);
   assertSectionBounds(stlGeometry,ranges,name+' STL');
   assertSectionBounds(mfGeometry,ranges,name+' 3MF');
+  if(routeSection){
+   const {viewportMesh,point}=routeSection;
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+   const walls=geometry=>{
+    const mesh=new THREE.Mesh(geometry,material);
+    return [-1,1].map(sign=>new THREE.Raycaster(point,new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0]?.distance);
+   };
+   const expected=walls(viewportMesh);
+   assert(expected.every(Number.isFinite));
+   assert(Math.abs(expected[0]+expected[1]-3.2)<.03,name+' rendered cutaway shows the calibrated route width');
+   for(const geometry of [stlGeometry,mfGeometry])
+    assert(walls(geometry).every((distance,i)=>Math.abs(distance-expected[i])<.01),name+' route walls match the rendered plane');
+   viewportMesh.dispose();material.dispose();
+  }
   for(const key of ['min','max'])
    assert(stlGeometry.boundingBox[key].distanceTo(mfGeometry.boundingBox[key])<.001,name+' matching print-space '+key);
   const measured=stlGeometry.boundingBox.getSize(new THREE.Vector3()).toArray();
@@ -1758,7 +1813,7 @@ try{
   await calibration.locator('[name=printedBoreDiameter]').fill('5.4');
   await calibration.getByRole('button',{name:'Save measured fit'}).click();
   assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].clearance),.4);
-  const {parameters,build,geometries}=await finishNativeJourney('FIT-03 gentle Wave');
+  const {parameters,build,geometries}=await finishNativeJourney('FIT-03 gentle Wave',{inspectCurvedRoute:true});
   const [a,b]=build.pixelHoles;
   const width=parameters.width+24,depth=parameters.depth+24;
   const tabX=-width/2+.13*2*(width+depth);
@@ -2124,6 +2179,12 @@ try{
   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.backingTabs[0].recessDepth===3.25);
   await originalInspector.getByText(/Preview only/).waitFor();
   assert(await originalInspector.getByRole('slider').isHidden());
+  await page.locator('#smsGlobalUndo').click();
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.backingTabs[0].recessDepth===3);
+  assert.equal(Number(await tabDepth.inputValue()),3);
+  await page.locator('#smsGlobalRedo').click();
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.backingTabs[0].recessDepth===3.25);
+  assert.equal(Number(await tabDepth.inputValue()),3.25);
   await printTab.click();
   await job.getByText('Stale',{exact:true}).waitFor();
   assert(await job.locator('[data-job-stl]').isDisabled());
@@ -2150,36 +2211,7 @@ try{
   await inspector.getByText('Prepared manufacturing mesh', {exact:false}).waitFor();
   const ranges=await sectionRanges(inspector);
   const position=inspector.getByRole('slider');
-  await inspector.getByLabel('Section axis').selectOption('X');
-  const sectionX=await position.evaluate((slider,x)=>{
-   slider.value=x;
-   slider.dispatchEvent(new Event('input',{bubbles:true}));
-   return Number(slider.value);
-  },topMount.x);
-  const section=await page.evaluate(async x=>{
-   const {Mesh}=await import('three');
-   const previous=Mesh.prototype.onBeforeRender;
-   return new Promise((resolve,reject)=>{
-    const timeout=setTimeout(()=>{
-     Mesh.prototype.onBeforeRender=previous;
-     reject(new Error('The prepared cutaway was not rendered at X='+x));
-    },5000);
-    Mesh.prototype.onBeforeRender=function(renderer,scene,camera,geometry,material,...rest){
-     previous.call(this,renderer,scene,camera,geometry,material,...rest);
-     const plane=material.clippingPlanes?.[0];
-     if(plane?.normal.x!==1||Math.abs(plane.constant+x)>.0001)return;
-     clearTimeout(timeout);
-     Mesh.prototype.onBeforeRender=previous;
-     resolve({positions:Array.from(geometry.attributes.position.array),indices:Array.from(geometry.index.array)});
-    };
-   });
-  },sectionX);
-  const viewportMesh=new THREE.BufferGeometry();
-  const printPositions=[];
-  for(let i=0;i<section.positions.length;i+=3)
-   printPositions.push(section.positions[i],-section.positions[i+2],section.positions[i+1]);
-  viewportMesh.setAttribute('position',new THREE.Float32BufferAttribute(printPositions,3));
-  viewportMesh.setIndex(section.indices);
+  const {sectionX,viewportMesh}=await renderedXSection(inspector,topMount.x);
   const sectionMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
   const profileAt=geometry=>{
    const mesh=new THREE.Mesh(geometry,sectionMaterial);

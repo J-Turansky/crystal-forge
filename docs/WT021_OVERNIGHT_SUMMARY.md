@@ -1,26 +1,33 @@
 # WT-021 overnight checkpoint
 
-Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) continues from `1518a289f421ee5635c749d4fbb8b46f3c222187`. The commit containing this report records the implementation checkpoint. See the [checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks) for its exact head and CI results.
+[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `20f0744811fd46490d18479d93199edccab79c7a`. GitHub static checks passed on that commit. Its Chromium and fabrication workflows were still running. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
 
 ## Latest checkpoint
 
+- The full unified Chromium suite passed with a 3.2 mm curved Wave route measured at the same cutaway plane in the viewport, STL and 3MF. Focused Chromium verified exact undo and redo of a Gear tab-depth edit and disabled downloads from the old revision.
 - Native journey tests compare prepared X and Z section ranges with fresh STL and 3MF coordinates. Moving the section slider on the revised linked Gear leaves the saved model untouched. A valid recess edit hides the previous cutaway and disables both prior downloads until preparation. At the same clipping plane, the rendered Gear pilot and countersink agree with the STL and 3MF mesh walls at three heights.
 - Chromium verified that the recessed Gear build survives library copies and reload. Independent edits stayed local, and the linked copy accepted revision 2 explicitly before preparing fresh STL and 3MF.
 - Native external backing tabs accept underside counterbores and countersinks. Export probes measured a 5.1 mm counterbore, 3.4 mm pilot, 3 mm depth and 5 mm remaining stock. Chromium verified the two downloads and confirmed that insufficient recess or backing edits preserve the saved model.
 - Planar Gear tops accept manually placed screw recesses alongside underside fixings. Manifold and independently decoded STL and 3MF verify the top taper. Thin or buried stock is refused. Focused Chromium prepared and downloaded a Gear with both faces in use.
 - Manual underside counterbores and countersinks use independently editable dimensions and production stock checks. Chromium verified the Gear counterbore in downloaded STL and 3MF and confirmed rollback of an invalid depth.
 
-## Earlier implementation
+## Current acceptance
+
+- The register has 8 VERIFIED and 16 PARTIAL rows. All seven model families have browser journey evidence and UX-01 was verified at `8083c547b76b5b1df4b547ffccc3ceb6b5765439`.
+- Recess editing applies to supported native mounts and external tabs. Planar top recesses were verified on Gear. Crystal retains its existing mounting workflow. Moving Rotary Caps require Stationary display before adding external tabs.
+- [Next software check](WT021_NOW.md) and [full acceptance register](WT021_COMPLETION_REGISTER.md). Physical Cura and printed fit still require owner validation under [#10](https://github.com/connorturansky-svg/crystal-forge/issues/10).
+
+## Earlier implementation and historical results
 
 - Native Build fitting inspection shares the production Manifold checks for blocked insertion, insufficient stock and nearby cut interference. It reports measured wire-cut overlap independently, since contact with a wire relief can be intentional.
 - Gear-top and Tile-underside fabrication fixtures exercise actual Boolean wire overlap and confirm that an interfering mounting cut is shown in the preview and rejected by preparation.
 - Updated the unreleased changelog, in-app release notes and FIT-02 acceptance evidence.
 
-## Evidence and next action
+### Initial checkpoint evidence
 
 - The targeted catalogue/manufacturing test passed locally. Added Chromium assertions for the new diagnostic readout. Exact-head CI is reported on the PR.
-- The register remains at 23 PARTIAL and one MISSING. Remaining limitations include routed stock protection, browser state preservation for rejected edits, side/curved-face fabrication, the remaining builder journeys and UX-01.
-- Resume with [the exact FIT-02 task](WT021_NOW.md), then continue through the [acceptance register](WT021_COMPLETION_REGISTER.md). Keep Cura and printed proof in #10.
+- At the initial checkpoint, the register had 23 PARTIAL and one MISSING. Remaining limitations include routed stock protection, browser state preservation for rejected edits, side/curved-face fabrication, the remaining builder journeys and UX-01.
+- The next task at that checkpoint was FIT-02.
 
 - First checkpoint e6dc8a8d1ea61aee9b037a6c7e57d87342ac9d8a failed the exact-head release-metadata gate because a draft note was inside the release entry. Moved the note to a labelled unreleased paragraph and verified node tests/release-metadata.mjs against main. Local Chromium also caught the missing readout text; wired the measured overlap and warnings into the DOM and started the browser retry.
 
