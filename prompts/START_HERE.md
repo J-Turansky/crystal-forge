@@ -6,11 +6,13 @@
 
 ## Codex reading order (do not skip)
 
-1. [Active execution instruction](active/WT021_EXECUTION.md) — concise ready-to-copy continuation.
-2. [Original owner-authorised WT-021 specification](021-complete-seven-builder-manufacturing-parity.md) — **full 65 KB contract**; do not substitute a summary.
-3. [Codex engineering handover](../docs/WT021_CODEX_HANDOFF.md) — last tested head, diagnosed geometry defects and implementation map.
-4. [23-row acceptance register](../docs/WT021_COMPLETION_REGISTER.md) — **authoritative status**; each row is PARTIAL until all independent gates pass.
-5. [Independent audit](../docs/WT021_INDEPENDENT_AUDIT.md), [AGENTS.md](../AGENTS.md), [project AI handover](../docs/AI_HANDOVER.md), [testing guide](../docs/TESTING.md).
+1. [Active execution instruction](active/WT021_EXECUTION.md) — concise ready-to-copy continuation, including the overnight operating protocol.
+4. [Overnight autonomous execution / access preflight / quota recovery](active/WT021_OVERNIGHT_RUNBOOK.md) — front-load essential permissions, continue without ordinary questions, checkpoint after each milestone.
+5. [Durable run log](../docs/WT021_RUN_LOG.md) — read before resuming any interrupted Codex session.
+4. [Original owner-authorised WT-021 specification](021-complete-seven-builder-manufacturing-parity.md) — **full 65 KB contract**; do not substitute a summary.
+5. [Codex engineering handover](../docs/WT021_CODEX_HANDOFF.md) — last tested head, diagnosed geometry defects and implementation map.
+6. [23-row acceptance register](../docs/WT021_COMPLETION_REGISTER.md) — **authoritative status**; each row is PARTIAL until all independent gates pass.
+7. [Independent audit](../docs/WT021_INDEPENDENT_AUDIT.md), [AGENTS.md](../AGENTS.md), [project AI handover](../docs/AI_HANDOVER.md), [testing guide](../docs/TESTING.md).
 6. Check the **current exact PR head, open issues, workflow logs and source** before editing. Older SHA claims and dated orchestration snapshots are historical, not current proof.
 
 **Boundaries:** No new PR, no merge, no deployment, no changes to `main`, no work on #90, no unsupported physical-fit claims. Keep unfinished software under [#79](https://github.com/connorturansky-svg/crystal-forge/issues/79) and original STL/Cura/printed verification under [#10](https://github.com/connorturansky-svg/crystal-forge/issues/10). A green existing test suite does not mean the missing seven independent user journeys exist.

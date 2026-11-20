@@ -2,6 +2,8 @@
 
 > **This is the short execution prompt.** The full [owner-authorised WT-021 specification](../021-complete-seven-builder-manufacturing-parity.md), [Codex handover](../../docs/WT021_CODEX_HANDOFF.md) and [completion register](../../docs/WT021_COMPLETION_REGISTER.md) remain authoritative; read them in full rather than relying on this summary.
 
+**OVERNIGHT / UNATTENDED DIRECTIVE:** Before intensive work, read [the overnight autonomous runbook](WT021_OVERNIGHT_RUNBOOK.md) and [durable recovery log](../../docs/WT021_RUN_LOG.md). Check permissions/tools and batch any truly unavoidable access requests **at the beginning**. Otherwise run the entire ordered queue **without stopping after each task or asking routine questions**. After each tested milestone, commit to #102 and append a resumable checkpoint. Continue until software acceptance is complete or the actual session limit prevents further work. Platform permission dialogs and quota limits cannot be bypassed; do not merge/deploy/create a PR.
+
 Work in `connorturansky-svg/crystal-forge`. **Continue only in existing draft PR #102**, branch `wt021/integrated-release`. **Do not open another PR, merge, deploy, mark ready for review or modify `main`.** Preserve tested history and avoid creating separate software issues; track all parity in #79, all Cura/printed manufacturing checks in #10, and #90 separately.
 
 1. **Verify the current head and CI** (static, Chromium, real Manifold). Follow [AGENTS.md](../../AGENTS.md) and resolve any exact-head failure without weakening geometry acceptance, altering hardware sizes to disguise errors, or turning false-positive checks back on.
