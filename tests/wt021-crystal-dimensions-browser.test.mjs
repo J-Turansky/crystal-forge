@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import {STLLoader} from 'three/addons/loaders/STLLoader.js';
 import {planHardware} from '../hardware-layout.js';
 import {baseSurfaceHeight} from '../geometry-v3.js';
+import {solvePixelMove} from '../pixel-motion.js';
 
 function bounds(points){
  const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
@@ -120,7 +121,7 @@ try{
   await page.mouse.move(x,y);
   return page.evaluate(()=>window.__crystalForgePlacementMetrics());
  };
- const onBase=async(x,z)=>{
+ const onBase=async(x,z,y)=>{
   const viewport=await page.locator('#viewport canvas').boundingBox();
   const {camera,target}=await page.evaluate(()=>window.__crystalForgeViewMetrics());
   const model=await crystal();
@@ -128,7 +129,7 @@ try{
   projection.position.fromArray(camera);
   projection.lookAt(new THREE.Vector3(...target));
   projection.updateMatrixWorld();
-  const p=new THREE.Vector3(x,baseSurfaceHeight(model.editableState.crystals,model.parameters,x,z),z).project(projection);
+  const p=new THREE.Vector3(x,y??baseSurfaceHeight(model.editableState.crystals,model.parameters,x,z),z).project(projection);
   return {x:viewport.x+(p.x+1)*viewport.width/2,y:viewport.y+(1-p.y)*viewport.height/2};
  };
  for(const [i,x] of [-18,18].entries()){
@@ -427,5 +428,54 @@ try{
   await page.keyboard.press('Escape');
   await page.locator('[data-tab-u="0"]').waitFor({state:'attached'});
   console.log('WT-021 Crystal empty tab list can place a new tab');
+ }
+ {
+  const name='Crystal draggable cable openings';
+  await page.evaluate(({parameters,name})=>window.__sensoryStudio.addModel('crystals',{
+   ...parameters,mount:'None',manualMountHoles:[],manualEdgeTabs:null
+  },name),{parameters:savedCrystal.parameters,name});
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await page.locator('[data-view=top]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  const original=await crystal();
+  const openingKeys=['wireEntryX','wireEntryZ','wireOutputX','wireOutputZ'];
+  for(const [kind,prefix,pointKey] of [['input','wireEntry','entryPoint'],['output','wireOutput','exitPoint']]){
+   const {parameters,editableState:{crystals}}=await crystal();
+   const {polygon,wirePlan}=planHardware(crystals,parameters);
+   const marker=page.locator('[data-edge-wire='+kind+']');
+   await marker.waitFor();
+   const old=wirePlan[pointKey];
+   const candidates=polygon.flatMap((a,i)=>{
+    const b=polygon[(i+1)%polygon.length];
+    return [.2,.4,.6,.8].map(t=>({x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t}));
+   }).filter(p=>Math.hypot(p.x-old.x,p.z-old.z)>6);
+   const target=candidates.find(edgePoint=>solvePixelMove(crystals,parameters,{edgeKind:kind,edgePoint}).valid);
+   assert(target,'a valid '+kind+' opening can move along the perimeter');
+   const to=await onBase(target.x,target.z,.8),from=await marker.boundingBox();
+   await page.mouse.move(from.x+from.width/2,from.y+from.height/2);
+   await page.mouse.down();
+   await page.mouse.move(to.x,to.y,{steps:4});
+   await page.mouse.up();
+   await page.locator('#status').filter({hasText:'Moved '+kind+' perimeter opening'}).waitFor();
+   const moved=await crystal();
+   assert(Math.hypot(moved.parameters[prefix+'X']-target.x,moved.parameters[prefix+'Z']-target.z)<1);
+   assert.deepEqual(moved.parameters.manualPixelHoles.map(({x,z})=>[x,z]),parameters.manualPixelHoles.map(({x,z})=>[x,z]));
+   const placed=planHardware(crystals,moved.parameters);
+   assert(placed.wirePlan.ready);
+   const fromMoved=await marker.boundingBox();
+   await page.mouse.move(fromMoved.x+fromMoved.width/2,fromMoved.y+fromMoved.height/2);
+   await page.mouse.down();
+   await page.mouse.move(8,8);
+   await page.mouse.up();
+   await page.locator('#status').filter({hasText:'original '+kind+' perimeter opening kept'}).waitFor();
+   assert.deepEqual(await crystal(),moved);
+  }
+  const moved=await crystal();
+  assert(moved.revision>original.revision);
+  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+  await page.reload();
+  await page.waitForFunction(id=>window.__sensoryStudio?.currentModel?.id===id,moved.id);
+  for(const key of openingKeys)assert.equal((await crystal()).parameters[key],moved.parameters[key]);
+  console.log('WT-021 both Crystal cable openings drag, reject outside release and survive reload');
  }
 }finally{await browser.close();}
