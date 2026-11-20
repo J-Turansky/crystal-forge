@@ -71,3 +71,9 @@ Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) co
 
 - Base was `766daed9c1c2c3ddd07d90545d964ff2ee951eed`. Native routing accepts validated manual through-holes with adequate channel clearance. Focused Chromium passed the separated Gear mount and rejected a move into the channel without editing the saved model.
 - Both formats independently measured a 3.4 mm through-hole and 8.7 mm of continuous material between its wall and the routed channel in the controlled Gear specimen. Next complete the Gear journey with fit calibration, Library/Print inspection and measurements of the browser downloads.
+
+### Gear design-to-download acceptance journey
+
+- Base was `6030de31553a49b289514212297f667df32b7e6f`. The focused Gear Chromium case now covers Design editing, two top sockets, accepted and rejected drags, serial channels, two manual holes, two edited external tabs, calibration, Library snapshot and backup, reload and actual prepared cutaway.
+- Real downloads included standalone STL and Cura profiles byte-matched to the ZIP, plus 3MF. The independently decoded model files measured the 12.5 mm calibrated bore and 3.2 mm channel, and confirmed through-holes and 4 mm printed material on both tabs.
+- Adding external-tab backing now preserves the original Gear top routing footprint. Exact-head CI gates completion. Next preserve eligible Tile front routing with backing, then complete the Tile journey.

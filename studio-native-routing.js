@@ -188,7 +188,8 @@ export function nativeRouteEligibility(recipe,build){
  if(recipe.dualMaterial)return 'Use a single material for native serial routing.';
  const channel=channelSize(build);
  const required=channel.depth+roof+(build.serialRouting?.vaulted?channel.radius/.9:0);
- if((front?.thickness??recipe.serialSupport.thickness)<required)return 'Routing needs at least '+required.toFixed(1)+' mm of solid backing for the groove and roof.';
+ const supportThickness=topY!==null||wave?recipe.serialSupport.topThickness??recipe.serialSupport.thickness:recipe.serialSupport.thickness;
+ if((front?.thickness??supportThickness)<required)return 'Routing needs at least '+required.toFixed(1)+' mm of solid backing for the groove and roof.';
  const blocksBacking=part=>part.kind!=='box'||part.rotation||!Array.isArray(part.position)||
   part.position[1]+part.size[1]/2>0;
  const otherCuts=recipe.negative.filter(part=>!part.mountHole);
@@ -220,7 +221,8 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
  if(wave)plan.face='wave';
  const pixels=holes.map(p=>({...p,z:front?p.surface.y:p.z,
   radius:(p.diameter+p.clearance)/2,wireAngle:topY===null&&!wave?(p.rotation??0):180-(p.rotation??0)}));
- const supportOutline=front?.outline??recipe.serialSupport.outline;
+ const upperOutline=topY!==null||wave?recipe.serialSupport.topOutline:null;
+ const supportOutline=front?.outline??upperOutline??recipe.serialSupport.outline;
  const outline=supportOutline.map(([x,z])=>({x,z}));
  const undersized=pixels.findIndex(p=>p.radius<2.1);
  if(undersized>=0){

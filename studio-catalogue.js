@@ -561,8 +561,15 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
   const b=r.bounds,spread=12;
   const width=b.width+spread*2,depth=b.depth+spread*2;
   r.positive.push(box([width,thickness,depth]));
-  // Only certify the new continuous underside slab. The planner still checks cutters.
+  // Keep an existing upper route on its own perimeter and stock.
+  const upper=r.serialSupport;
   r.serialSupport={outline:[[-width/2,-depth/2],[width/2,-depth/2],[width/2,depth/2],[-width/2,depth/2]],thickness,explicitBacking:true};
+  if(upper&&(Number.isFinite(upper.topY)||upper.wave)){
+   r.serialSupport.topY=upper.topY;
+   r.serialSupport.wave=upper.wave;
+   r.serialSupport.topOutline=upper.outline;
+   r.serialSupport.topThickness=upper.thickness;
+  }
   r.bounds={...b,width:b.width+spread*2,depth:b.depth+spread*2,height:Math.max(b.height,thickness)};
   r.warnings.push('Expanded fitting backing was explicitly enabled. Inspect underside openings, material joins and support requirements in Cura and on a printed sample.');
  }

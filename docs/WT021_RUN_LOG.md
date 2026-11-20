@@ -102,3 +102,9 @@
 
 - Base `766daed9c1c2c3ddd07d90545d964ff2ee951eed`. The initially rejected separated through-hole now routes, prepares and exports alongside serial grooves. Both parsed formats measure 3.4 mm through and 8.7 mm material web.
 - Focused Chromium passed safe Gear mounting and refused an edit into the path before changing the saved revision. DIM-05 and PAR-01 remain PARTIAL. Next finish Gear calibration/inspection and independent browser-download measurements.
+
+### 2026-11-20 - independent Gear acceptance journey
+
+- Base `6030de31553a49b289514212297f667df32b7e6f`. A failing real-Manifold routed Gear with backing and two tabs now passes. Upper-route eligibility, perimeter and stock remain tied to the original face.
+- Focused Chromium passed all recorded Gear actions and independent STL/3MF measurements. Both tab fixing bores and manual mount bores pass through; calibrated bore measures 12.5 mm and cable width 3.2 mm. STL and Cura standalone outputs match the production ZIP. E2E-G exact-head CI is pending.
+- Next preserve eligible Tile front routing with backing and exercise the same full browser/export gate on the Tile.

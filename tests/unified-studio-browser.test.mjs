@@ -2,6 +2,8 @@ import {WORKSPACE_KEY} from '../studio-documents.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {chromium} from 'playwright';
+import * as THREE from 'three';
+import {STLLoader} from 'three/addons/loaders/STLLoader.js';
 const browser=await chromium.launch({headless:true,executablePath:process.env.CRYSTAL_FORGE_BROWSER_EXECUTABLE||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
 let page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
 const errors=[];page.on('pageerror',error=>errors.push(error.message));
@@ -611,6 +613,16 @@ try{
   }
   return entries;
  }
+ function read3MFGeometry(xml){
+  assert.match(xml,/<model unit="millimeter"/);
+  const vertices=[...xml.matchAll(/<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"\/>/g)].flatMap(match=>match.slice(1).map(Number));
+  const indices=[...xml.matchAll(/<triangle v1="(\d+)" v2="(\d+)" v3="(\d+)"/g)].flatMap(match=>match.slice(1).map(Number));
+  assert(vertices.length>0&&indices.length>0);
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+  geometry.setIndex(indices);
+  return geometry;
+ }
  const modelFile=await useDownload(tile.locator('[data-job-3mf]'));
  const printPack=await useDownload(tile.locator('[data-job-export]'));
  const threeMF=zipEntries(modelFile.bytes),pack=zipEntries(printPack.bytes);
@@ -1207,6 +1219,11 @@ try{
   await page.evaluate(thickness=>window.__sensoryStudio.addModel('gears',{
    diameter:120,bore:0,thickness,wheelStyle:'Cam',webStyle:'Solid',dualMaterial:false
   },'Direct socket '+thickness),thickness);
+  if(thickness===25){
+   await page.locator('.sms-workspace-nav [data-tab=design]').click();
+   await page.locator('.sms-palette [data-palette-key=diameter]').press('ArrowLeft');
+   assert(await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.diameter)<120);
+  }
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
   await page.locator('[data-view=top]').click();
   await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
@@ -1257,6 +1274,17 @@ try{
    await page.mouse.click(safePoint.x,safePoint.y);
    await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===2);
    await page.keyboard.press('Escape');
+   const originalSecond=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[1]);
+   const acceptedDrag=await page.evaluate(id=>[
+    window.__sensoryStudio.pixelMarkerScreen(id),window.__sensoryStudio.fittingPointScreen(37,0,'top')
+   ],originalSecond.id);
+   assert(acceptedDrag.every(Boolean));
+   await page.mouse.move(acceptedDrag[0].x,acceptedDrag[0].y);
+   await page.mouse.down();
+   await page.waitForTimeout(225);
+   await page.mouse.move(acceptedDrag[1].x,acceptedDrag[1].y,{steps:6});
+   await page.mouse.up();
+   await page.waitForFunction(x=>window.__sensoryStudio.currentModel.build.pixelHoles[1].x>x+2,originalSecond.x);
    const prior=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
    const second=prior[1];
    const [start,end]=await page.evaluate(id=>[
@@ -1305,11 +1333,53 @@ try{
    await gearPalette.locator('[data-pixel-status]').filter({hasText:/too close to Mount hole 1/}).waitFor();
    assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),beforeConflict,
     'Rejecting a mount that meets the channel preserves the route, mount and revision');
+   await gearPalette.getByRole('button',{name:'Place mounting hole in 3D'}).click();
+   const otherMountPoint=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(16,-15,'top'));
+   assert(otherMountPoint);
+   await page.mouse.click(otherMountPoint.x,otherMountPoint.y);
+   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.manualMountHoles?.length===2);
+   await page.keyboard.press('Escape');
+   await gearPalette.getByRole('button',{name:'M2',exact:true}).click();
+   const secondMountZ=gearPalette.locator('[data-mount-field=z]');
+   await secondMountZ.fill('-16');
+   await secondMountZ.press('Tab');
+   assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[1].z),-16);
+   await gearPalette.locator('[data-pixel-backing]').check();
+   const addExternalTab=gearPalette.getByRole('button',{name:'Add external tab',exact:true});
+   await addExternalTab.click();
+   await addExternalTab.click();
+   for(const [index,position] of [13,63].entries()){
+    const perimeter=gearPalette.locator('[data-backing-tab="'+index+'"]');
+    await perimeter.fill(String(position));
+    await perimeter.press('Tab');
+   }
+   assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.backingTabs),[{u:.13},{u:.63}]);
+   await gearSerial.getByText('Channels ready for preparation.').waitFor();
+   await gearPalette.getByRole('button',{name:'P1',exact:true}).click();
+   await gearPalette.getByText('Record measured fit',{exact:true}).click();
+   const calibration=gearPalette.locator('[data-fit-calibration]');
+   await calibration.locator('[name=printedBoreDiameter]').fill('12.5');
+   await calibration.getByRole('button',{name:'Save measured fit'}).click();
+   const calibratedBuild=await page.evaluate(()=>window.__sensoryStudio.currentModel.build);
+   assert.equal(calibratedBuild.pixelHoles[0].clearance,.5);
+   await page.locator('#smsProjectTitle').fill('WT-021 Gear manufacturing journey');
+   await page.locator('#smsProjectTitle').press('Tab');
+   await page.locator('#smsLibrary').click();
+   await page.locator('#smsSaveProject').click();
+   await page.locator('#smsSavedProjects').getByRole('heading',{name:'WT-021 Gear manufacturing journey',exact:true}).waitFor();
+   const gearBackup=JSON.parse((await useDownload(page.locator('#smsBackup'))).bytes.toString());
+   assert.deepEqual(gearBackup.project.models.find(model=>model.name==='Direct socket 25').build,calibratedBuild);
    await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
    await page.reload();
    await page.waitForFunction(()=>window.__sensoryStudio?.currentModel?.build.serialRouting?.enabled);
+   assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build),calibratedBuild);
+   await page.locator('.sms-workspace-nav [data-tab=build]').click();
+   await page.getByRole('button',{name:'Render actual model',exact:true}).click();
+   const gearInspection=page.locator('#smsLightInspector');
+   await gearInspection.getByText('Prepared manufacturing mesh').waitFor({timeout:120000});
+   await gearInspection.getByLabel('Cut section').check();
+   await gearInspection.getByRole('button',{name:'Close inspection'}).click();
    await page.locator('.sms-workspace-nav [data-tab=print]').click();
-   await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
    const gearJob=page.locator('#smsJobs article').filter({hasText:'Direct socket 25'});
    await gearJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
    const gearPack=zipEntries((await useDownload(gearJob.locator('[data-job-export]'))).bytes);
@@ -1317,6 +1387,40 @@ try{
    assert.equal(JSON.parse(gearPack.get('print-job-manifest.json')).routing.channels.length,3);
    const gear3mf=zipEntries((await useDownload(gearJob.locator('[data-job-3mf]'))).bytes);
    assert(gear3mf.has('3D/3dmodel.model'));
+   const gearSTL=[...gearPack.entries()].find(([name])=>name.endsWith('.stl'))[1];
+   const standaloneSTL=await useDownload(gearJob.locator('[data-job-stl]'));
+   assert.deepEqual(standaloneSTL.bytes,gearSTL);
+   const standaloneCura=await useDownload(gearJob.locator('[data-job-cura]'));
+   assert(standaloneCura.name.endsWith('.curaprofile'));
+   assert.deepEqual(standaloneCura.bytes,[...gearPack.entries()].find(([name])=>name.endsWith('.curaprofile'))[1]);
+   const [fitting]=calibratedBuild.pixelHoles;
+   const mounts=calibratedBuild.manualMountHoles;
+   const gearDiameter=gearBackup.project.models.find(model=>model.name==='Direct socket 25').parameters.diameter;
+   const halfBacking=(gearDiameter+24)/2;
+   const stlGeometry=new STLLoader().parse(Uint8Array.from(gearSTL).buffer);
+   const threeMFGeometry=read3MFGeometry(gear3mf.get('3D/3dmodel.model').toString());
+   for(const [format,geometry] of [['STL',stlGeometry],['3MF',threeMFGeometry]]){
+    const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+    const mesh=new THREE.Mesh(geometry,material);
+    const hit=(origin,direction)=>new THREE.Raycaster(new THREE.Vector3(...origin),new THREE.Vector3(...direction)).intersectObject(mesh)[0]?.point;
+    const centre=[fitting.x,-fitting.z,fitting.surface.y-5];
+    const left=hit(centre,[-1,0,0]),right=hit(centre,[1,0,0]);
+    assert(left&&right&&Math.abs(left.distanceTo(right)-12.5)<.02,format+' calibrated bore exported from Print Centre');
+    const other=calibratedBuild.pixelHoles[1];
+    const groove=[(fitting.x+other.x)/2,-(fitting.z+other.z)/2,fitting.surface.y-1];
+    const grooveA=hit(groove,[0,-1,0]),grooveB=hit(groove,[0,1,0]);
+    assert(grooveA&&grooveB&&Math.abs(grooveA.distanceTo(grooveB)-3.2)<.04,format+' actual routed wire width is independent of fit calibration');
+    for(const mount of mounts){
+     assert.equal(hit([mount.x,-mount.z,-1],[0,0,1]),undefined,format+' routed project retains the mounting through-hole');
+    }
+    for(const sign of [-1,1]){
+     const tabHoleX=sign*.04*halfBacking,tabHoleY=sign*(halfBacking+5.05);
+     assert.equal(hit([tabHoleX,tabHoleY,-1],[0,0,1]),undefined,format+' external tab has a through-hole');
+     const tabTop=hit([tabHoleX+2.5,tabHoleY,10],[0,0,-1]);
+     assert(tabTop&&Math.abs(tabTop.z-4)<.01,format+' fixing walls are joined to the printed backing at 4 mm thickness');
+    }
+    material.dispose();geometry.dispose();
+   }
   }else{
    await page.locator('[data-pixel-status]').filter({hasText:/continuous stock/}).waitFor();
    assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length??0),0);
