@@ -160,3 +160,7 @@
 
 - Manifold validates continuous stock around each recessed fixing and rejects unrelated cuts that breach that stock. Build uses the same fabrication worker to validate edits before committing. Focused Chromium passed the solid Gear exports and thin Wave rejection.
 - Next verify individually positioned recessed mounts and depth adjustment.
+
+### 2026-11-20 - manual underside recessed fixings
+
+- Added counterbore and countersink profiles to individual underside mounts. Chromium measured the 5.1 mm recess, 3.4 mm pilot and 3 mm depth in both downloads and verified invalid depth rollback. Catalogue tests passed manual countersink stock and input guards. Other faces and tab recesses remain open.

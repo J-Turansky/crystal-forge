@@ -7,7 +7,7 @@ import {lightPassageExportBlock,lightPassageReportEntries} from './light-passage
 import {renderPixelProfileDiagram} from './pixel-profile-diagram.js';
 import {applyPixelFittingProfile,resolvePixelFitting,withMeasuredPixelFit,saveablePixelFit} from './studio-pixel-fit.js';
 import {pixelBuilderMarkup,pixelHoleMarkup,bindPixelBuilder,pixelProfiles,stablePixels,findPixelPosition,checkedPixelBore,newPixel} from './studio-pixel-builder.js';
-import {stableMounts,newMount,mountHoleIssue} from './studio-mount-builder.js';
+import {stableMounts,newMount,mountHoleIssue,mountProfiles,recessDimensions} from './studio-mount-builder.js';
 import {createModel,addModel,findModel,openTab,closeTab,reorderTabs,duplicateModel,editModel,
  queueModel,beginPreparation,finishPreparation,cancelPreparation,canExport,resolveJobPrinter,movePrintJob,invalidatePrintJob,saveLibraryRevision,
  insertLibraryModel,availableLinkedUpdate,acceptLinkedUpdate,breakLink,modelFingerprint,validateProject,WORKSPACE_KEY,newId} from './studio-documents.js';
@@ -856,7 +856,14 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const mounts=mountHoles(model);if(!mounts[index]||model.link)return false;
   const issue=mountIssue(model,mount,mounts.filter((_,i)=>i!==index));
   if(issue){pixelStatus(model,issue);return false;}
-  mounts[index]=mount;return saveMounts(model,mounts,mount.id);
+  mounts[index]=mount;
+  if(mount.profile&&mount.profile!==mountProfiles[0]){
+   checkFittingBuild(model,{...model.build,manualMountHoles:mounts},()=>saveMounts(model,mounts,mount.id),{
+    pending:'Checking material around the recessed fixing…'
+   });
+   return false; // Keep the accepted field values visible until the worker approves.
+  }
+  return saveMounts(model,mounts,mount.id);
  }
  function removeMount(model,index){
   const mounts=mountHoles(model);if(!mounts[index]||model.link)return;
@@ -1415,15 +1422,21 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(!['tactile-tiles','gears','waves','control-caps','characters','light-pods'].includes(family.typeId))return;
   const mounts=mountHoles(model),selected=mounts.findIndex(hole=>hole.id===selectedMounts.get(model.id));
   const locked=!!model.link,disabled=locked?' disabled':'';
+  const mount=mounts[selected],profile=mount?.profile??mountProfiles[0];
   const block=document.createElement('fieldset');block.setAttribute('aria-label','Mounting holes');
   block.innerHTML='<legend>Mounting &amp; attachments</legend>'+
-   '<p>Place actual vertical 2–8 mm through-holes on a verified solid top or underside surface. M1…Mn are editable; printed mounting loads and screw fit are not certified. The legacy two-hole mounting preset remains separate.</p>'+
+   '<p>Place vertical 2–8 mm through-holes on a solid top or underside. Select an underside mount to add a counterbore or countersink.</p>'+
    '<div class="sms-actions"><button type="button" data-place-mount'+(locked||mounts.length>=16?' disabled':'')+'>Place mounting hole in 3D</button>'+
    (mountingModel===model.id?'<button type="button" data-done-mount>Done placing mounts</button>':'')+'</div>'+
    '<div class="sms-actions" aria-label="Select mount">'+mounts.map((mount,i)=>'<button type="button" data-select-mount="'+i+'" aria-pressed="'+(i===selected)+'">M'+(i+1)+'</button>').join('')+'</div>'+
-   (selected<0?'':('<fieldset><legend>M'+(selected+1)+' · Through-hole</legend>'+
+   (selected<0?'':('<fieldset><legend>M'+(selected+1)+' · '+esc(profile)+'</legend>'+
     [['x','X (mm)','-200','200'],['z','Z (mm)','-200','200'],['diameter','Hole diameter (mm)','2','8']].map(([field,label,min,max])=>
      '<label>'+label+'<input type="number" data-mount-field="'+field+'" min="'+min+'" max="'+max+'" step=".1" value="'+esc(mounts[selected][field])+'"'+disabled+'></label>').join('')+
+    (mount.entryFace==='underside'?'<label>Mount profile<select data-mount-profile'+disabled+'>'+mountProfiles.map(option=>
+     '<option'+(option===profile?' selected':'')+'>'+option+'</option>').join('')+'</select></label>':'')+
+    (profile!==mountProfiles[0]?[['recessDiameter','Recess diameter (mm)',12],['recessDepth','Recess depth (mm)',8]].map(([key,label,max])=>
+     '<label>'+label+'<input type="number" required min=".5" max="'+max+'" step="any" data-mount-recess="'+key+
+     '" value="'+esc(recessDimensions(mount)[key==='recessDiameter'?'diameter':'depth'])+'"'+disabled+'></label>').join(''):'')+
     '<button type="button" data-remove-mount'+disabled+'>Remove M'+(selected+1)+'</button></fieldset>'));
   root.append(block);
   block.querySelector('[data-place-mount]').onclick=()=>{
@@ -1438,6 +1451,17 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    if(!input.checkValidity()){input.reportValidity();input.value=mounts[selected][input.dataset.mountField];return;}
    const hole={...mounts[selected],[input.dataset.mountField]:Number(input.value)};
    if(!editMount(model,selected,hole))input.value=mounts[selected][input.dataset.mountField];
+  });
+  const selectProfile=block.querySelector('[data-mount-profile]');
+  if(selectProfile)selectProfile.onchange=()=>{
+   if(!editMount(model,selected,{...mount,profile:selectProfile.value}))selectProfile.value=profile;
+  };
+  block.querySelectorAll('[data-mount-recess]').forEach(input=>{
+   const key=input.dataset.mountRecess,accepted=recessDimensions(mount)[key==='recessDiameter'?'diameter':'depth'];
+   input.onchange=()=>{
+    if(!input.checkValidity()){input.reportValidity();input.value=accepted;return;}
+    if(!editMount(model,selected,{...mount,[key]:input.valueAsNumber}))input.value=accepted;
+   };
   });
   const remove=block.querySelector('[data-remove-mount]');
   if(remove)remove.onclick=()=>removeMount(model,selected);

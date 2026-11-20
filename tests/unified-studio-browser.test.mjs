@@ -1979,6 +1979,44 @@ try{
   assert(await job.locator('[data-job-3mf]').isDisabled());
   await job.locator('[data-job-prepare]').click();
   await measureFixing(5.05);
+  await buildTab.click();
+  await enabled.evaluate(node=>{for(let p=node.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS')p.open=true;});
+  await enabled.uncheck();
+  await page.locator('[data-view=bottom]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  const palette=page.locator('.sms-palette');
+  await palette.getByRole('button',{name:'Place mounting hole in 3D'}).click();
+  const point=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(-20,0,'underside'));
+  assert(point);await page.mouse.click(point.x,point.y);
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.manualMountHoles?.length===1);
+  await page.keyboard.press('Escape');
+  await palette.locator('[data-mount-profile]').selectOption('Counterbore');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[0].profile==='Counterbore');
+  const depth=palette.locator('[data-mount-recess=recessDepth]');
+  await depth.fill('3');await depth.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[0].recessDepth===3);
+  const manualAccepted=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
+  await depth.fill('8.5');await depth.press('Tab');
+  assert.equal(Number(await depth.inputValue()),3);
+  assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),manualAccepted);
+  const {x,z}=JSON.parse(manualAccepted).build.manualMountHoles[0];
+  await printTab.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  await job.locator('[data-job-prepare]').click();
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const manualSTL=await useDownload(job.locator('[data-job-stl]'));
+  const manualMF=await useDownload(job.locator('[data-job-3mf]'));
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(manualSTL.bytes).buffer),
+   read3MFGeometry(zipEntries(manualMF.bytes).get('3D/3dmodel.model').toString())]){
+   const mesh=new THREE.Mesh(geometry,material);
+   const hit=(y,height,dy,dz)=>new THREE.Raycaster(new THREE.Vector3(x,y,height),new THREE.Vector3(0,dy,dz)).intersectObject(mesh)[0];
+   assert(Math.abs(hit(-z,1,1,0).distance+hit(-z,1,-1,0).distance-5.1)<.01);
+   assert(Math.abs(hit(-z,4,1,0).distance+hit(-z,4,-1,0).distance-3.4)<.01);
+   assert(Math.abs(hit(-z+2,-1,0,1).point.z-3)<.01);
+   geometry.dispose();
+  }
+  material.dispose();
  }
  {
   await page.evaluate(()=>window.__sensoryStudio.addModel('waves',{width:100,depth:70,thickness:2,amplitude:1,variation:0},'Thin fixing witness'));

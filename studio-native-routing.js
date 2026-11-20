@@ -192,7 +192,7 @@ export function nativeRouteEligibility(recipe,build){
  if((front?.thickness??supportThickness)<required)return 'Routing needs at least '+required.toFixed(1)+' mm of solid backing for the groove and roof.';
  const blocksBacking=part=>part.kind!=='box'||part.rotation||!Array.isArray(part.position)||
   part.position[1]+part.size[1]/2>0;
- const otherCuts=recipe.negative.filter(part=>!part.mountHole);
+ const otherCuts=recipe.negative.filter(part=>!part.mountHole&&!part.manualMountRecess);
  const obstructed=recipe.serialSupport.explicitBacking?otherCuts.some(blocksBacking):otherCuts.length>0;
  if(obstructed||build.mounting||build.base||Object.values(build.partOffsets||{}).some(offset=>offset?.some?.(value=>value!==0)))
   return 'Existing cavities, mounting cuts, added bases or part offsets prevent safe routing.';
@@ -237,7 +237,7 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
  if(nearEdge>=0){
   plan.reason='P'+(nearEdge+1)+' is too close to the backing edge. Move the fitting inward to clear its cable ports.';return plan;
  }
- const mounts=recipe.negative.filter(part=>part.mountHole);
+ const mounts=recipe.negative.filter(part=>part.mountHole||part.manualMountRecess);
  const mountConflicts=(mount,path)=>{
   const [x,,z]=mount.position;
   const clearance=mount.radius+radius+routeSideStock;
@@ -266,7 +266,7 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
   const obstructingMount=mounts.find(mount=>mountConflicts(mount,path));
   const needsLift=front?.backingHeight&&dense.some(point=>point.z<front.backingHeight+(radius+routeSideStock)/.9);
   let reason=needsLift?'Move the route above the fitting backing so the channel and its exits stay open.'
-   :obstructingMount?'Channel is too close to '+obstructingMount.mountHole+'. Move the mounting hole or the route.'
+   :obstructingMount?'Channel is too close to '+(obstructingMount.mountHole||obstructingMount.fixingRecess)+'. Move the mounting hole or the route.'
    :invalid?'Channel approaches an edge or unrelated bore.':measure>budget+1e-6?'Cable budget exceeded.':'';
   if(!reason&&plan.links.some(other=>{
    const shared=pixels.filter(p=>ends.includes(p.id)&&other.ends?.includes(p.id));

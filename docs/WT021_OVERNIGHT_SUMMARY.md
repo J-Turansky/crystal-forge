@@ -2,7 +2,11 @@
 
 Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) continues from `1518a289f421ee5635c749d4fbb8b46f3c222187`. The commit containing this report records the implementation checkpoint. See the [checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks) for its exact head and CI results.
 
-## Implemented
+## Latest checkpoint
+
+- Manual underside counterbores and countersinks use independently editable dimensions and production stock checks. Chromium verified the Gear counterbore in downloaded STL and 3MF and confirmed rollback of an invalid depth.
+
+## Earlier implementation
 
 - Native Build fitting inspection shares the production Manifold checks for blocked insertion, insufficient stock and nearby cut interference. It reports measured wire-cut overlap independently, since contact with a wire relief can be intentional.
 - Gear-top and Tile-underside fabrication fixtures exercise actual Boolean wire overlap and confirm that an interfering mounting cut is shown in the preview and rejected by preparation.

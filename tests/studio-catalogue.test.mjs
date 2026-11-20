@@ -453,6 +453,13 @@ assert.throws(()=>applyBuildModules(flatStock,{mounting:true,holeDiameter:4,spac
 const fixingFixtures=new Map(['Underside counterbores','Underside countersinks'].map(style=>[
  applyBuildModules(flatStock,{mounting:true,mountStyle:style,spacing:30,holeDiameter:4},{supportsMounting:true}),style
 ]));
+const manualRecess={id:'manual-recess',x:-15,z:0,entryFace:'underside',diameter:4,profile:'Countersink',recessDiameter:7,recessDepth:3};
+const manualRecipe=applyBuildModules(flatStock,{manualMountHoles:[manualRecess]});
+assert.equal(manualRecipe.negative.find(cut=>cut.manualMountRecess).topRadius,2);
+assert.equal(prepareRecipe(THREE,wasm,manualRecipe).bodies.length,1);
+assert.throws(()=>applyBuildModules(flatStock,{manualMountHoles:[{...manualRecess,entryFace:'top'}]}),/solid underside face/);
+assert.throws(()=>applyBuildModules(flatStock,{manualMountHoles:[{...manualRecess,recessDiameter:4}]}),/wider than the through-hole/);
+assert.throws(()=>prepareRecipe(THREE,wasm,{...manualRecipe,positive:[{kind:'box',size:[70,4,40],position:[0,2,0]}]}),/needs continuous underside stock/);
 for(const [fixture] of fixingFixtures){
  const thin={...fixture,positive:[{kind:'box',size:[70,2.8,40],position:[0,1.4,0]}]};
  assert.throws(()=>prepareRecipe(THREE,wasm,thin),/needs continuous underside stock/);
