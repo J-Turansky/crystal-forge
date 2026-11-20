@@ -2,11 +2,17 @@
 
 [Open the browser app](https://connorturansky-svg.github.io/crystal-forge/).
 
+## Current development — WT-021 (draft PR #102)
+
+**For Codex and collaborators:** [Start here: WT-021 active prompt](prompts/START_HERE.md) → [complete owner-approved WT-021 specification](prompts/021-complete-seven-builder-manufacturing-parity.md) → [verified handover](docs/WT021_CODEX_HANDOFF.md) → [23-item acceptance register](docs/WT021_COMPLETION_REGISTER.md).
+
+The [complete milestone prompt library](prompts/README.md) has been copied from the dedicated `planning/prompts` branch for easier access. The planning source remains an independently versioned historical archive. **Active implementation is confined to existing draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102); do not open another PR, merge, or deploy.** `main` hosts the production app and does not contain draft-only features. See the [documentation hub](docs/README.md) for architecture, tests, print guidance, acceptance and historical plans.
+
 Design seven model families, including Crystal Clusters, Tactile Tiles, Gears, Waves, Control Caps, Characters, and Light Pods. Build adds measured LED fittings on suitable material. Print Centre prepares valid geometry through Manifold and exports STL and 3MF. SVG artwork and validated STL/OBJ solids can enter the same workspace. Open or invalid meshes remain available for preview with an explanation.
 
 Projects save locally. Use Library to save reusable models and export a backup, or connect a private GitHub repository for optional cross-device recovery.
 
-Source baseline `7ad5326` includes WT-018 and the first Gear placement and wire-guide changes from [#84](https://github.com/connorturansky-svg/crystal-forge/pull/84). [Software parity and acceptance](docs/MODEL_BUILDER_PARITY.md) tracks what is evidenced across the seven families. [Software work #79](https://github.com/connorturansky-svg/crystal-forge/issues/79) and [physical QA #10](https://github.com/connorturansky-svg/crystal-forge/issues/10) remain active.
+[Software parity and acceptance](docs/MODEL_BUILDER_PARITY.md) tracks evidence across all seven families. [Software work #79](https://github.com/connorturansky-svg/crystal-forge/issues/79) and [physical Cura/print QA #10](https://github.com/connorturansky-svg/crystal-forge/issues/10) remain active. For current branch and CI state, use the [draft PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) rather than a hard-coded historical SHA.
 
 ## Source visibility and reuse
 
@@ -24,19 +30,7 @@ the account's plan and does not revoke existing clones/forks.
 
 ## Historical development milestones
 
-### PR7 — Completion milestone
-
-[Draft PR7](https://github.com/connorturansky-svg/crystal-forge/pull/13) extends all five development packages in one branch. [PR7 scope and physical acceptance matrix](docs/PR7_COMPLETE_FABRICATION.md): real opt-in targeted light conduits, mixed per-LED socket profiles, shaped fit coupons, detachable M3 base/plate, modular production ZIP, worker progress and extended benchmarking. None of these guarantees every spike is illuminated or mounted safely without actual Cura/print testing.
-
-## PR6: all five packages in one pull request
-
-[Merged PR6](https://github.com/connorturansky-svg/crystal-forge/pull/11) contains **implementation changes from all five major development packages**, with reviewable commits and an [all-phase acceptance matrix](docs/PR6_ALL_PHASES.md). It includes Cura/print checks, candidate optical audit and LED retention, split dowels, shape presets/hardware snap, and a complete production ZIP. It does **not** claim that physical safety, optical transmission, Cura imports or the advanced work backlog are all verified or complete.
-
-## PR5 development and what remains
-
-Draft [PR5](https://github.com/connorturansky-svg/crystal-forge/pull/5) adds an opt-in underside wiring plan and manufacturing grooves, wire CSV, LED-specific calibration strips, conservative roof-span review and user-entered printer dimensions. The live app only updates after a reviewed merge to main.
-
-The **[PR5 master implementation plan](docs/PR5_MASTER_IMPLEMENTATION_PLAN.md)** groups all outstanding tasks into five large delivery packages, and the [Cura profile generator guide](docs/CURA_PROFILE_GENERATOR.md) explains machine/nozzle/material compatibility, importing the .curaprofile ZIP and the required test prints. The backlog tracks stages from physical pixel retention through real optical passages, bridge/support checks, modular split connectors, hardware editing, performance and material previews. Items listed there are not automatically implemented.
+[PR5–PR14 project history, original release descriptions and old acceptance guides](docs/history/README.md). The full historical README excerpts have been preserved in [legacy release notes](docs/history/LEGACY_README_NOTES.md); they are **not statements of current WT-021 acceptance**.
 
 ## Workspaces
 
@@ -121,17 +115,8 @@ The older `app.js` file is an unreferenced archive of the first demonstration.
 
 ## Working across ChatGPT Chat and Codex Desktop
 
-Start with [AGENTS.md](AGENTS.md) followed by [AI handover](docs/AI_HANDOVER.md). The [project vision](docs/PROJECT_VISION.md), [feature contracts](docs/FEATURE_SPECIFICATIONS.md), [design decision log](docs/DESIGN_DECISIONS.md), [architecture](docs/ARCHITECTURE.md), [development history](docs/DEVELOPMENT_HISTORY.md), [roadmap](docs/ROADMAP.md), [testing guide](docs/TESTING.md) and [collaboration workflow](docs/COLLABORATION.md) provide persistent intent and implementation context. GitHub is the canonical committed source; develop features on task branches and review PRs before merging to production main.
+For WT-021, begin with [the active Codex prompt](prompts/START_HERE.md) and [WT-021 handover](docs/WT021_CODEX_HANDOFF.md). For the standing project rules, read [AGENTS.md](AGENTS.md) followed by [AI handover](docs/AI_HANDOVER.md). The [project vision](docs/PROJECT_VISION.md), [feature contracts](docs/FEATURE_SPECIFICATIONS.md), [design decision log](docs/DESIGN_DECISIONS.md), [architecture](docs/ARCHITECTURE.md), [development history](docs/DEVELOPMENT_HISTORY.md), [roadmap](docs/ROADMAP.md), [testing guide](docs/TESTING.md) and [collaboration workflow](docs/COLLABORATION.md) provide persistent intent and implementation context. GitHub is the canonical committed source; develop features on task branches and review PRs before merging to production main.
 
 Lightweight syntax/wiring checks: `npm run test:static`. Existing representative Manifold tests: `npm test`. Chromium smoke tests: `npm run test:browser` (start local web server first). Timing sample: `npm run test:benchmark`. These checks do not replace Cura or physical prints.
 
-## v0.8.0 — Extreme shapes and printable hardware
-
-**Design:** Crystal starting size (50–400%) changes crystal diameter independently of height. Bottom and top/shoulder adjustments (-85% to +400%) and reproducible per-crystal width randomness create extreme tapered shapes. Lean is a rigid quaternion rotation rather than a stretched/sheared shaft; the whole root perimeter is seated inside the mound. Viewport brightness controls the softer studio lighting only.
-
-**LEDs:** Automatic socket placement searches crystal roots and the wider integrated base, using the actual global crystal scale. In Build choose Place / move LED: hover the model for a circular valid/invalid bore preview, click to add repeatedly without orbiting, then use Escape/Stop to exit. A rounded blind roof retains modeled wall above each LED channel; verify physical LED clearance and light routes in Cura.
-
-**Edge fixing tabs:** Advanced Build → Mounting → Edge fixing tabs. Set number of equally spaced semicircular ears, holes per ear, diameter, thickness and plastic web. Build shows planned ears/holes; valid ones are fused into the prepared mesh, and crowded ears are skipped with a warning. Neither geometry tests nor tooltips certify load strength or suitable overhead fastening.
-
-**Help:** Hover buttons, tabs and sliders (or keyboard-focus them) for a short contextual explanation. See the in-app What's new panel and [testing instructions](docs/TESTING.md).
 

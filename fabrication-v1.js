@@ -140,7 +140,7 @@ function positionedInnerCrystal(c,s,openingY,wall){
  mesh.updateMatrixWorld(true);
  return mesh;
 }
-export function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLocalWireRelief=true}={}){
+export function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLocalWireRelief=true,conical=false}={}){
  // Legacy standalone LED seats can have local cable exit reliefs.
  // They MUST NOT be combined with any external planned wiring grooves:
  // those cuts use a different fixed axis and appear as disconnected stubs.
@@ -150,27 +150,61 @@ export function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLo
  // The measured housing enters from the real bottom face (Y=0). The
  // extra below-bed cutter length only opens the bore, not its usable depth.
  const requestedBodyDepth=Math.max(1,Number(p.bodyHeight)||22);
- const tipY=Math.max(start+1.4,Math.min(roofY-2.8,requestedBodyDepth)),available=tipY-start;
+ const bodyRadius=Math.max(.8,p.boreDiameter/2);
+ const tipY=conical?requestedBodyDepth+bodyRadius:Math.max(start+1.4,Math.min(roofY-2.8,requestedBodyDepth));
+ if(conical&&roofY<tipY+2.8)
+  throw Error('Conical pixel socket needs '+(tipY+2.8).toFixed(2)+' mm of stock. Increase base thickness or choose a rounded roof.');
+
  // Curved cap E is included within total B, not added on top.
  const capRise=Math.min(Math.max(.35,Number(p.capHeight)||.35),Math.max(.35,Math.max(0,tipY)*.65));
- const shaftEnd=tipY-capRise,depth=Math.max(.5,shaftEnd-start);
- const bodyRadius=Math.max(.8,p.boreDiameter/2),cutters=[];
+ const shaftEnd=conical?requestedBodyDepth:tipY-capRise,depth=Math.max(.5,shaftEnd-start);
+ // Manufacture bore, flange, optional retaining ridge and roof as ONE
+ // profile-shaped solid. Unioning overlapping coaxial cutters creates
+ // microscopic seams that can become degenerate printable triangles.
+ const cutters=[];
  let relievedDepth=0;
- const cylinder=(r,y,h)=>hold(wasm.Manifold.cylinder(h,r,r,32).rotate([-90,0,0]).translate([pos.x,y,pos.z]));
  const lip=Math.min(.7,Math.max(0,Number(p.retentionLip)||0));
  const lipFrom=Math.max(1.9,Number(p.flangeHeight||0)+.8),lipWidth=1.4;
- if(lip>0&&depth>lipFrom-start+lipWidth+2&&bodyRadius-lip>1.4){
-  // Narrow bore section above the flange. Physical snap-fit is unverified.
-  cutters.push(cylinder(bodyRadius,start,lipFrom-start));
-  cutters.push(cylinder(bodyRadius-lip,lipFrom,lipWidth));
-  cutters.push(cylinder(bodyRadius,lipFrom+lipWidth,depth-(lipFrom+lipWidth-start)));
- }else cutters.push(cylinder(bodyRadius,start,depth));
- if(p.kind!=='seed'&&p.flangeHeight>.1&&p.maxDiameter>p.boreDiameter+.1)
-  cutters.push(cylinder(p.maxDiameter/2,-.5,Math.min(depth,p.flangeHeight+.5)));
- cutters.push(hold(wasm.Manifold.sphere(bodyRadius,32).scale([1,capRise/bodyRadius,1]).translate([pos.x,shaftEnd,pos.z])));
+ const hasLip=lip>0;
+ if(hasLip&&(depth<=lipFrom-start+lipWidth+2||bodyRadius-lip<=1.4))
+  throw Error('Cannot cut the selected retention lip. Choose a longer or wider straight fitting body, or set retention to zero.');
+ const hasFlange=p.kind!=='seed'&&p.flangeHeight>.1&&p.maxDiameter>p.boreDiameter+.1;
+ if(hasFlange&&shaftEnd<p.flangeHeight+.1)
+  throw Error('Pixel socket needs enough stock for the complete flange and roof.');
+ const radial=48,rings=[[start,hasFlange?p.maxDiameter/2:bodyRadius]];
+ if(hasFlange)rings.push([p.flangeHeight,p.maxDiameter/2],[p.flangeHeight,bodyRadius]);
+ if(hasLip)rings.push([lipFrom,bodyRadius],[lipFrom,bodyRadius-lip],
+  [lipFrom+lipWidth,bodyRadius-lip],[lipFrom+lipWidth,bodyRadius]);
+ rings.push([shaftEnd,bodyRadius]);
+ if(!conical)for(let i=1;i<20;i++){
+  const angle=i*Math.PI/40;
+  rings.push([shaftEnd+capRise*Math.sin(angle),bodyRadius*Math.cos(angle)]);
+ }
+ const vertices=[],triangles=[];
+ for(const [y,r] of rings)for(let side=0;side<radial;side++){
+  const angle=2*Math.PI*side/radial;
+  vertices.push(pos.x+r*Math.cos(angle),y,pos.z+r*Math.sin(angle));
+ }
+ const bottom=vertices.length/3,apex=bottom+1,last=(rings.length-1)*radial;
+ vertices.push(pos.x,start,pos.z,pos.x,tipY,pos.z);
+ for(let side=0;side<radial;side++){
+  const next=(side+1)%radial;
+  triangles.push(bottom,side,next,apex,last+next,last+side);
+  for(let ring=0;ring<rings.length-1;ring++){
+   const a=ring*radial+side,b=ring*radial+next,c=a+radial,d=b+radial;
+   triangles.push(a,c,b,b,c,d);
+  }
+ }
+ const latheMesh=new wasm.Mesh({numProp:3,vertProperties:new Float32Array(vertices),triVerts:new Uint32Array(triangles)});
+ latheMesh.merge();
+ const socket=hold(new wasm.Manifold(latheMesh));
+ if(socket.status()!=='NoError'||socket.isEmpty())
+  throw Error('The measured pixel-socket cutter is not a valid closed solid.');
+ cutters.push(socket);
  if(includeLocalWireRelief&&p.wireWidth>.1&&p.wireDepth>.1){
   // Two shallow underside cable reliefs; not full wiring channels.
-  const w=Math.max(.8,p.wireWidth+p.clearance),h=Math.max(.2,Math.min(p.wireDepth,Math.max(.2,roofY-2.8))),len=bodyRadius+4;
+  // Wire relief F is a measured physical width; socket fit clearance must not resize it.
+  const w=Math.max(.8,p.wireWidth),h=Math.max(.2,Math.min(p.wireDepth,Math.max(.2,roofY-2.8))),len=bodyRadius+4;
   relievedDepth=h;
   for(const sign of [-1,1]){
    cutters.push(hold(wasm.Manifold.cube([w,h+.5,len])
@@ -178,8 +212,25 @@ export function putSocket(wasm,hold,pos,radius,roofY,start=-3,profile,{includeLo
   }
  }
  return {solid:hold(wasm.Manifold.union(cutters)),roofY,tipY,shaftEnd,
-  capRise,remainingWall:roofY-tipY,profileId:p.id,retentionLip:lip,
-  requestedBodyDepth,usableBodyDepth:Math.max(0,tipY),wireReliefDepth:relievedDepth};
+  capRise:conical?bodyRadius:capRise,remainingWall:roofY-tipY,profileId:p.id,retentionLip:lip,
+  requestedBodyDepth,usableBodyDepth:Math.max(0,conical?requestedBodyDepth:tipY),wireReliefDepth:relievedDepth};
+}
+export function crystalFittingPreview(wasm,positiveMesh,baseMesh,pos,roof,profile,settings){
+ const owned=[],hold=solid=>(owned.push(solid),solid);
+ try{
+  const cutter=putSocket(wasm,hold,pos,pos.radius,roof,-3,profile,{
+   conical:settings.socketConical===true,
+   includeLocalWireRelief:!settings.wireChannels&&settings.wireMode!=='string'
+  });
+  const pixel=hold(hold(new wasm.Manifold(positiveMesh)).translate([pos.x,0,pos.z]));
+  assertSolid(pixel,'Positive pixel preview');
+  const stock=hold(convertMesh(wasm,baseMesh));
+  const exposed=hold(pixel.subtract(stock));
+  const collision=hold(hold(pixel.intersect(stock)).subtract(cutter.solid));
+  return {positive:fromResultMesh(pixel.getMesh()),negative:fromResultMesh(cutter.solid.getMesh()),
+   insertionDepth:cutter.usableBodyDepth,remainingRoof:cutter.remainingWall,
+   exposedVolume:exposed.volume(),collisionVolume:collision.volume()};
+ }finally{cleanupAll(owned)}
 }
 function cleanupAll(list){
  for(const m of list){try{m.delete()}catch(e){}}
@@ -286,6 +337,21 @@ function createPrintVault(wasm,hold,crystals,s,hardware,warnings){
  if(stats.gapEstimate>25)warnings.push('Zero-infill vault may retain roof gaps above 25 mm. Reduce buttress spacing or add Cura supports/infill.');
  warnings.push('Integral base buttresses are supportless-first geometry, not a guarantee. Validate bridging and print orientation in Cura.');
  return {cutter,stats};
+}
+// Validate at the SAME float32 precision and area threshold as the STL
+// material exporter. A prepared-but-unexportable print job is never valid.
+function printableMaterialTriangles(mesh){
+ const points=mesh.vertProperties,faces=mesh.triVerts,stride=mesh.numProp;
+ if(!points||!faces||stride<3||faces.length%3)return false;
+ for(let i=0;i<faces.length;i+=3){
+  const a=faces[i]*stride,b=faces[i+1]*stride,c=faces[i+2]*stride;
+  const ux=points[b]-points[a],uy=points[b+1]-points[a+1],uz=points[b+2]-points[a+2];
+  const vx=points[c]-points[a],vy=points[c+1]-points[a+1],vz=points[c+2]-points[a+2];
+  const nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;
+  const twiceArea=Math.hypot(nx,ny,nz);
+  if(!Number.isFinite(twiceArea)||twiceArea<1e-12)return false;
+ }
+ return true;
 }
 export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=>{}}){
  if(!wasm?.Manifold || !wasm?.Mesh)throw new Error('Manifold engine has not loaded');
@@ -470,8 +536,17 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
       // but retained spurious independent slots at every yellow LED ring.
       // Any enabled routing plan owns the groove geometry across ALL modes.
       // A standalone legacy LED may retain its local relief when routing is off.
+      conical:s.socketConical===true,
       includeLocalWireRelief:!s.wireChannels&&s.wireMode!=='string'
      });
+    if(s.socketConical){
+     const stockRadius=Math.max(pos.radius,resolveSocketProfile(s,pos).maxDiameter/2)+1;
+     const envelope=hold(wasm.Manifold.cylinder(bore.tipY+2.8,stockRadius,stockRadius,32)
+      .rotate([-90,0,0]).translate([pos.x,0,pos.z]));
+     const available=hold(combined.intersect(envelope));
+     if(envelope.volume()-available.volume()>.05)
+      throw Error('Conical pixel socket lacks continuous surrounding stock. Move the pixel or increase base thickness.');
+    }
     cutters.push(bore.solid);
     socketCeilings.push({x:pos.x,z:pos.z,roofY:bore.roofY,tipY:bore.tipY,
       straightHeight:bore.shaftEnd,capRise:bore.capRise,remainingWall:bore.remainingWall,profileId:bore.profileId,retentionLip:bore.retentionLip,requestedBodyDepth:bore.requestedBodyDepth,
@@ -547,11 +622,33 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
     const dx=route.b.x-route.a.x,dz=route.b.z-route.a.z;
     const length=Math.hypot(dx,dz)+.5,angle=-Math.atan2(dz,dx)*180/Math.PI;
     const mx=(route.a.x+route.b.x)/2,mz=(route.a.z+route.b.z)/2;
-    return hold(wasm.Manifold.cube([length,route.depth+.6,route.width])
-     .translate([-length/2,-.5,-route.width/2])
-     .rotate([0,angle,0]).translate([mx,0,mz]));
+    const halfWidth=route.width/2;
+    let groove;
+    if(s.wireVaulted){
+     const section=new wasm.CrossSection([[[-halfWidth,-.5],[halfWidth,-.5],
+      [halfWidth,route.depth],[0,route.depth+halfWidth],[-halfWidth,route.depth]]],'EvenOdd');
+     try{
+      const prism=hold(section.extrude(length));
+      groove=hold(hold(prism.rotate([0,90,0])).translate([-length/2,0,0]));
+     }finally{section.delete();}
+    }else{
+     const block=hold(wasm.Manifold.cube([length,route.depth+.6,route.width]));
+     groove=hold(block.translate([-length/2,-.5,-halfWidth]));
+    }
+    return hold(hold(groove.rotate([0,angle,0])).translate([mx,0,mz]));
    });
-   const cut=hold(combined.subtract(hold(wasm.Manifold.union(grooves))));
+   // Overlapping vaulted segments can produce slivers below STL precision.
+   const joined=hold(wasm.Manifold.union(grooves));
+   let cut=hold(combined.subtract(joined));
+   if(s.wireVaulted){
+    const tolerance=.0001;
+    const rounded=hold(new wasm.Manifold(cut.getMesh()));
+    const simplified=hold(hold(rounded.asOriginal()).simplify(tolerance));
+    assertSolid(simplified,'Vaulted track mesh cleanup');
+    if(Math.abs(simplified.volume()-cut.volume())>.01)
+     throw Error('Vaulted track cleanup changed the model volume. Adjust the route before exporting.');
+    cut=simplified;
+   }
    assertSolid(cut,'Underside wiring grooves');combined=cut;
    wireChannelsCut=grooves.length;
    warnings.push('Shallow underside wiring grooves are not complete enclosed conduits. Check physical wire bend radius, exit and strain relief.');
@@ -605,6 +702,55 @@ export function prepareFabrication({wasm,meshes,crystals,settings,onProgress=()=
     combined=repaired;
     warnings.push(sealedCavitiesFilled+' sealed inaccessible void shells were filled, rather than leaving unlit air pockets inside the model.');
    }
+  }
+  // All print jobs must pass the same triangle-quality gate as STL and
+  // 3MF output *before* being marked prepared. Rounded socket Booleans can
+  // leave sub-precision slivers that Manifold still regards as valid.
+  if(!printableMaterialTriangles(combined.getMesh())){
+   const before=combined.volume(),raw=combined.getMesh();
+   let repaired=null,acceptedTolerance=0;
+   // Try only sub-layer-height tolerances; never change nominal socket
+   // dimensions or silently drop bad triangles from exported materials.
+   for(const tolerance of [.0001,.0003,.001,.002]){
+    const rebuilt=hold(new wasm.Manifold(raw));
+    const tolerant=hold(rebuilt.setTolerance(tolerance));
+    const candidate=hold(hold(tolerant.asOriginal()).simplify(tolerance));
+    if(candidate.status()==='NoError'&&!candidate.isEmpty()&&
+       Math.abs(candidate.volume()-before)<=.05&&printableMaterialTriangles(candidate.getMesh())){
+     repaired=candidate;acceptedTolerance=tolerance;break;
+    }
+   }
+   // Last resort: a zero-area facet has no printable surface or volume.
+   // Drop only such facets, reimport into Manifold and accept ONLY if the
+   // reconstructed solid is closed, nonempty, dimensionally volume-stable
+   // and entirely STL-precision safe. Any open boundary fails closed.
+   let removed=0,repairNote='';
+   if(!repaired){
+    const vertices=raw.vertProperties,faces=raw.triVerts,stride=raw.numProp,kept=[];
+    for(let i=0;i<faces.length;i+=3){
+     const a=faces[i]*stride,b=faces[i+1]*stride,c=faces[i+2]*stride;
+     const ux=vertices[b]-vertices[a],uy=vertices[b+1]-vertices[a+1],uz=vertices[b+2]-vertices[a+2];
+     const vx=vertices[c]-vertices[a],vy=vertices[c+1]-vertices[a+1],vz=vertices[c+2]-vertices[a+2];
+     const area=Math.hypot(uy*vz-uz*vy,uz*vx-ux*vz,ux*vy-uy*vx);
+     if(Number.isFinite(area)&&area>=1e-12)kept.push(faces[i],faces[i+1],faces[i+2]);
+     else removed++;
+    }
+    if(removed){
+     try{
+      const mesh=new wasm.Mesh({numProp:stride,vertProperties:vertices,triVerts:new Uint32Array(kept)});
+      mesh.merge();
+      const candidate=hold(new wasm.Manifold(mesh));
+      if(candidate.status()==='NoError'&&!candidate.isEmpty()&&
+         Math.abs(candidate.volume()-before)<=.05&&printableMaterialTriangles(candidate.getMesh())){
+       repaired=candidate;acceptedTolerance='zero-area facet rebuild';
+      }
+     }catch(error){repairNote=error.message;}
+    }
+   }
+   if(!repaired)
+    throw Error('The physical mesh contains sub-STL-precision triangles that could not be repaired into a closed print solid (invalid facets: '+removed+(repairNote?', '+repairNote:'')+'). Preparation was refused before export.');
+   combined=repaired;
+   warnings.push('Sub-printable triangle slivers were removed with a bounded '+acceptedTolerance+' mm repair tolerance. Inspect the final layer geometry in Cura.');
   }
   onProgress('Auditing the final manifold geometry and printer limits…');
   const inspectionMode=s.lightingMode==='none'?'none':s.hollowCrystals?'hollow':portPlan.requested&&vault.applied?'vault':s.targetedLightPaths?'targeted':portPlan.requested?'vault':'none';
@@ -693,24 +839,25 @@ export function encodeSTL(geometry){
 }
 // A real stepped pixel-body and flange fitting coupon. Each of five pockets
 // uses the EXACT socket cutter from the full build, not a plain round hole.
-export function makePixelSeatCoupon(wasm,s,{openWireExits=true,single=false}={}){
+export function makePixelSeatCoupon(wasm,s,{openWireExits=true,single=false,trackWidthMm}={}){
  const profile=resolvePixelProfile(s),keep=[],hold=m=>{keep.push(m);return m};
  const spec=single?{fits:[profile.clearance],captions:[],diameters:[profile.boreDiameter]}:calibrationSpec(s,'stepped');
  const labels=spec.captions,pitch=Math.max(32,profile.maxDiameter+20),
-  width=Math.max(32,profile.maxDiameter+22),roof=Math.max(12,profile.bodyHeight+6);
+  width=Math.max(32,profile.maxDiameter+22),roof=Math.max(12,profile.bodyHeight+6+(s.socketConical?profile.maxDiameter/2:0));
  try{
   const bar=hold(wasm.Manifold.cube([pitch*spec.fits.length,roof,width]));
   const cutters=[],legend=[],wireExits=[];
   for(let i=0;i<spec.fits.length;i++){
    const fit=spec.fits[i],adjusted=resolvePixelProfile(s,fit);
    const centreX=(i+.5)*pitch,pos={x:centreX,z:width/2};
-   const bore=putSocket(wasm,hold,pos,adjusted.maxDiameter/2,roof,-3,adjusted);
+   const bore=putSocket(wasm,hold,pos,adjusted.maxDiameter/2,roof,-3,adjusted,{conical:s.socketConical===true});
    cutters.push(bore.solid);
    // On a FULL profile sample, wiring must reach both external side walls.
    // Extend the underside cut a full mm beyond each edge. The same
    // measured F/G relief still determines the groove's width and depth.
-   if(openWireExits&&adjusted.wireWidth>.1&&adjusted.wireDepth>.1){
-    const laneWidth=Math.max(.8,adjusted.wireWidth+adjusted.clearance);
+   if(openWireExits&&(trackWidthMm!=null||adjusted.wireWidth>.1)&&adjusted.wireDepth>.1){
+    // An optional independent track-width calibration overrides the measured relief.
+    const laneWidth=trackWidthMm??Math.max(.8,adjusted.wireWidth);
     const laneDepth=Math.min(adjusted.wireDepth,Math.max(.2,roof-2.8));
     wireExits.push(hold(wasm.Manifold.cube([laneWidth,laneDepth+.6,width+2])
       .translate([centreX-laneWidth/2,-.5,-1])));
@@ -719,6 +866,12 @@ export function makePixelSeatCoupon(wasm,s,{openWireExits=true,single=false}={})
   }
   let cut=hold(bar.subtract(hold(wasm.Manifold.union([...cutters,...wireExits]))));
   if(legend.length)cut=hold(cut.subtract(hold(wasm.Manifold.union(legend))));
+  // Heal sub-printable Boolean slivers from adjacent curved sockets and labels,
+  // but never accept meaningful material loss or an invalid solid.
+  const rawVolume=cut.volume(),tolerance=.0001;
+  cut=hold(hold(cut.asOriginal()).simplify(tolerance));
+  if(cut.status()!=='NoError'||cut.isEmpty()||Math.abs(cut.volume()-rawVolume)>.01)
+   throw Error('The stepped fitting coupon cannot be cleaned without changing its physical dimensions.');
   assertSolid(cut,'Engraved stepped LED-fit coupon');
   return {geometry:fromResultMesh(cut.getMesh()),diameters:spec.diameters,
    captions:labels,profileName:profile.name,flangeDiameter:profile.flangeDiameter,
@@ -941,7 +1094,7 @@ export function makeSteppedPixelCoupon(wasm,settings,{openWireExits=true}={}){
    const bore=putSocket(wasm,hold,at,profile.maxDiameter/2,thick,-3,profile);
    cuts.push(bore.solid);
    if(openWireExits&&profile.wireWidth>.1&&profile.wireDepth>.1){
-    const laneWidth=Math.max(.8,profile.wireWidth+profile.clearance);
+    const laneWidth=Math.max(.8,profile.wireWidth);
     const laneDepth=Math.min(profile.wireDepth,Math.max(.2,thick-2.8));
     wireExits.push(hold(wasm.Manifold.cube([laneWidth,laneDepth+.6,width+2])
      .translate([centreX-laneWidth/2,-.5,-1])));

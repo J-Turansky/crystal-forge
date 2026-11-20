@@ -118,7 +118,7 @@ export function planPixelStringRoutes(crystals,s,hardware){
     // First/last ~1 mm within the LED bore or exterior opening are allowed.
     if(edge&&((i===1&&j<=1)||(i===points.length-1&&j>=n-1)))continue;
     if(!inside(p,poly))return false;
-    if(baseSurfaceHeight(crystals,s,p.x,p.z)<depth+1.5)return false;
+    if(baseSurfaceHeight(crystals,s,p.x,p.z)<depth+1.5+(s.wireVaulted?width/2:0))return false;
    }
   }
   return true;

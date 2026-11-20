@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import Module from 'manifold-3d';
+import {exportMaterialBodies} from '../studio-material-export.js';
 import {generateFormation,crystalGeometry,baseGeometry,baseAccentSpecs,baseSurfaceHeight,baseProfileHeight,baseEdgeHeight,crystalRootOffset,crystalOrientation,crystalEndRatios} from '../geometry-v3.js';
-import {setThreeInstance,prepareFabrication,probeLightPassageSegment,makeCalibrationStrip,makePixelSeatCoupon,splitPreparedMesh,splitPreparedMeshGrid,makeSplitPinCoupon,makeDetachablePlate,makeSteppedPixelCoupon,encodeSTL,saveSTL,save3MF} from '../fabrication-v1.js';
+import {setThreeInstance,prepareFabrication,putSocket,probeLightPassageSegment,makeCalibrationStrip,makePixelSeatCoupon,splitPreparedMesh,splitPreparedMeshGrid,makeSplitPinCoupon,makeDetachablePlate,makeSteppedPixelCoupon,encodeSTL,saveSTL,save3MF} from '../fabrication-v1.js';
 setThreeInstance(THREE);
 import {planHardware} from '../hardware-layout.js';
 import {planBedAwareSplit} from '../bed-split.js';
@@ -15,6 +16,28 @@ import {PIXEL_PRESETS,normalisePixelProfile,resolvePixelProfile,resolveSocketPro
 import {auditLightPassages,lightPassageExportBlock,lightPassageReportEntries} from '../light-passage-inspection.js';
 
 const wasm=await Module();wasm.setup();
+{
+ const settings={pixelProfileId:'gumdrop',pixelDiameter:12,pixelFit:.15,pixelRetentionLip:.2,socketConical:true};
+ const profile=resolvePixelProfile(settings),solids=[],hold=solid=>(solids.push(solid),solid);
+ try{
+  const rounded=putSocket(wasm,hold,{x:0,z:0},6,35,-3,profile,{includeLocalWireRelief:false});
+  const conical=putSocket(wasm,hold,{x:0,z:0},6,35,-3,profile,{conical:true,includeLocalWireRelief:false});
+  assert.equal(conical.usableBodyDepth,profile.bodyHeight);
+  assert.equal(conical.retentionLip,rounded.retentionLip);
+  assert.equal(conical.capRise,profile.boreDiameter/2);
+  assert(hold(rounded.solid.subtract(conical.solid)).volume()<.001,'Conical cavity preserves the rounded fit envelope');
+  assert.throws(()=>putSocket(wasm,hold,{x:0,z:0},6,25,-3,profile,{conical:true}),/needs .*stock/);
+  const coupon=makePixelSeatCoupon(wasm,settings,{single:true,openWireExits:false});
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(coupon.geometry,material);
+  const center=Math.max(32,profile.maxDiameter+20)/2,depth=Math.max(32,profile.maxDiameter+22)/2;
+  const ray=new THREE.Raycaster(new THREE.Vector3(center,1,depth),new THREE.Vector3(0,1,0));
+  assert(Math.abs(ray.intersectObject(mesh)[0].point.y-conical.tipY)<.001,'Coupon has the same conical roof apex');
+  coupon.geometry.dispose();material.dispose();
+ }finally{for(const solid of solids)solid.delete();}
+ console.log('WT-021 conical gumdrop: rounded cavity contained, thin stock rejected, coupon apex matched');
+}
+
 
 {
  const block=wasm.Manifold.cube([10,10,10]);
@@ -32,9 +55,9 @@ const wasm=await Module();wasm.setup();
  open.delete();opening.delete();block.delete();
 }
 
-function geometryEdges(g){
+function geometryEdges(g,precision=1e4){
  const p=g.attributes.position.array,edges=new Map();
- const v=i=>[...p.slice(i,i+3)].map(x=>Math.round(x*1e4)).join(',');
+ const v=i=>[...p.slice(i,i+3)].map(x=>precision===0?x:Math.round(x*precision)).join(',');
  for(let i=0;i<p.length;i+=9)for(let j=0;j<3;j++){
   const endpoints=[v(i+j*3),v(i+((j+1)%3)*3)].sort().join(':');
   edges.set(endpoints,(edges.get(endpoints)||0)+1);
@@ -116,6 +139,34 @@ function assembly(s){
   }
   return {meshes,crystals};
 }
+function crystalExportTriangles(measured){
+ const bytes=encodeSTL(measured.geometry);
+ const stl=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+ const vertices=[];
+ for(let i=0;i<stl.getUint32(80,true);i++){
+  for(let coordinate=0;coordinate<9;coordinate++)
+   vertices.push(stl.getFloat32(96+i*50+coordinate*4,true));
+ }
+ const {threeMF}=exportMaterialBodies({
+  report:{ready:true,engine:'Manifold',coordinateFrame:'Y-up'},
+  bodies:[{role:'primary',volume:measured.report.volumeMm3,mesh:measured.report.mesh}]
+ });
+ const zip=Buffer.from(threeMF);
+ let xml;
+ for(let i=0;zip.readUInt32LE(i)===0x04034b50;){
+  const nameLength=zip.readUInt16LE(i+26),start=i+30+nameLength+zip.readUInt16LE(i+28),size=zip.readUInt32LE(i+18);
+  if(zip.toString('utf8',i+30,i+30+nameLength)==='3D/3dmodel.model'){
+   assert.equal(zip.readUInt16LE(i+8),0);
+   xml=zip.toString('utf8',start,start+size);break;
+  }
+  i=start+size;
+ }
+ assert.match(xml,/<model unit="millimeter"/);
+ assert.match(xml,/<item objectid="2" transform="1 0 0 0 1 0 0 0 1 0 0 0"/);
+ const points=[...xml.matchAll(/<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"/g)].map(m=>m.slice(1).map(Number));
+ const indexes=[...xml.matchAll(/<triangle v1="(\d+)" v2="(\d+)" v3="(\d+)"/g)].flatMap(m=>m.slice(1).map(Number));
+ return [['STL',vertices],['3MF',indexes.flatMap(index=>points[index])]];
+}
 function validate(label,s){
   const {meshes,crystals}=assembly(s);
   const result=prepareFabrication({wasm,meshes,crystals,settings:s});
@@ -184,6 +235,20 @@ assert.notDeepEqual(Array.from(meshA.getAttribute('position').array),
  Array.from(meshB.getAttribute('position').array),'Individual shape override changes mesh');
 meshA.dispose();meshB.dispose();
 safetyGeometryCheck();
+{
+ const crystal=generateFormation({...settings,count:1})[0];
+ const shapes=new Map(['Rounded','Blunt','Flat'].map(tipStyle=>{
+  const geometry=crystalGeometry(THREE,crystal,{...settings,tipStyle});
+  assert.equal(geometryEdges(geometry).open,0,tipStyle+' tip is closed');
+  const points=Array.from(geometry.getAttribute('position').array);
+  geometry.dispose();
+  return [tipStyle,points];
+ }));
+ assert.notDeepEqual(shapes.get('Rounded'),shapes.get('Blunt'));
+ assert.notDeepEqual(shapes.get('Rounded'),shapes.get('Flat'));
+ const flat=shapes.get('Flat'),top=Math.max(...flat.filter((_,i)=>i%3===1));
+ assert(flat.some((x,i)=>i%3===0&&Math.abs(x)>1&&Math.abs(flat[i+1]-top)<.001),'Flat tip ends in a measurable plane');
+}
 function testLeanAndSpacing(){
  const base={...settings,count:12,baseDome:0,spacing:100,leanAmount:90,angleRandomness:0};
  for(const mode of ['One direction','Criss-cross','Radial outward','Radial inward','Organic / natural']){
@@ -296,6 +361,32 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
  const roof=estimateRoofReview(plan.polygon,cfg,{});
  assert(roof.needsCura&&Number.isFinite(roof.estimateMm),'Roof span review remains advisory');
  const prepared=validate('wired-groove',cfg);
+ const flatSix=validate('flat six millimetre groove',{...cfg,wireWidth:6});
+ const vaultedSix=validate('vaulted six millimetre groove',{...cfg,wireWidth:6,wireVaulted:true});
+ assert.equal(vaultedSix.wireChannelsCut,flatSix.wireChannelsCut);
+ assert(vaultedSix.volumeMm3<flatSix.volumeMm3-1,'Vault cut adds volume above the full usable wire space');
+ // Read the exported triangles and measure the void between the two sockets.
+ const measuredCfg={...cfg,wireWidth:6,wireVaulted:true};
+ const measured=prepareFabrication({wasm,...assembly(measuredCfg),settings:measuredCfg});
+ for(const [format,positions] of crystalExportTriangles(measured)){
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  const section=new THREE.Mesh(geometry,material);
+  const at=(height,direction)=>{
+   const ray=new THREE.Raycaster(new THREE.Vector3(.23,0,height),new THREE.Vector3(0,direction,0));
+   const hit=ray.intersectObject(section)[0];
+   assert(hit,format+' section must hit the channel wall');
+   return hit.distance;
+  };
+  for(const [height,expected] of [[1,6],[3,4],[4,2]]){
+   const opening=at(height,1)+at(height,-1);
+   assert(Math.abs(opening-expected)<.001,format+' section at '+height+' mm measured '+opening+' mm');
+  }
+  geometry.dispose();material.dispose();
+ }
+ measured.geometry.dispose();
+ console.log('WT-021 Crystal STL and 3MF sections: 6 mm usable width, taper to 4 and 2 mm at 3 and 4 mm height');
  assert(prepared.socketCeilings.every(socket=>socket.wireReliefDepth===0),
   'PR13: two legacy-routed pixels must have no detached local relief cuts');
  assert.equal(prepared.wireChannelsCut,plan.wirePlan.routes.length,'Manufacturing uses the exact planned groove count');
@@ -344,6 +435,136 @@ validate('domed-union',{...settings,baseDome:20,tipRound:3.5});
   'Valid serial string must not cut orphan reliefs underneath the connected path');
  assert.equal(serialMesh.wireChannelsCut,serialPlan.wirePlan.routes.length,
   'Manifold removes every approved IN/OUT groove in the string plan');
+ const routedVault={...serialOne,baseHeight:35,wireWidth:6,wireDepth:2,wireVaulted:true,socketConical:true};
+ const asymmetric={...routedVault,lightingMode:'multi',pixelCount:2,pixelStringSpacing:100,
+  pixelRetentionLip:.15,manualPixelHoles:[{x:-18,z:-4,wireAngle:0},{x:18,z:6,wireAngle:0}]};
+ // WT-021 AUD-01: missing intersections are never evidence of clearance.
+ const requireExportedRoof=(height,label)=>{
+  assert(Number.isFinite(height),label+': missing exported channel roof (no intersection)');
+  assert(height>1.95,label+': channel roof gives less than 1.95 mm clearance');
+ };
+ assert.throws(()=>requireExportedRoof(undefined,'deliberately missing roof fixture'),
+  /missing exported channel roof/);
+ const footprintEdgeDistance=(x,z,polygon)=>{
+  let nearest=Infinity;
+  for(let j=0;j<polygon.length;j++){
+   const a=polygon[j],b=polygon[(j+1)%polygon.length];
+   const dx=b.x-a.x,dz=b.z-a.z,length2=dx*dx+dz*dz||1;
+   const t=Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/length2));
+   nearest=Math.min(nearest,Math.hypot(x-(a.x+t*dx),z-(a.z+t*dz)));
+  }
+  return nearest;
+ };
+ const insideFootprint=(x,z,polygon)=>{
+  let inside=false;
+  for(let i=0,j=polygon.length-1;i<polygon.length;j=i++){
+   const a=polygon[i],b=polygon[j];
+   if((a.z>z)!==(b.z>z)&&x<(b.x-a.x)*(z-a.z)/(b.z-a.z)+a.x)inside=!inside;
+  }
+  return inside;
+ };
+ for(const installation of [routedVault,asymmetric]){
+ const routed=prepareFabrication({wasm,...assembly(installation),settings:installation});
+ const routes=routed.report.hardware.wirePlan.routes;
+ const sockets=routed.report.socketCeilings;
+ assert.equal(sockets.length,installation.pixelCount===2&&installation.lightingMode==='multi'?2:1);
+ assert(routes.length>1);
+ if(installation===asymmetric){
+  const links=routed.report.hardware.wirePlan.connections;
+  assert.deepEqual(links.map(link=>link.kind),['input','link','output']);
+  assert(links[1].segments>1,'Asymmetric link must use the sampled curve');
+  assert(links[1].lengthMm<=100);
+ }
+ for(const [format,positions] of crystalExportTriangles(routed)){
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(geometry,material);
+  const ceiling=(x,z)=>new THREE.Raycaster(new THREE.Vector3(x,-z,-1),new THREE.Vector3(0,0,1)).intersectObject(mesh)[0]?.point.z;
+  for(const socket of sockets){
+  const apex=ceiling(socket.x,socket.z);
+  assert(Math.abs(apex-socket.tipY)<.001,format+' full-model conical apex');
+  assert(Math.abs(apex-ceiling(socket.x+2,socket.z)-2)<.001,format+' conical roof falls 2 mm over 2 mm');
+  const profile=resolvePixelProfile(installation);
+  const throatHeight=Math.max(1.9,profile.flangeHeight+.8)+.7;
+  for(const [height,width] of [[throatHeight,profile.boreDiameter-2*profile.retentionLip],[8,profile.boreDiameter]]){
+   const origin=new THREE.Vector3(socket.x,-socket.z,height);
+   const walls=[-1,1].map(sign=>new THREE.Raycaster(origin,new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0]);
+   assert(walls.every(Boolean),format+' Crystal retained section has both walls');
+   assert(Math.abs(walls[0].distance+walls[1].distance-width)<.055,format+' Crystal measured section at '+height);
+  }
+  }
+  for(const {a,b,kind} of routes){
+   const span=Math.hypot(b.x-a.x,b.z-a.z);
+   assert(span>.001,format+' zero-length route cannot be sampled');
+   const steps=Math.ceil(span),footprint=routed.report.hardware.polygon;
+   let verifiedInside=0;
+   for(let i=0;i<=steps;i++){
+    const t=i/steps;
+    for(const offset of [-2.9,0,2.9]){
+     const z=a.z+(b.z-a.z)*t+(b.x-a.x)*offset/span;
+     const x=a.x+(b.x-a.x)*t-(b.z-a.z)*offset/span;
+     // An exterior IN/OUT cutter deliberately extends beyond the base;
+     // outside that footprint there must be no requirement to hit stock.
+     if(!insideFootprint(x,z,footprint))continue;
+     const distanceFromEdge=footprintEdgeDistance(x,z,footprint);
+     const height=ceiling(x,z);
+     // The explicit perimeter end of an IN/OUT cut can be open to air
+     // rather than have a roof at the exact edge of the solid. This is
+     // *not* permitted for interior samples, even 1 mm farther in.
+     if((kind==='input'||kind==='output')&&distanceFromEdge<.05&&!Number.isFinite(height))continue;
+     requireExportedRoof(height,format+' route '+kind+' offset '+offset+' edge distance '+distanceFromEdge.toFixed(2)+' mm at '+x.toFixed(2)+','+z.toFixed(2));
+     verifiedInside++;
+    }
+   }
+   // A link is entirely internal; an IN/OUT segment may lie wholly outside
+   // the base where it deliberately opens the physical wire aperture.
+   assert(verifiedInside>0||kind==='input'||kind==='output',
+    format+' internal route has no verifiable roof cross-sections');
+  }
+  geometry.dispose();material.dispose();
+ }
+ routed.geometry.dispose();
+ }
+ // WT-021 AUD-02: inspect a physical wire aperture in the *serialized STL*.
+ // The socket body bore grows with pixelFit, while the wire relief width
+ // must remain independently determined by physical profile F (3 mm here).
+ const couponWireOpening=(fit)=>{
+  const settings={pixelProfileId:'gumdrop',pixelDiameter:12,pixelFit:fit,pixelRetentionLip:0};
+  const profile=resolvePixelProfile(settings);
+  const coupon=makePixelSeatCoupon(wasm,settings,{single:true,openWireExits:true});
+  const bytes=encodeSTL(coupon.geometry),data=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  const facets=data.getUint32(80,true),positions=new Float32Array(facets*9);
+  for(let face=0;face<facets;face++)for(let coordinate=0;coordinate<9;coordinate++)
+   positions[face*9+coordinate]=data.getFloat32(96+face*50+coordinate*4,true);
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(geometry,material);
+  try{
+   const centreX=Math.max(32,profile.maxDiameter+20)/2;
+   const insideSlot=new THREE.Vector3(centreX,-.5,.7); // Z-up STL coordinates
+   const left=new THREE.Raycaster(insideSlot,new THREE.Vector3(-1,0,0)).intersectObject(mesh)[0];
+   const right=new THREE.Raycaster(insideSlot,new THREE.Vector3(1,0,0)).intersectObject(mesh)[0];
+   assert(left&&right,'Serialized STL must contain both exterior wire-aperture walls');
+   const width=left.distance+right.distance;
+   assert(Math.abs(width-profile.wireWidth)<.01,
+    'STL wire aperture '+width+' mm differs from physical F '+profile.wireWidth+' mm');
+   return width;
+  }finally{geometry.dispose();material.dispose();coupon.geometry.dispose();}
+ };
+ const tightWire=couponWireOpening(.1),looseWire=couponWireOpening(.5);
+ assert(Math.abs(tightWire-looseWire)<.001,
+  'Changing bore fit must not resize the serialized wire aperture');
+ const tooShort={...asymmetric,pixelStringSpacing:25};
+ assert.throws(()=>prepareFabrication({wasm,...assembly(tooShort),settings:tooShort}),/Pixel string route invalid/);
+ const thin={...routedVault,baseHeight:5};
+ assert.throws(()=>prepareFabrication({wasm,...assembly(thin),settings:thin}),/Pixel string route invalid/);
+ const shallowSocket={...routedVault,baseHeight:25,wireChannels:false};
+ assert.throws(()=>prepareFabrication({wasm,...assembly(shallowSocket),settings:shallowSocket}),
+  /Conical pixel socket needs .*stock/);
+
+ console.log('WT-021 full Crystal STL/3MF: IN/OUT clearance samples, conical apex/slope and thin stock rejection');
  const uncutSerial=validate('PR9 single-pixel wiring OFF',{...serialOne,wireChannels:false});
  assert(serialMesh.volumeMm3<uncutSerial.volumeMm3-1,
   'Opposed cable channels remove real material from Manifold geometry');
@@ -529,7 +750,10 @@ assert.deepEqual(stepped.diameters,[11.95,12.05,12.15,12.25,12.35]);
 assert.equal(stepped.wireExitCount,10,'Five shapes have their wires open on both sides');
 assert.equal(stepped.diameters.length,5,'Stepped pixel housing and flange coupon has five holes');
 assert(stepped.geometry.getAttribute('position').count>200,'Stepped coupon has real printable geometry');
-assert.equal(geometryEdges(stepped.geometry).open,0,'Stepped coupon remains watertight');
+const couponCoarse=geometryEdges(stepped.geometry).open;
+assert.equal(couponCoarse,0,'Stepped coupon remains watertight: rounding at 1e-4 mm produces '+
+ couponCoarse+' suspect edges; 1e-5 mm produces '+geometryEdges(stepped.geometry,1e5).open+
+ ', and exact serialized Float32 coordinates produce '+geometryEdges(stepped.geometry,0).open);
 stepped.geometry.dispose();
 const singleSocket=makePixelSeatCoupon(wasm,{...settings,pixelProfileId:'gumdrop',pixelDiameter:12,pixelFit:.25,pixelRetentionLip:.35},{single:true,openWireExits:false});
 assert.deepEqual(singleSocket.diameters,[12.25]);

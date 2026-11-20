@@ -7,13 +7,14 @@ import {lightPassageExportBlock,lightPassageReportEntries} from './light-passage
 import {renderPixelProfileDiagram} from './pixel-profile-diagram.js';
 import {applyPixelFittingProfile,resolvePixelFitting,withMeasuredPixelFit,saveablePixelFit} from './studio-pixel-fit.js';
 import {pixelBuilderMarkup,pixelHoleMarkup,bindPixelBuilder,pixelProfiles,stablePixels,findPixelPosition,checkedPixelBore,newPixel} from './studio-pixel-builder.js';
-import {stableMounts,newMount,mountHoleIssue} from './studio-mount-builder.js';
+import {stableMounts,newMount,mountHoleIssue,mountProfiles,manualMountProfiles,blindMountProfile,recessDimensions} from './studio-mount-builder.js';
 import {createModel,addModel,findModel,openTab,closeTab,reorderTabs,duplicateModel,editModel,
  queueModel,beginPreparation,finishPreparation,cancelPreparation,canExport,resolveJobPrinter,movePrintJob,invalidatePrintJob,saveLibraryRevision,
  insertLibraryModel,availableLinkedUpdate,acceptLinkedUpdate,breakLink,modelFingerprint,validateProject,WORKSPACE_KEY,newId} from './studio-documents.js';
 import {makeCatalogue,applyBuildModules,generators} from './studio-catalogue.js';
-import {previewRecipe,disposeGroup} from './studio-geometry.js';
-import {exportMaterialBodies} from './studio-material-export.js';
+import {previewRecipe,disposeGroup,nativeFittingPreviews} from './studio-geometry.js';
+import {loadManifold} from './fabrication-v1.js';
+import {exportMaterialBodies,preparedDimensionsMm} from './studio-material-export.js';
 import {installExactValueEditors} from './exact-value-editors.js';
 import {createToolFinder} from './studio-tool-finder.js';
 import {createCuraProfile,zipProfileEntries,curaFallbackText,calculateCuraSettings} from './cura-profiles.js';
@@ -48,6 +49,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   validateParameters:p=>({valid:!!p,errors:[],parameters:p}),generatePreview:()=>adapter.capture(),
   generateManufacturingGeometry:()=>adapter.capture(),estimateBounds:()=>adapter.bounds(),migrateParameters:(_,p)=>p};
  const registry=makeCatalogue(crystalAdapter),cache=new Map(),histories=new Map(),prepared=new Map(),workers=new Map();
+ const nativeFitPreviewChoices=new Map(),nativeFitPreviewMessages=new Map();
  let currentId=null,mode='model',stage='design',switching=false,saveTimer=null,dirty=false,search='',filter='all',studioVault=null,vaultClient=null,previewBuilds=0;
  const link=document.createElement('link');link.rel='stylesheet';link.href='./sensory-studio.css';document.head.append(link);
  const bar=document.createElement('nav');bar.className='studio-modelbar';bar.setAttribute('aria-label','Project and model workspaces');
@@ -62,7 +64,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  const overlay=document.createElement('div');overlay.className='sms-overlay';overlay.hidden=true;overlay.id='smsOverlay';document.querySelector('.viewarea').style.position='relative';document.querySelector('.viewarea').append(overlay);
  const shell=unified?setupShell():null;
  const inspection=shell?createLightInspector({THREE,scene,camera,
-  prepare:modelId=>prepare(enqueue(modelId).id),
+  prepare:modelId=>{if(active()?.id===modelId)captureCrystal();prepare(enqueue(modelId).id);},
   cancel:modelId=>{const job=project.printJobs.find(item=>item.modelId===modelId);if(job?.status==='preparing'){cancelPreparation(project,job.id);delete job.progress;discardPrintResult(job.id);save();renderJobs();renderTabs();}}}):null;
  if(inspection){
   $('smsPrecisionContent').prepend(inspection.root);
@@ -139,7 +141,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    focusAfterNavigation(action==='pixels'?
     ['.sms-palette [data-pixel-profile-editor]','.sms-palette [data-fit-profile]','.sms-palette [data-fit-print]','#placePixelBtn']:
     action==='mounts'?
-    ['.sms-palette [data-place-mount]','.sms-palette [data-select-mount]','#mountType','#mountPlacement','[data-state="mount"]']:
+    ['.sms-palette [data-new-mount-profile]','.sms-palette [data-place-mount]','.sms-palette [data-select-mount]','#mountType','#mountPlacement','[data-state="mount"]']:
     ['#wireRouteStatus','.sms-palette [data-native-route]','#wireSpacingPreset']);
   };
   const finder=createToolFinder(chooseTool);
@@ -233,7 +235,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   },'smsFocus');
   focus.setAttribute('aria-pressed','false');viewer.querySelector('.vcolumn').append(focus);
   window.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.body.classList.contains('sms-focused'))focus.click();});
-  return {palette,home,searchSettings,search,focus};
+  return {palette,home,searchSettings,search,focus,chooseTool,focusAfterNavigation};
  }
  function shellUndo(delta){
   if(mode!=='model'||active()?.link)return;
@@ -458,13 +460,75 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    if(c?.group&&c.group.parent)c.view={camera:camera.position.toArray(),target:orbit.target.toArray()};
    if(c?.group)disposeGroup(c.group);
    const recipe=applyBuildModules(generator.recipe(model.parameters),model.build,generator.capabilities,{preview:true});
-   const group=previewRecipe(THREE,recipe,[model.materials.primary?.colour||0x88bbff,model.materials.secondary?.colour||0xffcf70]);previewBuilds++;c={kind:'generic',group,fingerprint,view:c?.view,routing:recipe.nativeRouting};cache.set(model.id,c);
+   const group=previewRecipe(THREE,recipe,[model.materials.primary?.colour||0x88bbff,model.materials.secondary?.colour||0xffcf70]);previewBuilds++;c={kind:'generic',group,fingerprint,view:c?.view,routing:recipe.nativeRouting,recipe};cache.set(model.id,c);
    model.thumbnail=thumbnail(group);
   }
   scene.add(c.group);
   if(c.view){camera.position.fromArray(c.view.camera);orbit.target.fromArray(c.view.target);camera.lookAt(orbit.target);}
   else frame(c.group);
   adapter.status('Ready — '+generator.displayName+'. Preview is editable geometry; prepare the print job before exporting.');
+  refreshNativeFittingPreview(model);
+ }
+ // Build-only physical overlays derive their solids from the exact same
+ // Manifold cutter and placement transform as the manufacturing worker.
+ // They are excluded from picking, saved state and all exported geometry.
+ function nativeFitMesh(mesh){
+  const vertices=mesh.vertProperties||mesh.points,triangles=mesh.triVerts||mesh.triangles,stride=mesh.numProp||3;
+  if(!vertices?.length||!triangles?.length||stride<3)throw Error('No valid physical fitting preview geometry.');
+  const positions=new Float32Array(triangles.length*3);
+  for(let i=0;i<triangles.length;i++){
+   const offset=triangles[i]*stride;
+   for(let axis=0;axis<3;axis++)positions[i*3+axis]=vertices[offset+axis];
+  }
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+  geometry.computeVertexNormals();
+  return geometry;
+ }
+ function refreshNativeFittingPreview(model){
+  if(model?.generator.typeId==='crystals')return;
+  const c=cache.get(model.id);
+  if(!c?.group||!c.recipe)return;
+  const enabled=stage==='build'&&nativeFitPreviewChoices.get(model.id)===true;
+  const token=c.fingerprint+':'+(enabled?'on':'off');
+  if(c.fitToken===token)return;
+  c.fitToken=token;
+  for(const overlay of c.group.children.filter(child=>child.userData.nativeFittingPreview)){
+   c.group.remove(overlay);overlay.geometry?.dispose();overlay.material?.dispose();
+  }
+  nativeFitPreviewMessages.set(model.id,enabled?'Preparing physical fitting preview…':'');
+  const report=message=>{
+   nativeFitPreviewMessages.set(model.id,message);
+   if(active()?.id===model.id)for(const output of document.querySelectorAll('[data-native-fit-preview-status]'))
+    output.textContent=message;
+  };
+  if(!enabled){report('');return;}
+  (async()=>{
+   try{
+    const wasm=await loadManifold();
+    if(cache.get(model.id)!==c||c.fitToken!==token)return;
+    const results=nativeFittingPreviews(THREE,wasm,c.recipe);
+    if(cache.get(model.id)!==c||c.fitToken!==token)return;
+    const messages=[];
+    for(const [index,fit] of results.entries()){
+     for(const [kind,shape,color,opacity] of [
+      ['negative',fit.negative,0x46beff,.16],
+      ['positive',fit.positive,(fit.collisionVolume>.01||fit.warnings.length)?0xff6161:0xffdc58,.42]
+     ]){
+      const overlay=new THREE.Mesh(nativeFitMesh(shape),new THREE.MeshBasicMaterial({
+       color,opacity,transparent:true,depthTest:false,depthWrite:false,side:THREE.DoubleSide
+      }));
+      overlay.userData.nativeFittingPreview=kind;
+      overlay.userData.previewOnly=true;
+      overlay.name='native-fitting-'+kind+'-'+fit.pixelId;
+      overlay.renderOrder=kind==='positive'?96:95;
+      c.group.add(overlay);
+     }
+     messages.push('P'+(index+1)+' · insertion '+fit.insertionDepth.toFixed(2)+' mm · nominal cutter roof allowance '+fit.nominalRoofAllowance.toFixed(2)+' mm (local stock not measured) · '+fit.exposedVolume.toFixed(2)+' mm³ outside stock · '+fit.collisionVolume.toFixed(2)+' mm³ stock interference; '+fit.wireOverlap.toFixed(2)+' mm³ overlap with wire cuts',...fit.warnings);
+    }
+    report(messages.join(' | ')||'Select a measured shaped socket to preview its physical fit.');
+   }catch(error){if(cache.get(model.id)===c&&c.fitToken===token)report('Physical fitting preview unavailable: '+error.message);}
+  })();
  }
  function frame(group){
   const box=new THREE.Box3().setFromObject(group),size=box.getSize(new THREE.Vector3()),centre=box.getCenter(new THREE.Vector3());
@@ -597,7 +661,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const familyFields={
    outline:['Pushbutton'],top:['Pushbutton'],
    symbol:model.parameters.rotaryMark==='Recessed pointer'?['Pushbutton','Rotary selector']:['Pushbutton','Rotary knob','Rotary selector'],
-   rotaryTop:['Rotary knob'],rotaryMark:['Rotary knob'],
+   rotaryTop:['Rotary knob'],rotaryMark:['Rotary knob'],knobInstallation:['Rotary knob','Rotary selector'],
    controlGrip:['Thumb joystick','Toggle lever','Rocker','Fader cap','Directional pad'],
    cornerRound:style==='Pushbutton'&&model.parameters.outline==='Square'?['Pushbutton']:[],
    gripProfile:['Rotary knob','Rotary selector'],gripCount:['Rotary knob','Rotary selector'],gripDepth:['Rotary knob','Rotary selector'],
@@ -625,6 +689,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   save();
   if(mode==='model'&&stage==='build'){renderPalette();if(model.generator.typeId!=='crystals')renderEditor();}
  });
+ const mountPlacementProfiles=new Map();
  let placementModel=null,mountingModel=null,pixelGesture=null,pendingDuplicate=null,placeShaped=false,seatCheck=null;
  const pixelHoles=model=>stablePixels(model.build.pixelHoles||[]);
  const mountHoles=model=>stableMounts(model.build.manualMountHoles||[]);
@@ -758,20 +823,45 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   refreshPixelMarkers(model);
   renderPalette();
  }
- function savePixels(model,holes,id,focus){
-  if(!commit({build:{...model.build,pixelHoles:holes,pixelBuilderVersion:1}}))return false;
+ function savePixels(model,holes,id,focus,serialRouting=model.build.serialRouting){
+  const build={...model.build,pixelHoles:holes,pixelBuilderVersion:1,...(serialRouting?{serialRouting}:{})};
+  if(!commit({build}))return false;
   selectedPixels.set(model.id,id);
   pixelMessages.delete(model.id);
   redrawPixelEditor(focus);
   return true;
  }
- function editPixel(model,index,hole,focus){
-  const holes=pixelHoles(model);
-  if(!holes[index]||model.link)return false;
+ function reorderPixels(model,holes,id,serialRouting=model.build.serialRouting){
+  const save=()=>savePixels(model,holes,id,undefined,serialRouting);
+  if(serialRouting?.enabled){
+   checkFittingBuild(model,{...model.build,pixelHoles:holes,pixelBuilderVersion:1,serialRouting},save,
+    {pending:'Checking the new cable order and openings…'});
+  }else save();
+ }
+ function editPixel(model,index,hole,focus,onSaved){
+  const holes=pixelHoles(model),previous=holes[index];
+  if(!previous||model.link)return false;
+  const moved=hole.x!==previous.x||hole.z!==previous.z;
+  if(hole.socketProfile&&moved){
+   const updated=relocateShapedSocket(model,previous,hole);
+   if(!updated){pixelStatus(model,'Move along the current installation face, or drag the socket onto another solid face.');return false;}
+   hole=updated;
+  }
   const issue=pixelIssue(model,hole,holes.filter((_,i)=>i!==index));
   if(issue){pixelStatus(model,pixelPlacementAdvice(model,issue));return false;}
   holes[index]={...hole,checked:true};
-  return savePixels(model,holes,hole.id,focus);
+  const save=()=>{
+   const saved=savePixels(model,holes,hole.id,focus);
+   if(saved)onSaved?.();
+   return saved;
+  };
+  const routeRotation=model.build.serialRouting?.enabled&&hole.rotation!==previous.rotation;
+  if(hole.socketProfile&&(moved||routeRotation||hole.socketProfile!==previous.socketProfile||
+     hole.diameter!==previous.diameter||hole.clearance!==previous.clearance)){
+   checkFittingBuild(model,{...model.build,pixelHoles:holes,pixelBuilderVersion:1},save);
+   return false;
+  }
+  return save();
  }
  function removePixel(model,index){
   const holes=pixelHoles(model);
@@ -792,7 +882,14 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const mounts=mountHoles(model);if(!mounts[index]||model.link)return false;
   const issue=mountIssue(model,mount,mounts.filter((_,i)=>i!==index));
   if(issue){pixelStatus(model,issue);return false;}
-  mounts[index]=mount;return saveMounts(model,mounts,mount.id);
+  mounts[index]=mount;
+  if(mount.profile&&mount.profile!==mountProfiles[0]){
+   checkFittingBuild(model,{...model.build,manualMountHoles:mounts},()=>saveMounts(model,mounts,mount.id),{
+    pending:'Checking material around the recessed fixing…'
+   });
+   return false; // Keep the accepted field values visible until the worker approves.
+  }
+  return saveMounts(model,mounts,mount.id);
  }
  function removeMount(model,index){
   const mounts=mountHoles(model);if(!mounts[index]||model.link)return;
@@ -849,6 +946,21 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   for(const mesh of meshes??fittingMeshes(model))bounds.expandByObject(mesh);
   return bounds;
  }
+ function relocateShapedSocket(model,previous,desired){
+  const meshes=fittingMeshes(model),bounds=nativeModelBounds(meshes);
+  if(!bounds||bounds.isEmpty())return null;
+  const normal=new THREE.Vector3(...(previous.surface?.normal??[0,-1,0]));
+  const axis=Math.abs(normal.y)>=.5?'y':Math.abs(normal.x)>=Math.abs(normal.z)?'x':'z';
+  const origin=new THREE.Vector3(desired.x,previous.surface?.y??0,desired.z),direction=new THREE.Vector3();
+  const positive=normal[axis]>0;
+  origin[axis]=positive?bounds.max[axis]+1:bounds.min[axis]-1;
+  direction[axis]=positive?-1:1;
+  const hit=new THREE.Raycaster(origin,direction).intersectObjects(meshes,false)[0];
+  if(!hit?.face||Math.abs(hit.point.x-desired.x)>.02||Math.abs(hit.point.z-desired.z)>.02)return null;
+  const hitNormal=hit.face.normal.clone().applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld));
+  if(normal.dot(hitNormal)<.7)return null;
+  return {...desired,surface:socketSurface(hit.point,hitNormal),entryFace:hitNormal.y<0?'underside':'top'};
+ }
  function fittingPointScreen(x,z,face){
   const model=active(), meshes=model?fittingMeshes(model):[];
   const bounds=nativeModelBounds(meshes);
@@ -882,23 +994,26 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const hit=fittingSurface(model,event);
   if(!hit){placementGhost.visible=false;viewport.dataset.nativePlacement='outside';return;}
   const {point}=hit,placingMount=mountingModel===model.id;
-  const hole=placingMount?newMount(Math.round(point.x*10)/10,Math.round(point.z*10)/10):fittingCandidate(model,point,pendingDuplicate);
+  const hole=placingMount?mountAtPoint(point,hit.normal,mountPlacementProfiles.get(model.id)):fittingCandidate(model,point,pendingDuplicate);
   const holes=placingMount?mountHoles(model):pixelHoles(model);
   const shaped=!placingMount&&(placeShaped||pendingDuplicate?.socketProfile);
   const issue=(!shaped&&fittingFaceIssue(hit))||(holes.length>=16?'Maximum 16 fittings per model.':
    shaped?null:placingMount?mountIssue(model,{...hole,entryFace:hit.normal.y<0?'underside':'top'},holes):pixelIssue(model,hole,holes));
   placementGhost.position.copy(point).addScaledVector(hit.normal,.3);
   placementGhost.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),hit.normal);
-  placementGhost.scale.setScalar((hole.diameter+(hole.clearance||0))/2);
-  placementGhost.material.color.setHex(issue?0xff3c59:shaped?0xffbe47:0x48e4f1);
+  const needsStockCheck=shaped||(placingMount&&hole.profile&&hole.profile!==mountProfiles[0]);
+  placementGhost.scale.setScalar((placingMount&&blindMountProfile(hole.profile)?recessDimensions(hole).diameter:hole.diameter+(hole.clearance||0))/2);
+  placementGhost.material.color.setHex(issue?0xff3c59:needsStockCheck?0xffbe47:0x48e4f1);
   placementGhost.visible=true;
-  viewport.dataset.nativePlacement=issue?'invalid':shaped?'unverified':'valid';
+  viewport.dataset.nativePlacement=issue?'invalid':needsStockCheck?'unverified':'valid';
  }
  function socketSurface(point,normal){
   if(normal.y<-.999&&Math.abs(point.y)<.01)return undefined;
   return {y:point.y,normal:normal.toArray()};
  }
- function checkAndSaveSeat(model,holes,hole,onSaved){
+ function checkFittingBuild(model,build,onValidated,{
+  report=message=>pixelStatus(model,message),pending='Checking socket walls, insertion opening and collisions…'
+ }={}){
   if(seatCheck||model.link)return;
   const revision=model.revision;
   const worker=new Worker(new URL('./studio-model-worker.js',import.meta.url),{type:'module'});
@@ -907,18 +1022,23 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    worker.terminate();
    if(seatCheck!==worker)return;
    seatCheck=null;
-   if(active()?.id!==model.id||model.revision!==revision||!canEditPixels(model))return;
-   if(message){pixelStatus(model,message);return;}
-   if(savePixels(model,holes,hole.id))onSaved?.();
+   if(active()?.id!==model.id||active().revision!==revision||!canEditPixels(model))return;
+   if(message){report(message);return;}
+   onValidated();
   };
   worker.onmessage=({data})=>{
    if(data.type==='complete')finish();
    if(data.type==='error')finish(data.message);
   };
-  worker.onerror=event=>{event.preventDefault();finish(event.message||'Socket validation could not start.');};
-  worker.onmessageerror=()=>finish('Socket validation returned an unreadable result.');
-  pixelStatus(model,'Checking socket walls, insertion opening and collisions…');
-  worker.postMessage({ticket:{model:{...model,build:{...model.build,pixelHoles:holes,pixelBuilderVersion:1}}}});
+  worker.onerror=event=>{event.preventDefault();finish(event.message||'Geometry validation could not start.');};
+  worker.onmessageerror=()=>finish('Geometry validation returned an unreadable result.');
+  report(pending);
+  worker.postMessage({ticket:{model:{...model,build}}});
+ }
+ function checkAndSaveSeat(model,holes,hole,onSaved){
+  checkFittingBuild(model,{...model.build,pixelHoles:holes,pixelBuilderVersion:1},()=>{
+   if(savePixels(model,holes,hole.id))onSaved?.();
+  });
  }
  function placeFittingAt(model,{point,normal},duplicate=null,onSaved){
   const holes=pixelHoles(model);
@@ -941,14 +1061,23 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(hole.socketProfile){checkAndSaveSeat(model,next,hole,onSaved);return false;}
   return savePixels(model,next,hole.id);
  }
- function placeMountAt(model,{point,normal}){
+ function mountAtPoint(point,normal,profile=mountProfiles[0]){
+  return {...newMount(Math.round(point.x*10)/10,Math.round(point.z*10)/10),...(profile===mountProfiles[0]?{}:{profile}),
+   entryFace:normal.y<0?'underside':'top'};
+ }
+ function placeMountAt(model,{point,normal},profile,onSaved){
   const mounts=mountHoles(model);
   if(mounts.length>=16){pixelStatus(model,'Use up to 16 mounting holes per model.');return false;}
-  const mount=newMount(Math.round(point.x*10)/10,Math.round(point.z*10)/10);
-  mount.entryFace=normal.y<0?'underside':'top';
+  const mount=mountAtPoint(point,normal,profile);
   const issue=fittingFaceIssue({normal})||mountIssue(model,mount,mounts);
   if(issue){pixelStatus(model,issue);return false;}
-  return saveMounts(model,[...mounts,mount],mount.id);
+  const next=[...mounts,mount];
+  const save=()=>{if(!saveMounts(model,next,mount.id))return false;onSaved?.();return true;};
+  if(mount.profile&&mount.profile!==mountProfiles[0]){
+   checkFittingBuild(model,{...model.build,manualMountHoles:next},save,{pending:'Checking material around the mounting feature…'});
+   return false;
+  }
+  return save();
  }
  const fittingActions=document.createElement('dialog');
  fittingActions.setAttribute('aria-label','Hardware at this point');
@@ -1042,22 +1171,25 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    const others=holes.filter(hole=>hole.id!==id);
    gesture.issue=mounts?mountIssue(gesture.model,candidate,others):pixelIssue(gesture.model,candidate,others,gesture.recipe);
    if(!gesture.issue)gesture.candidate=candidate;
-   movePixelMarker(gesture.model,gesture.marker,candidate.x,candidate.z,hit.point.y+(underside?-.3:.3));
+   const markerPoint=new THREE.Vector3(candidate.x,hit.point.y,candidate.z);
+   if(current.socketProfile)markerPoint.addScaledVector(hit.normal,.3);
+   else markerPoint.y+=underside?-.3:.3;
+   movePixelMarker(gesture.model,gesture.marker,markerPoint);
   }
   gesture.marker.material.color.setHex(gesture.issue?0xff3c59:0x48e4f1);
  },true);
- function movePixelMarker(model,marker,x,z,y=marker.position.y){
-  const lift=y-marker.position.y;
-  marker.position.set(x,y,z);
+ function movePixelMarker(model,marker,position){
+  const delta=position.clone().sub(marker.position);
+  marker.position.copy(position);
   const id=marker.userData.pixelId||marker.userData.mountId;
   for(const part of cache.get(model.id)?.group?.children||[]){
-   if(part.userData.pixelPort===id||part.userData.pixelLabel===id||part.userData.mountLabel===id){part.position.x=x;part.position.y+=lift;part.position.z=z;}
+   if(part.userData.pixelPort===id||part.userData.pixelLabel===id||part.userData.mountLabel===id)part.position.add(delta);
   }
  }
  function cancelPixelGesture(){
   const gesture=pixelGesture;pixelGesture=null;
   if(!gesture)return;
-  if(gesture.origin)movePixelMarker(gesture.model,gesture.marker,gesture.origin.x,gesture.origin.z,gesture.origin.y);
+  if(gesture.origin)movePixelMarker(gesture.model,gesture.marker,gesture.origin);
   refreshPixelMarkers(gesture.model);
   if(viewport.hasPointerCapture(gesture.id))viewport.releasePointerCapture(gesture.id);
  }
@@ -1089,10 +1221,10 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const faceIssue=placeShaped||pendingDuplicate?.socketProfile?'':fittingFaceIssue(hit);
   if(faceIssue){pixelStatus(model,faceIssue);return;}
   if(mountingModel===model.id){
-   if(placeMountAt(model,hit)){
+   placeMountAt(model,hit,mountPlacementProfiles.get(model.id),()=>{
     if(mountHoles(model).length>=16){endPixelPlacement();renderPalette();}
     else updatePlacementGhost(model,event);
-   }
+   });
   }else{
    const onSaved=()=>{
     if(pendingDuplicate||pixelHoles(model).length>=16){endPixelPlacement();renderPalette();}
@@ -1179,17 +1311,29 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const length=document.querySelector('[data-state="pixelStringSpacing"]');
   const channels=document.querySelector('[data-state="wireChannels"]');
   const arrows=document.querySelector('[data-state="wireDirectionArrows"]');
-  if(!length||!channels||!arrows)return;
+  const width=document.querySelector('[data-state="wireWidth"]');
+  const vaulted=document.querySelector('[data-state="wireVaulted"]');
+  if(!length||!channels||!arrows||!width||!vaulted)return;
   const field=document.createElement('fieldset');
   field.innerHTML='<legend>Wire routing and cable lengths</legend>'+
    '<label>Available pixel-to-pixel cable length<select data-build-wire-pitch>'+
    '<option value="25">25 mm</option><option value="50">50 mm</option><option value="100">100 mm</option><option value="custom">Custom</option></select></label>'+
    '<label data-build-wire-custom-row>Custom length (mm)<input data-build-wire-custom type="number" min="5" max="1000" step="1"></label>'+
+   '<label>Wire-track width (mm)<input data-build-wire-width type="number" min="1.5" max="9" step=".25" required></label>'+
    '<label><input data-build-wire-channels type="checkbox"> Cut underside wiring channels</label>'+
+   '<label><input data-build-wire-vaulted type="checkbox"> Vault wire-track roofs</label>'+
    '<label><input data-build-wire-arrows type="checkbox"> Show direction arrows</label>'+
    '<div class="sms-actions"><button type="button" data-build-wire-snap>Snap pixels to cable length</button>'+
    '<button type="button" data-build-wire-reverse>Reverse pixel order</button></div>'+
    '<p>Ordered P1 → Pn; opposite 180° IN/OUT. The real curved cable length is checked and overlength routes show red. Thin or blocked paths are refused by Prepare.</p>';
+  const trackWidth=field.querySelector('[data-build-wire-width]');
+  trackWidth.value=width.value;
+  trackWidth.onchange=()=>{
+   if(!trackWidth.checkValidity()){trackWidth.reportValidity();trackWidth.value=width.value;return;}
+   width.value=trackWidth.value;
+   width.dispatchEvent(new Event('input',{bubbles:true}));
+   trackWidth.value=width.value;
+  };
   const pitch=field.querySelector('[data-build-wire-pitch]');
   const custom=field.querySelector('[data-build-wire-custom]');
   const chosen=Number(length.value);
@@ -1206,7 +1350,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    if(!custom.checkValidity()){custom.reportValidity();custom.value=length.value;return;}
    length.value=custom.value;length.dispatchEvent(new Event('change',{bubbles:true}));
   };
-  for(const [selector,origin] of [['[data-build-wire-channels]',channels],['[data-build-wire-arrows]',arrows]]){
+  for(const [selector,origin] of [['[data-build-wire-channels]',channels],['[data-build-wire-vaulted]',vaulted],['[data-build-wire-arrows]',arrows]]){
    const control=field.querySelector(selector);control.checked=origin.checked;
    control.onchange=()=>{origin.click();control.checked=origin.checked;};
   }
@@ -1228,7 +1372,16 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const settings={version:1,enabled:false,pitch:50,inTail:200,outTail:200,...model.build.serialRouting};
   const disabled=model.link?' disabled':'';
   const change=fields=>{
-   if(commit({build:{...model.build,serialRouting:{...settings,...fields}}}))redrawPixelEditor();
+   const serialRouting={...settings,...fields},build={...model.build,serialRouting};
+   const apply=()=>{
+    if(!commit({build}))return false;
+    redrawPixelEditor();return true;
+   };
+   if(serialRouting.enabled&&(serialRouting.vaulted||Object.hasOwn(fields,'minBendRadius'))){
+    checkFittingBuild(model,build,apply,{pending:'Checking the cable path and surrounding material…'});
+    return false;
+   }
+   return apply();
   };
   const note=document.createElement('p');
   note.setAttribute('role','status');
@@ -1236,7 +1389,43 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   block.append(note);
   block.insertAdjacentHTML('beforeend','<label><input type="checkbox" data-native-route'+(settings.enabled?' checked':'')+
    (model.link||(!settings.enabled&&plan.reason)?' disabled':'')+'> Cut serial channels</label>');
-  block.querySelector('[data-native-route]').onchange=e=>change({enabled:e.target.checked});
+  if(pixelHoles(model).length>1){
+   const reverse=document.createElement('button');
+   reverse.type='button';reverse.textContent='Reverse pixel order and wiring';reverse.disabled=!!model.link;
+   reverse.onclick=()=>{
+    const holes=pixelHoles(model).reverse().map(hole=>({...hole,rotation:(hole.rotation+180)%360}));
+    const serialRouting={...settings,inTail:settings.outTail,outTail:settings.inTail,
+     inEdgePercent:settings.outEdgePercent??null,outEdgePercent:settings.inEdgePercent??null};
+    reorderPixels(model,holes,selectedPixels.get(model.id),serialRouting);
+   };
+   block.append(reverse);
+  }
+  block.querySelector('[data-native-route]').onchange=event=>{
+   const input=event.target,enabled=input.checked;
+   input.checked=!!settings.enabled;
+   change({enabled});
+  };
+  block.insertAdjacentHTML('beforeend','<label><input type="checkbox" data-vaulted-route'+
+   (settings.vaulted?' checked':'')+disabled+'> Vault wire-track roofs for underside-down printing</label>');
+  block.querySelector('[data-vaulted-route]').onchange=event=>{
+   const input=event.target,vaulted=input.checked;
+   input.checked=!!settings.vaulted;
+   change({vaulted});
+  };
+  const widthLabel=document.createElement('label'),widthInput=document.createElement('input');
+  widthLabel.textContent='Requested wire-track width (mm) ';
+  widthInput.type='number';widthInput.min='1.5';widthInput.max='12';widthInput.step='any';
+  widthInput.value=settings.channelWidthMm??3.2;
+  widthInput.required=true;widthInput.disabled=!!model.link;
+  widthInput.dataset.nativeChannelWidth='';
+  widthInput.onchange=()=>{
+   if(!widthInput.checkValidity()){widthInput.reportValidity();widthInput.value=settings.channelWidthMm??3.2;return;}
+   if(!change({channelWidthMm:widthInput.valueAsNumber}))widthInput.value=settings.channelWidthMm??3.2;
+  };
+  widthLabel.append(widthInput);block.append(widthLabel);
+  const widthNote=document.createElement('p');
+  widthNote.textContent='Planned usable width: '+plan.channelWidthMm.toFixed(2)+' mm. Fitting relief may require a wider track.';
+  block.append(widthNote);
   const guide=document.createElement('label'),show=document.createElement('input');
   show.type='checkbox';show.dataset.nativePreview='';show.checked=showNativeGuide(model);
   show.onchange=()=>{nativeGuideChoices.set(model.id,show.checked);refreshPixelMarkers(model);};
@@ -1264,7 +1453,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    input.value=settings[key]??'';
    input.onchange=()=>{
     if(!input.checkValidity()){input.reportValidity();input.value=settings[key]??'';return;}
-    change({[key]:input.value===''?null:input.valueAsNumber});
+    if(!change({[key]:input.value===''?null:input.valueAsNumber}))input.value=settings[key]??'';
    };
    label.append(input);edgeControls.append(label);
    const resolved=plan.edgePositions?.[end];
@@ -1279,13 +1468,26 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   block.append(edgeControls);
   const pitch=block.querySelector('[data-native-pitch]');
   pitch.value=settings.customPitch||![25,50,100].includes(settings.pitch)?'custom':settings.pitch;
-  pitch.onchange=()=>change(pitch.value==='custom'?{customPitch:true}:{pitch:Number(pitch.value),customPitch:false});
+  pitch.onchange=()=>{
+   if(!change(pitch.value==='custom'?{customPitch:true}:{pitch:Number(pitch.value),customPitch:false}))
+    pitch.value=settings.customPitch||![25,50,100].includes(settings.pitch)?'custom':settings.pitch;
+  };
   const bindNumber=(input,key)=>input.onchange=()=>{
    if(!input.value||!input.checkValidity()){input.reportValidity();input.value=settings[key];return;}
-   change({[key]:input.valueAsNumber});
+   if(!change({[key]:input.valueAsNumber}))input.value=settings[key];
   };
   bindNumber(block.querySelector('[data-native-in-tail]'),'inTail');
   bindNumber(block.querySelector('[data-native-out-tail]'),'outTail');
+  const bend=document.createElement('label');
+  bend.textContent='Minimum bend radius (mm) ';
+  const bendInput=document.createElement('input');
+  bendInput.type='number';bendInput.min='1';bendInput.max='60';bendInput.step='any';
+  bendInput.value=settings.minBendRadius??5;bendInput.disabled=!!model.link;
+  bendInput.onchange=()=>{
+   if(!bendInput.value||!bendInput.checkValidity()){bendInput.reportValidity();bendInput.value=settings.minBendRadius??5;return;}
+   if(!change({minBendRadius:bendInput.valueAsNumber}))bendInput.value=settings.minBendRadius??5;
+  };
+  bend.append(bendInput);block.append(bend);
   if(pitch.value==='custom'){
    pitch.parentElement.insertAdjacentHTML('afterend','<label>Custom pitch (mm)<input data-native-custom type="number" min="5" max="250" value="'+esc(settings.pitch)+'"'+disabled+'></label>');
    bindNumber(block.querySelector('[data-native-custom]'),'pitch');
@@ -1302,21 +1504,31 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(!['tactile-tiles','gears','waves','control-caps','characters','light-pods'].includes(family.typeId))return;
   const mounts=mountHoles(model),selected=mounts.findIndex(hole=>hole.id===selectedMounts.get(model.id));
   const locked=!!model.link,disabled=locked?' disabled':'';
+  const placementProfile=mountPlacementProfiles.get(model.id)??mountProfiles[0];
+  const mount=mounts[selected],profile=mount?.profile??mountProfiles[0],blind=blindMountProfile(profile);
   const block=document.createElement('fieldset');block.setAttribute('aria-label','Mounting holes');
   block.innerHTML='<legend>Mounting &amp; attachments</legend>'+
-   '<p>Place actual vertical 2–8 mm through-holes on a verified solid top or underside surface. M1…Mn are editable; printed mounting loads and screw fit are not certified. The legacy two-hole mounting preset remains separate.</p>'+
+   '<p>Place vertical 2–8 mm through-holes on a solid top or underside. Choose a screw recess, magnet pocket or threaded insert pilot on an underside or supported planar top mount.</p>'+
+   '<label>New mounting profile<select data-new-mount-profile'+disabled+'>'+manualMountProfiles.map(option=>
+    '<option'+(option===placementProfile?' selected':'')+'>'+option+'</option>').join('')+'</select></label>'+
    '<div class="sms-actions"><button type="button" data-place-mount'+(locked||mounts.length>=16?' disabled':'')+'>Place mounting hole in 3D</button>'+
    (mountingModel===model.id?'<button type="button" data-done-mount>Done placing mounts</button>':'')+'</div>'+
    '<div class="sms-actions" aria-label="Select mount">'+mounts.map((mount,i)=>'<button type="button" data-select-mount="'+i+'" aria-pressed="'+(i===selected)+'">M'+(i+1)+'</button>').join('')+'</div>'+
-   (selected<0?'':('<fieldset><legend>M'+(selected+1)+' · Through-hole</legend>'+
-    [['x','X (mm)','-200','200'],['z','Z (mm)','-200','200'],['diameter','Hole diameter (mm)','2','8']].map(([field,label,min,max])=>
+   (selected<0?'':('<fieldset><legend>M'+(selected+1)+' · '+esc(profile)+'</legend>'+
+    [['x','X (mm)','-200','200'],['z','Z (mm)','-200','200'],...(blind?[]:[['diameter','Hole diameter (mm)','2','8']])].map(([field,label,min,max])=>
      '<label>'+label+'<input type="number" data-mount-field="'+field+'" min="'+min+'" max="'+max+'" step=".1" value="'+esc(mounts[selected][field])+'"'+disabled+'></label>').join('')+
+    (mount.entryFace==='underside'||profile!==mountProfiles[0]||Number.isFinite(family.recipe(model.parameters).serialSupport?.topY)?'<label>Mount profile<select data-mount-profile'+disabled+'>'+manualMountProfiles.map(option=>
+     '<option'+(option===profile?' selected':'')+'>'+option+'</option>').join('')+'</select></label>':'')+
+    (profile!==mountProfiles[0]?[['recessDiameter',blind?'Pocket diameter (mm)':'Recess diameter (mm)',12],['recessDepth',blind?'Pocket depth (mm)':'Recess depth (mm)',8]].map(([key,label,max])=>
+     '<label>'+label+'<input type="number" required min=".5" max="'+max+'" step="any" data-mount-recess="'+key+
+     '" value="'+esc(recessDimensions(mount)[key==='recessDiameter'?'diameter':'depth'])+'"'+disabled+'></label>').join(''):'')+
     '<button type="button" data-remove-mount'+disabled+'>Remove M'+(selected+1)+'</button></fieldset>'));
   root.append(block);
+  block.querySelector('[data-new-mount-profile]').onchange=event=>mountPlacementProfiles.set(model.id,event.target.value);
   block.querySelector('[data-place-mount]').onclick=()=>{
    endPixelPlacement();mountingModel=model.id;viewport.dataset.nativePlacement='outside';
    renderPalette();viewport.tabIndex=0;viewport.focus({preventScroll:true});
-   pixelStatus(model,'Click or tap a verified top/underside solid surface to place 3.4 mm mounting through-holes. Use Done or Escape to exit.');
+   pixelStatus(model,'Click or tap a solid top or underside to place the selected mounting profile. Use Done or Escape to exit.');
   };
   const done=block.querySelector('[data-done-mount]');
   if(done)done.onclick=()=>{endPixelPlacement();renderPalette();};
@@ -1326,6 +1538,19 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    const hole={...mounts[selected],[input.dataset.mountField]:Number(input.value)};
    if(!editMount(model,selected,hole))input.value=mounts[selected][input.dataset.mountField];
   });
+  const selectProfile=block.querySelector('[data-mount-profile]');
+  if(selectProfile)selectProfile.onchange=()=>{
+   const next={...mount,profile:selectProfile.value};
+   if(blind!==blindMountProfile(next.profile)){delete next.recessDiameter;delete next.recessDepth;}
+   if(!editMount(model,selected,next))selectProfile.value=profile;
+  };
+  block.querySelectorAll('[data-mount-recess]').forEach(input=>{
+   const key=input.dataset.mountRecess,accepted=recessDimensions(mount)[key==='recessDiameter'?'diameter':'depth'];
+   input.onchange=()=>{
+    if(!input.checkValidity()){input.reportValidity();input.value=accepted;return;}
+    if(!editMount(model,selected,{...mount,[key]:input.valueAsNumber}))input.value=accepted;
+   };
+  });
   const remove=block.querySelector('[data-remove-mount]');
   if(remove)remove.onclick=()=>removeMount(model,selected);
   const tabList=model.build.backingTabs||[],tabDiameter=model.build.backingTabDiameter??3.4;
@@ -1334,13 +1559,30 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    '<p>Add screw tabs to a stationary design using the fitting backing. Adjust each position along the perimeter.</p>'+
    '<label>Tab hole diameter (mm)<input type="number" data-tab-diameter min="2" max="8" step=".1" value="'+esc(tabDiameter)+'"'+disabled+'></label>'+
    '<button type="button" data-add-backing-tab'+(locked||tabList.length>=24?' disabled':'')+'>Add external tab</button>'+
-   tabList.map((tab,i)=>'<div class="sms-actions"><label>T'+(i+1)+' perimeter (%)<input type="number" data-backing-tab="'+i+'" min="0" max="99.9" step=".1" value="'+esc((tab.u*100).toFixed(1))+'"'+disabled+'></label>'+
-     '<button type="button" data-remove-backing-tab="'+i+'"'+disabled+'>Remove T'+(i+1)+'</button></div>').join('');
+   tabList.map((tab,i)=>{
+    const profile=tab.profile??mountProfiles[0],recess=recessDimensions({...tab,diameter:tabDiameter});
+    return '<fieldset><legend>T'+(i+1)+'</legend><label>Perimeter (%)<input type="number" data-backing-tab="'+i+
+     '" min="0" max="99.9" step=".1" value="'+esc((tab.u*100).toFixed(1))+'"'+disabled+'></label>'+
+     '<label>Underside fixing profile<select data-tab-profile="'+i+'"'+disabled+'>'+mountProfiles.map(option=>
+      '<option'+(option===profile?' selected':'')+'>'+option+'</option>').join('')+'</select></label>'+
+     (profile!==mountProfiles[0]?[['recessDiameter','Recess diameter (mm)',12,recess.diameter],['recessDepth','Recess depth (mm)',8,recess.depth]]
+      .map(([field,label,max,value])=>'<label>'+label+'<input type="number" required min=".5" max="'+max+
+       '" step="any" data-tab-index="'+i+'" data-tab-recess="'+field+'" value="'+esc(value)+'"'+disabled+'></label>').join(''):'')+
+     '<button type="button" data-remove-backing-tab="'+i+'"'+disabled+'>Remove T'+(i+1)+'</button></fieldset>';
+   }).join('');
   block.append(tabs);
   const saveTabs=(backingTabs,backingTabDiameter)=>{
-   if(commit({build:{...model.build,backingTabs,backingTabDiameter}})){redrawPixelEditor();return true;}
-   pixelStatus(model,$('smsModelError')?.textContent||'Could not attach the external tab.');
-   return false;
+   const build={...model.build,backingTabs,backingTabDiameter};
+   const save=()=>{
+    if(commit({build})){pixelMessages.delete(model.id);redrawPixelEditor();return true;}
+    pixelStatus(model,$('smsModelError')?.textContent||'Could not attach the external tab.');
+    return false;
+   };
+   if(backingTabs.some(tab=>tab.profile&&tab.profile!==mountProfiles[0])){
+    checkFittingBuild(model,build,save,{pending:'Checking material around the recessed tab fixings…'});
+    return false;
+   }
+   return save();
   };
   const diameterInput=tabs.querySelector('[data-tab-diameter]');
   diameterInput.onchange=()=>{
@@ -1365,6 +1607,17 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    if(input.value&&input.checkValidity()&&saveTabs(tabList.map((tab,index)=>index===i?{...tab,u:input.valueAsNumber/100}:tab),tabDiameter))return;
    input.value=(tabList[i].u*100).toFixed(1);
   });
+  const editTab=(index,patch)=>saveTabs(tabList.map((tab,i)=>i===index?{...tab,...patch}:tab),tabDiameter);
+  tabs.querySelectorAll('[data-tab-profile]').forEach(select=>select.onchange=()=>{
+   const index=Number(select.dataset.tabProfile);
+   if(!editTab(index,{profile:select.value}))select.value=tabList[index].profile??mountProfiles[0];
+  });
+  tabs.querySelectorAll('[data-tab-recess]').forEach(input=>input.onchange=()=>{
+   const index=Number(input.dataset.tabIndex),field=input.dataset.tabRecess;
+   const accepted=recessDimensions({...tabList[index],diameter:tabDiameter})[field==='recessDepth'?'depth':'diameter'];
+   if(!input.checkValidity()){input.reportValidity();input.value=accepted;return;}
+   if(!editTab(index,{[field]:input.valueAsNumber}))input.value=accepted;
+  });
   tabs.querySelectorAll('[data-remove-backing-tab]').forEach(button=>button.onclick=()=>
    saveTabs(tabList.filter((_,i)=>i!==Number(button.dataset.removeBackingTab)),tabDiameter));
  }
@@ -1376,7 +1629,11 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   root.innerHTML='<h3>Pixel fittings</h3><div class="sms-actions"><button type="button" data-pixel-profile-editor>Create / edit pixel profile</button></div>'+
    '<p>Choose a saved measured profile before placing. A profile selection with P1/P2 selected updates <strong>only that fitting</strong>; otherwise it chooses the next fitting. Plain bores open on both faces. Select a fitting to enable a measured blind socket on its installation face. Cable cuts open on the underside. Print a coupon to check fit.</p>'+
    '<label><input type="checkbox" data-pixel-backing'+(model.build.pixelBacking?' checked':'')+disabled+'> Add fitting backing (12 mm of additional material around each edge)</label>'+
+   (model.build.pixelBacking?'<label>Fitting backing thickness (mm)<input type="number" min="3" max="10" step="0.1" data-pixel-backing-thickness value="'+
+    esc(model.build.pixelBackingThickness??4)+'"'+disabled+'></label><button type="button" data-reset-pixel-backing-thickness'+disabled+'>Reset backing thickness</button>':'')+
    '<p>Fitting bores need continuous solid material. Thin walls, cavities and narrow rims can block placement.</p>'+
+   '<label><input type="checkbox" data-native-fit-preview'+(nativeFitPreviewChoices.get(model.id)?' checked':'')+'> Show physical pixels and socket cutters</label>'+
+   '<output role="status" data-native-fit-preview-status>'+esc(nativeFitPreviewMessages.get(model.id)||'')+'</output>'+
    '<div class="sms-actions" aria-label="Hardware library">'+profiles.map(profile=>
     '<button type="button" data-fit-profile="'+esc(profile.id)+'" aria-pressed="'+(chosenProfile(model)?.id===profile.id)+'"'+disabled+
     '>◉ '+esc(profile.name)+' · '+profile.bodyDiameter+' mm</button>').join('')+'</div>'+
@@ -1388,7 +1645,9 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    '<p role="status" data-pixel-status>'+esc(pixelMessages.get(model.id)||'Click a marker to select. Hold then drag to move. Arrow keys nudge 1 mm, or 5 mm with Shift.')+'</p>'+
    (selected<0?'':pixelHoleMarkup(holes[selected],selected,esc,disabled,profiles)+
     '<label><input type="checkbox" data-shaped-socket'+(hole.socketProfile?' checked':'')+disabled+'> Shape a socket on the selected face from the measured profile</label>'+
-    (hole.socketProfile?'<label>Retention lip (mm)<input type="number" data-seat-retention min="0" max=".7" step=".05" value="'+esc(hole.socketProfile.retentionLip)+'"'+disabled+'></label>':'')+
+    (hole.socketProfile?'<label>Retention lip (mm)<input type="number" data-seat-retention min="0" max=".7" step=".05" value="'+esc(hole.socketProfile.retentionLip)+'"'+disabled+'></label>'+
+     (hole.conical||(hole.surface?hole.surface.normal?.[1]<=-.9999:hole.entryFace==='underside')?
+      '<label><input type="checkbox" data-seat-conical'+(hole.conical?' checked':'')+disabled+'> Conical socket roof</label>':''):'')+
     '<div class="sms-actions"><button type="button" data-pixel-previous'+(selected===0?' disabled':disabled)+'>Move earlier</button><button type="button" data-pixel-next'+(selected===holes.length-1?' disabled':disabled)+'>Move later</button><button type="button" data-duplicate-pixel'+noAdd+'>Duplicate fitting in 3D</button></div>')+
    '<section aria-label="Test print"><h3>Test print</h3><p>'+esc(fit.profileName)+' · '+fit.nominalDiameter+' mm nominal · '+fit.diameter+' mm body · '+fit.boreDiameter+' mm bore · '+fit.clearance+' mm clearance.</p>'+
    '<p>'+esc(fit.warning)+' Print flat with the intended material and nozzle. Test the actual pixel and record the bore that fits.</p>'+
@@ -1404,13 +1663,42 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    diagram.innerHTML='<summary>Fitting dimensions</summary>'+renderPixelProfileDiagram({...fit.profile,bodyDiameter:fit.diameter});
    root.querySelector('[aria-label="Hardware library"]').after(diagram);
   }
-  root.querySelector('[data-pixel-profile-editor]').onclick=()=>adapter.openPixelProfileEditor(chosenProfile(model)?.id,false);
+  root.querySelector('[data-native-fit-preview]').onchange=event=>{
+   nativeFitPreviewChoices.set(model.id,event.target.checked);
+   refreshNativeFittingPreview(model);
+  };
+  root.querySelector('[data-pixel-profile-editor]').onclick=()=>{
+   const seat=selected>=0&&hole.socketProfile;
+   adapter.openPixelProfileEditor(seat?hole.profileId:chosenProfile(model)?.id,false,seat?{
+    measurements:{...seat,bodyDiameter:hole.diameter},clearance:hole.clearance,retentionLip:seat.retentionLip,conical:!!hole.conical
+   }:undefined);
+  };
   root.querySelector('[data-pixel-backing]').onchange=event=>{
    if(!commit({build:{...model.build,pixelBacking:event.target.checked}})){
     event.target.checked=!!model.build.pixelBacking;return;
    }
    renderEditor();
   };
+  const backingThickness=root.querySelector('[data-pixel-backing-thickness]');
+  if(backingThickness){
+   const changeThickness=value=>{
+    const previous=model.build.pixelBackingThickness??4;
+    backingThickness.value=previous;
+    if(!Number.isFinite(value)||value<3||value>10){
+     pixelStatus(model,'Choose 3–10 mm fitting backing thickness.');
+     return;
+    }
+    if(value===previous)return;
+    const build={...model.build,pixelBackingThickness:value};
+    const apply=()=>{if(commit({build}))renderEditor();};
+    const hasRecess=build.mounting&&['Underside countersinks','Underside counterbores'].includes(build.mountStyle)||
+     [...(build.backingTabs||[]),...mountHoles(model)].some(fixing=>fixing.profile&&fixing.profile!==mountProfiles[0]);
+    if(holes.some(hole=>hole.socketProfile)||build.serialRouting?.enabled||hasRecess)checkFittingBuild(model,build,apply);
+    else apply();
+   };
+   backingThickness.onchange=()=>changeThickness(backingThickness.valueAsNumber);
+   root.querySelector('[data-reset-pixel-backing-thickness]').onclick=()=>changeThickness(4);
+  }
   root.querySelectorAll('[data-fit-profile]').forEach(button=>button.onclick=()=>{
    const profileId=button.dataset.fitProfile;
    if(selected>=0&&!editPixel(model,selected,applyPixelFittingProfile(holes[selected],profileId,adapter.pixelFitProfiles())))return;
@@ -1429,15 +1717,26 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     next.socketProfile={...fit.profile,retentionLip:0};
     next.surface=hole.hitSurface;
    }else{
-    delete next.socketProfile;
+    delete next.socketProfile;delete next.conical;
     delete next.surface;
    }
    if(!editPixel(model,selected,next))shaped.checked=!!hole.socketProfile;
   };
+  const conical=root.querySelector('[data-seat-conical]');
+  if(conical)conical.onchange=()=>{
+   const next={...hole,conical:conical.checked};
+   conical.checked=!!hole.conical;
+   checkAndSaveSeat(model,holes.map((item,index)=>index===selected?next:item),next);
+  };
   const lip=root.querySelector('[data-seat-retention]');
   if(lip)lip.onchange=()=>{
-   if(!lip.value||!lip.checkValidity()||!editPixel(model,selected,{...hole,
-    socketProfile:{...hole.socketProfile,retentionLip:lip.valueAsNumber}}))lip.value=hole.socketProfile.retentionLip;
+   const value=lip.valueAsNumber;
+   const valid=lip.checkValidity()&&Number.isFinite(value);
+   lip.value=hole.socketProfile.retentionLip;
+   if(!valid||value===hole.socketProfile.retentionLip)return;
+   const next={...hole,socketProfile:{...hole.socketProfile,retentionLip:value}};
+   const candidates=holes.map((item,index)=>index===selected?next:item);
+   checkAndSaveSeat(model,candidates,next);
   };
   const armPlacement=(duplicate,shaped=false)=>{
    if(!duplicate&&!chosenProfile(model)){pixelStatus(model,'Import the missing profile or select another before placing.');return;}
@@ -1457,7 +1756,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    const control=root.querySelector(button);
    if(control)control.onclick=()=>{
     const next=holes.slice();[next[selected+step],next[selected]]=[next[selected],next[selected+step]];
-    savePixels(model,next,holes[selected].id);
+    reorderPixels(model,next,holes[selected].id);
    };
   }
   const print=root.querySelector('[data-fit-print]');
@@ -1472,10 +1771,10 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    try{
     if(!name){editPixel(model,selected,withMeasuredPixelFit(hole,measurement));return;}
     const calibrated=saveablePixelFit(hole,measurement,{name,id:'custom-'+newPixel().id,customProfiles:adapter.pixelFitProfiles()});
-    if(editPixel(model,selected,calibrated.hole)){
+    editPixel(model,selected,calibrated.hole,undefined,()=>{
      adapter.savePixelFitProfile(calibrated.profile);
      redrawPixelEditor();pixelStatus(model,'Saved measured fit to the profile library.');
-    }
+    });
    }catch(error){pixelStatus(model,error.message);}
   };
   bindPixelEditor(root,model,holes,profiles);
@@ -1597,6 +1896,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   const model=active(),family=registry.get(model.generator.typeId);
   const build=model.generator.typeId==='crystals'?document.querySelector('.workspace-tabs [data-tab=build]').classList.contains('active'):stage==='build';
   const root=shell.palette;root.replaceChildren();
+  if(model.generator.typeId!=='crystals')refreshNativeFittingPreview(model);
   const heading=document.createElement('h2');heading.textContent=build?'Build tools':'Design choices';root.append(heading);
   const controls=document.createElement('div');controls.className='sms-context-controls';root.append(controls);
   if(!build&&family.presets.length){
@@ -1648,6 +1948,14 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
     addAction('Fit base for gumdrop',$('fitPixelBaseBtn'));
     addAction('Print a pixel fit test',$('calibrationBtn'));
     renderActivePixelProfile(controls,model);
+    const origin=document.querySelector('[data-state="showPixels"]');
+    const label=document.createElement('label'),toggle=document.createElement('input'),status=document.createElement('output');
+    toggle.type='checkbox';toggle.checked=origin.checked;toggle.disabled=!!model.link;
+    toggle.onchange=()=>origin.click();
+    label.append(toggle,' Show physical pixels and socket cutters');
+    status.dataset.buildFitPreviewStatus='';status.setAttribute('aria-live','polite');
+    status.textContent=$('pixelFittingPreviewStatus')?.textContent||'';
+    controls.append(label,status);
     renderCrystalPixelPalette(controls,model);
     renderCrystalWirePalette(controls);
    }else{
@@ -1673,7 +1981,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    const controlKeys=()=>{
     const style=parameters.controlStyle;
     return ['controlStyle','diameter','height',
-     ...(['Rotary knob','Rotary selector'].includes(style)?['gripProfile','gripCount','gripDepth']:[]),
+     ...(['Rotary knob','Rotary selector'].includes(style)?['knobInstallation','gripProfile','gripCount','gripDepth']:[]),
      ...(style==='Rotary knob'?['rotaryTop','rotaryMark']:[]),
      ...(['Thumb joystick','Toggle lever','Rocker','Fader cap','Directional pad'].includes(style)?['controlGrip']:[])
     ];
@@ -1716,7 +2024,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   }
   if(build&&inspection){
    const render=document.createElement('button');
-   render.type='button';render.textContent='Render actual model';
+   render.type='button';render.textContent='Render actual model';render.dataset.featureInspect='';
    render.onclick=()=>inspection.openManufacturingMesh();
    controls.append(render);
   }
@@ -1746,7 +2054,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    (model.link?'<p class="sms-descriptor">Linked to library revision '+model.link.revision+'.</p><button id="smsBreak">Make an independent variant</button>'+(update?'<button id="smsAccept">Accept library revision '+update.revision+'</button>':''):'')+
    '<div class="sms-actions"><button id="smsUndo">Undo</button><button id="smsRedo">Redo</button><button id="smsDuplicate">Duplicate</button><button id="smsSaveModel">Save to Library</button></div>'+
    (stage==='design'?'<label>Starting point<select id="smsPreset"><option value="">Choose a preset…</option>'+g.presets.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('')+'</select></label>'+designSections(g,model)+partEditor(model):
-    (g.capabilities.supportsBase?details('Base and backing','Add a flat backing and set its thickness.','<label><input type="checkbox" data-build="base" '+(model.build.base?'checked':'')+'> Integrated flat base</label><label>Base thickness (mm)<input type="number" data-build="baseThickness" value="'+(model.build.baseThickness||3)+'" min="2" max="15"></label>'):'')+(g.capabilities.supportsMounting?details('Mounting holes','Choose plain or recessed fixing holes.','<label><input type="checkbox" data-build="mounting" '+(model.build.mounting?'checked':'')+'> Two mounting holes</label><label>Fixing profile<select data-build="mountStyle">'+['Through holes','Underside counterbores','Underside countersinks'].map(value=>'<option'+(model.build.mountStyle===value?' selected':'')+'>'+value+'</option>').join('')+'</select></label><label>Hole diameter (mm)<input type="number" data-build="holeDiameter" value="'+(model.build.holeDiameter||3.4)+'" min="2" max="8" step=".1"></label>'):'')+(g.capabilities.supportsLEDs?details('Lighting and cable access','Set the cavity and opening in Design.','<p>Use the Light and materials and Holes and fittings sections to size the cavity and cable exit.</p>'):'')+details('Pixel holes','Place and size holes to fit real pixels.',pixelBuilderMarkup(model,esc,fittingProfiles())))+
+    (g.capabilities.supportsBase?details('Base and backing','Add a flat backing and set its thickness.','<label><input type="checkbox" data-build="base" '+(model.build.base?'checked':'')+'> Integrated flat base</label><label>Base thickness (mm)<input type="number" data-build="baseThickness" value="'+(model.build.baseThickness||3)+'" min="2" max="15"></label>'):'')+(g.capabilities.supportsMounting?details('Automatic screw pair','Set the separate two-hole preset.','<label><input type="checkbox" data-build="mounting" '+(model.build.mounting?'checked':'')+'> Two mounting holes</label><label>Fixing profile<select data-build="mountStyle">'+['Through holes','Underside counterbores','Underside countersinks'].map(value=>'<option'+(model.build.mountStyle===value?' selected':'')+'>'+value+'</option>').join('')+'</select></label><label>Hole diameter (mm)<input type="number" data-build="holeDiameter" value="'+(model.build.holeDiameter||3.4)+'" min="2" max="8" step=".1"></label>'):'')+(g.capabilities.supportsLEDs?details('Lighting and cable access','Set the cavity and opening in Design.','<p>Use the Light and materials and Holes and fittings sections to size the cavity and cable exit.</p>'):'')+details('Pixel holes','Place and size holes to fit real pixels.',pixelBuilderMarkup(model,esc,fittingProfiles())))+
    '<div id="smsModelError" class="sms-descriptor" role="status"></div>';
   $('smsModelName').onchange=e=>commit({name:e.target.value.trim()||g.displayName});
   if($('smsDesign'))$('smsDesign').onclick=()=>{stage='design';renderTabs();renderEditor();};if($('smsBuild'))$('smsBuild').onclick=()=>{stage='build';renderTabs();renderEditor();};if($('smsSend'))$('smsSend').onclick=()=>send(model.id);
@@ -1779,7 +2087,29 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
   if(coupon)coupon.onclick=()=>downloadPixelCoupon(model,
    pixelHoles(model).find(hole=>hole.id===selectedPixels.get(model.id))||newPixel(chosenProfile(model)),{},coupon);
   if($('smsPixelAdd'))bindPixelEditor(panel,model,pixelHoles(model),fittingProfiles());
-  panel.querySelectorAll('[data-build]').forEach(input=>input.onchange=()=>commit({build:{...model.build,[input.dataset.build]:input.type==='checkbox'?input.checked:input.tagName==='SELECT'?input.value:Number(input.value)}}));
+  panel.querySelectorAll('[data-build]').forEach(input=>{
+   const checkbox=input.type==='checkbox';
+   let accepted=checkbox?input.checked:input.value;
+   const restore=()=>{if(checkbox)input.checked=accepted;else input.value=accepted;};
+   input.onchange=()=>{
+    const value=checkbox?input.checked:input.value;
+    const valid=input.type!=='number'||(Number.isFinite(input.valueAsNumber)&&
+     !input.validity.rangeUnderflow&&!input.validity.rangeOverflow);
+    if(!valid){
+     $('smsModelError').textContent=input.validationMessage||'Enter a number within the allowed range.';
+     restore();return;
+    }
+    const build={...model.build,[input.dataset.build]:input.type==='number'?input.valueAsNumber:value};
+    const apply=()=>{if(commit({build}))accepted=value;restore();};
+    if(build.mounting&&g.capabilities.supportsMounting&&['Underside counterbores','Underside countersinks'].includes(build.mountStyle)){
+     restore();
+     checkFittingBuild(model,build,apply,{
+      report:message=>{$('smsModelError').textContent=message;},
+      pending:'Checking material around the recessed fixings…'
+     });
+    }else apply();
+   };
+  });
   bindPartEditor(model);
   editors.refresh();renderPalette();
  }
@@ -2128,20 +2458,9 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
    return 'Choose Ultimaker 3 Extended for two materials, or switch the model to one material and prepare again.';
   return '';
  }
- // Match the exporter’s X, -Z, Y rotation. Sign does not affect extents.
  function preparedSize(result){
-  let size=printSizes.get(result);
-  if(size)return size;
-  const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
-  for(const {mesh} of result.bodies){
-   const points=mesh.vertProperties||mesh.points,stride=mesh.numProp||3;
-   for(let i=0;i<points.length;i+=stride)for(let axis=0;axis<3;axis++){
-    min[axis]=Math.min(min[axis],points[i+axis]);max[axis]=Math.max(max[axis],points[i+axis]);
-   }
-  }
-  size=[0,2,1].map(axis=>max[axis]-min[axis]);
-  printSizes.set(result,size);
-  return size;
+  if(!printSizes.has(result))printSizes.set(result,preparedDimensionsMm(result));
+  return printSizes.get(result);
  }
  function printEnvelope(result,settings){
   if(!result)return '';
@@ -2343,7 +2662,7 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  }
  function backup(){captureCrystal();adapter.download(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),'wonder-trunks-studio-backup.json');}
  function replaceProject(saved){
-  for(const worker of workers.values())worker.terminate();workers.clear();prepared.clear();
+  for(const worker of workers.values())worker.terminate();workers.clear();prepared.clear();histories.clear();
   for(const c of cache.values())if(c.group)disposeGroup(c.group);else adapter.release(c);cache.clear();
   currentId=null;Object.assign(project,copy(saved));delete project.snapshotId;for(const job of project.printJobs){job.status='stale';job.requestId=null;job.preparedRevision=null;}
   $('smsProjectTitle').value=project.title;switchModel(project.activeTab||project.models[0]?.id);save();
@@ -2411,6 +2730,24 @@ export function installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstra
  for(const job of project.printJobs)if(['preparing','prepared'].includes(job.status)){job.status='stale';job.requestId=null;job.preparedRevision=null;}
  if(shell)showHome();
  save();
- window.__sensoryStudio={project,registry,get currentModel(){return active();},get mode(){return mode;},switchModel,addModel:add,showLibrary,showPrint,send,prepare,saveImmediately,fittingPointScreen,pixelMarkerScreen:id=>{const marker=pixelMarkers(active()).find(item=>item.userData.pixelId===id);return marker?projectMarker(marker):null;},get cacheSize(){return cache.size;},get metrics(){return {previewBuilds,geometries:renderer.info.memory.geometries,activeWorkers:workers.size};}};
+ function canOpenFeature({action,family}){
+  if(!shell)return false;
+  if(action==='family')return !!registry.get(family);
+  if(action==='library'||action==='print')return true;
+  return !!active()&&['design','build','pixels','wires','mounts','inspect'].includes(action);
+ }
+ function openFeature(feature){
+  if(!canOpenFeature(feature))return;
+  const {action,family}=feature;
+  if(action==='family'){renderPicker(registry.get(family));picker.showModal();return;}
+  if(action==='library'){showLibrary();$('smsSearch')?.focus();return;}
+  if(action==='print'){showPrint();shell.focusAfterNavigation(['#smsPrintCurrent button','#smsExpandPrint']);return;}
+  if(['pixels','wires','mounts'].includes(action)){shell.chooseTool(action);return;}
+  const tab=document.querySelector('.workspace-tabs [data-tab="'+(action==='design'?'design':'build')+'"]');
+  tab?.click();
+  if(action==='inspect')shell.focusAfterNavigation(['[data-feature-inspect]']);
+  else tab?.focus();
+ }
+ window.__sensoryStudio={project,registry,canOpenFeature,openFeature,get currentModel(){return active();},get mode(){return mode;},switchModel,addModel:add,showLibrary,showPrint,send,prepare,saveImmediately,fittingPointScreen,pixelMarkerScreen:id=>{const marker=pixelMarkers(active()).find(item=>item.userData.pixelId===id);return marker?projectMarker(marker):null;},get cacheSize(){return cache.size;},get metrics(){return {previewBuilds,geometries:renderer.info.memory.geometries,activeWorkers:workers.size};}};
  return {onCrystalChange:captureCrystal,backup,nativeModelBounds,planPixelProfileClearance};
 }

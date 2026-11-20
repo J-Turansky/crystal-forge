@@ -4,7 +4,7 @@ import {planNativePixelString} from './studio-native-routing.js';
 import {layeredCharacter} from './studio-character-relief.js';
 import {createPodShell} from './wt002-pod-shell.js';
 import {addPixelHoleCuts,checkedPixelBore} from './studio-pixel-builder.js';
-import {addManualMountCuts} from './studio-mount-builder.js';
+import {addManualMountCuts,fixingRecessCut,mountProfiles} from './studio-mount-builder.js';
 import {planEdgeTabs} from './edge-tabs.js';
 import {generateTile,tactileTileGenerator} from './tactile-tile-generator.js';
 import {createGeneratorRegistry} from './studio-generator-registry.js';
@@ -159,7 +159,7 @@ export const gearGenerator=define('gears','Cogs & Gears','Mechanical',[
    positive.push(extrusion(outer,height,[0,y,0],[inner]));
   }
  }
- const serialSupport=decorative&&p.webStyle==='Solid'&&p.wheelStyle!=='Pulley'&&!holes.length?{outline,thickness:p.thickness}:null;
+ const serialSupport=decorative&&p.webStyle==='Solid'&&p.wheelStyle!=='Pulley'&&!holes.length?{outline,thickness:p.thickness,...(!relief&&!inlay?{topY:p.thickness}:{})}:null;
  const serialReason='Use a solid decorative gear without a shaft bore, fixing holes, openwork or pulley recess.';
  if((creativeWeb||relief)&&!inlay)return {positive,serialSupport,serialReason,secondary:[],negative:[],materialSplitHeight:p.thickness-.8,materialSplitRole:'top',bounds:{width:diameter,depth:diameter,height:p.thickness+(relief?p.reliefHeight:0)},warnings:['Decorative wheel. Check wheel clearances before using moving parts.']};
  const secondary=[extrusion(inlay?circle(hubRadius):outline,.8,[0,p.thickness-.8,0],inlay?(p.bore?[circle(p.bore/2)]:[circle(hubRadius*.55)]):holes)];
@@ -186,11 +186,17 @@ export const waveGenerator=define('waves','Waves & Organic Forms','Organic',[
   }
   return p.thickness+p.amplitude*relief;
  };
- const mesh=heightField(p.width,p.depth,top);
+ const segments=48,mesh=heightField(p.width,p.depth,top,segments);
+ const count=segments+1,stepX=p.width/segments,stepZ=p.depth/segments;
+ const heights=Array.from({length:count*count},(_,i)=>mesh.points[i*3+1]);
+ // The cutter and stock guards can follow both axes on gentle relief.
+ const gentle=heights.every((height,i)=>(i%count===segments||Math.abs(heights[i+1]-height)<=stepX*.025)&&
+  (i>=segments*count||Math.abs(heights[i+count]-height)<=stepZ*.025));
+ const wave=gentle?{width:p.width,depth:p.depth,segments,heights}:null;
  const w = p.width / 2, d = p.depth / 2;
  const pixelBoreSupport = {outline:[[-w,-d],[w,-d],[w,d],[-w,d]],minThickness:p.thickness};
  const material=p.flowStyle==='Parallel'?{secondary:[box([p.width,.8,p.depth],[0,.4,0])]}:{secondary:[],materialSplitHeight:.8,materialSplitRole:'top'};
- return {positive:[{kind:'mesh',mesh}],...material,pixelBoreSupport,serialSupport:{outline:pixelBoreSupport.outline,thickness:p.thickness},negative:[],bounds:{width:p.width,depth:p.depth,height:p.thickness+p.amplitude},warnings:['Review the wave slopes in Cura; the flat underside is the intended bed face.']};
+ return {positive:[{kind:'mesh',mesh}],...material,pixelBoreSupport,serialSupport:{outline:pixelBoreSupport.outline,thickness:p.thickness,wave},negative:[],bounds:{width:p.width,depth:p.depth,height:p.thickness+p.amplitude},warnings:['Review the wave slopes in Cura; the flat underside is the intended bed face.']};
 });
 function raisedControlSymbol(symbol,width,surface,offset=0){
  const h=2.4,y=surface, size=width*.34;
@@ -330,7 +336,8 @@ function panelControlRecipe(p){
  }
  const band=Math.min(2,h*.16);
  const separateRotaryFace=shape==='Rotary knob'&&!secondary.length&&(p.rotaryTop!=='Flat'||p.rotaryMark!=='Raised symbol');
- return {positive,negative,secondary,
+ const rotaryInstallation=['Rotary knob','Rotary selector'].includes(shape)?p.knobInstallation:null;
+ return {positive,negative,secondary,rotaryInstallation,
   materialSplitHeight:shape==='Indicator lens'||separateRotaryFace?band:undefined,
   materialSplitRole:separateRotaryFace?'top':undefined,
   materialBand:secondary.length||shape==='Indicator lens'||separateRotaryFace?undefined:box([width+2,band,depth+2]),
@@ -340,6 +347,7 @@ function panelControlRecipe(p){
 export const capGenerator=define('control-caps','Buttons & Control Caps','Controls',[
  choice('controlStyle','Control family','Pushbutton',['Pushbutton','Rotary knob','Rotary selector','Toggle lever','Rocker','Fader cap','Thumb joystick','Directional pad','Indicator lens']),
  choice('controlGrip','Grip silhouette','Classic',['Classic','Broad']),
+ choice('knobInstallation','Rotary installation','Moving control',['Moving control','Stationary display']),
  choice('rotaryTop','Rotary knob face','Flat',['Flat','Dish','Stepped']),choice('rotaryMark','Rotary knob mark','Raised symbol',['Raised symbol','Recessed pointer']),
  choice('gripProfile','Rotary grip','Fluted',['Smooth','Fluted','Scalloped']),numeric('gripCount','Rotary grip count',16,4,32,'',1),numeric('gripDepth','Rotary grip depth',10,2,25,'%',1),
  numeric('leverAngle','Lever or rocker angle',15,0,32,'degrees',1),choice('socketProfile','Socket profile','Round',['Round','Rectangular']),
@@ -454,7 +462,15 @@ export const characterGenerator=define('characters','Characters & Silhouettes','
 export const tileGenerator={...tactileTileGenerator,
  capabilities:{...tactileTileGenerator.capabilities,supportsStationaryFittingBacking:true},
  parameterSchema:tactileTileGenerator.parameterSchema.map(s=>({...s,label:s.label||s.key.replace(/[A-Z]/g,c=>' '+c.toLowerCase()),step:s.key==='seed'?1:s.key==='randomness'?.05:.5})),
- recipe(input){const r=generateTile(input);return {serialSupport:{outline:r.bodies[0].mesh.boreOutline,thickness:r.parameters.thickness},pixelBoreSupport:{outline:r.bodies[0].mesh.boreOutline,minThickness:r.parameters.thickness},positive:[{kind:'mesh',mesh:r.bodies[0].mesh}],partitioned:r.parameters.dualMaterial,secondary:r.bodies.length===2?[{kind:'mesh',mesh:r.bodies[1].mesh}]:[],negative:[],dualMaterial:r.parameters.dualMaterial,bounds:this.estimateBounds(input),warnings:['Tactile feel, cleanability and edge comfort require a printed sample.']};}};
+ recipe(input){
+  const r=generateTile(input),{outline,width,depth,thickness,dualMaterial}=r.parameters;
+  const boreOutline=r.bodies[0].mesh.boreOutline;
+  const front=outline==='square'?{z:depth/2,thickness:depth,wallHeight:thickness,modelOutline:boreOutline,
+   outline:[[-width/2,0],[width/2,0],[width/2,thickness],[-width/2,thickness]]}:null;
+  return {serialSupport:{outline:boreOutline,thickness,front},pixelBoreSupport:{outline:boreOutline,minThickness:thickness},
+   positive:[{kind:'mesh',mesh:r.bodies[0].mesh}],partitioned:dualMaterial,secondary:dualMaterial?[{kind:'mesh',mesh:r.bodies[1].mesh}]:[],
+   negative:[],dualMaterial,bounds:this.estimateBounds(input),warnings:['Tactile feel, cleanability and edge comfort require a printed sample.']};
+ }};
 export const svgArtworkGenerator=define('svg-artwork','Imported SVG artwork','Imports',[],[],
  p=>buildSvgExtrusionRecipe(p.artwork),{supportsDualMaterial:false});
 export const generators=[tileGenerator,gearGenerator,waveGenerator,capGenerator,characterGenerator,pebbleGenerator];
@@ -474,6 +490,8 @@ function addBackingTabs(recipe,build,routing){
   tabs.some(tab=>!tab||!Number.isFinite(tab.u)||tab.u<0||tab.u>=1))
   throw Error('Use up to 24 tabs with perimeter positions from 0 to less than 100%.');
  if(!tabs.length)return;
+ if(recipe.rotaryInstallation==='Moving control')
+  throw Error('External tabs need a fixed support. Choose Stationary display in Design to attach tabs to the rotary body.');
  const backing=recipe.serialSupport;
  if(!backing?.explicitBacking||recipe.dualMaterial)
   throw Error('External tabs need a single-material stationary fitting backing. Enable Add fitting backing or choose a compatible solid design.');
@@ -489,14 +507,20 @@ function addBackingTabs(recipe,build,routing){
  for(const tab of plan.tabs){
   if(stockHoles.some(h=>Math.hypot(h.x-tab.x,h.z-tab.z)<tab.radius+h.radius+2))
    throw Error('Tab '+(tab.index+1)+' intersects a fitting or mounting hole. Move it along the backing edge.');
-  if(routing.enabled&&routing.links.some(link=>link.path.some(p=>Math.hypot(p.x-tab.x,p.z-tab.z)<tab.radius+6)))
+  // Front routes with backing are already checked above the entire tab height.
+  if(routing.enabled&&!routing.front&&routing.links.some(link=>link.path.some(p=>Math.hypot(p.x-tab.x,p.z-tab.z)<tab.radius+6)))
    throw Error('Tab '+(tab.index+1)+' is too close to a cut cable route. Move the tab away from the cable exit.');
   recipe.positive.push(cylinder(tab.radius,tab.thickness,[tab.x,tab.thickness/2,tab.z]));
  }
- for(const hole of plan.tabHoles)recipe.negative.push({
-  ...cylinder(hole.radius,backing.thickness+2,[hole.x,backing.thickness/2,hole.z]),
-  tabHole:'Tab fixing hole '+(hole.tabIndex+1)
- });
+ for(const hole of plan.tabHoles){
+  const tab=tabs[hole.tabIndex],profile=tab.profile??mountProfiles[0];
+  const label='Tab '+(hole.tabIndex+1),fixingId='backing-tab-'+hole.tabIndex;
+  if(!mountProfiles.includes(profile))throw Error(label+' needs a supported fixing profile.');
+  recipe.negative.push({...cylinder(hole.radius,backing.thickness+2,[hole.x,backing.thickness/2,hole.z]),
+   tabHole:'Tab fixing hole '+(hole.tabIndex+1),fixingId});
+  if(profile!==mountProfiles[0])recipe.negative.push(fixingRecessCut({...tab,profile,diameter,x:hole.x,z:hole.z},
+   {fixingId,label:label+' recess'}));
+ }
  recipe.bounds={...recipe.bounds,
   width:Math.max(recipe.bounds.width,...plan.tabs.map(tab=>2*(Math.abs(tab.x)+tab.radius))),
   depth:Math.max(recipe.bounds.depth,...plan.tabs.map(tab=>2*(Math.abs(tab.z)+tab.radius)))};
@@ -525,14 +549,16 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
  }
  const b=r.bounds;
  if(build.mounting&&capabilities.supportsMounting){
-  const spacing=Math.min(build.spacing||b.width*.55,b.width*.65),diameter=build.holeDiameter||3.4;
-  if(diameter<2||diameter>8||spacing<diameter*3)throw Error('Mounting hole spacing or diameter is unsafe.');
+  const spacing=Math.min(build.spacing??b.width*.55,b.width*.65),diameter=build.holeDiameter??3.4;
+  if(!Number.isFinite(spacing)||!Number.isFinite(diameter)||diameter<2||diameter>8||spacing<diameter*3)throw Error('Mounting hole spacing or diameter is unsafe.');
   const style=build.mountStyle||'Through holes';
-  for(const x of [-spacing/2,spacing/2]){
-   r.negative.push(cylinder(diameter/2,b.height+4,[x,b.height/2,0]));
-   if(style==='Underside counterbores')r.negative.push(cylinder(diameter*.75,1.6,[x,.6,0]));
-   if(style==='Underside countersinks'){
-    r.negative.push({...cylinder(diameter*.75,1.6,[x,.6,0]),topRadius:diameter/2});
+  for(const [index,x] of [-spacing/2,spacing/2].entries()){
+   const fixingId='automatic-fixing-'+(index+1);
+   r.negative.push({...cylinder(diameter/2,b.height+4,[x,b.height/2,0]),fixingId});
+   if(style==='Underside counterbores'||style==='Underside countersinks'){
+    const recess=cylinder(diameter*.75,1.6,[x,.6,0]);
+    if(style==='Underside countersinks')recess.topRadius=diameter/2;
+    r.negative.push({...recess,fixingId,fixingRecess:'Fixing '+(index+1)+' recess'});
    }
   }
   r.warnings.push('Through mounting holes are un-rated; test actual mounting loads.');
@@ -549,8 +575,16 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
   const b=r.bounds,spread=12;
   const width=b.width+spread*2,depth=b.depth+spread*2;
   r.positive.push(box([width,thickness,depth]));
-  // Only certify the new continuous underside slab. The planner still checks cutters.
+  // Keep an existing upper route on its own perimeter and stock.
+  const upper=r.serialSupport;
   r.serialSupport={outline:[[-width/2,-depth/2],[width/2,-depth/2],[width/2,depth/2],[-width/2,depth/2]],thickness,explicitBacking:true};
+  if(upper&&(Number.isFinite(upper.topY)||upper.wave)){
+   r.serialSupport.topY=upper.topY;
+   r.serialSupport.wave=upper.wave;
+   r.serialSupport.topOutline=upper.outline;
+   r.serialSupport.topThickness=upper.thickness;
+  }
+  if(upper?.front)r.serialSupport.front={...upper.front,backingHeight:thickness};
   r.bounds={...b,width:b.width+spread*2,depth:b.depth+spread*2,height:Math.max(b.height,thickness)};
   r.warnings.push('Expanded fitting backing was explicitly enabled. Inspect underside openings, material joins and support requirements in Cura and on a printed sample.');
  }
@@ -568,23 +602,30 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
  addPixelHoleCuts(r,build.pixelHoles,{routed:routing.enabled&&routing.ready});
  if(routing.enabled&&routing.ready){
   r.negative.push(...routing.cutters);
-  r.warnings.push('Serial grooves are underside-open. Check cable seating and roof layers in Cura and on a physical print.');
+  r.warnings.push(routing.face==='wave'
+   ?'Serial grooves follow the Wave surface. Check cable seating and floor layers in Cura and on a physical print.'
+   :routing.front
+   ?'Serial grooves open on the '+routing.face+' wall. Check cable seating and print orientation in Cura and on a physical print.'
+   :routing.face==='top'
+   ?'Serial grooves open upward. Check cable seating and floor layers in Cura and on a physical print.'
+   :'Serial grooves are underside-open. Check cable seating and roof layers in Cura and on a physical print.');
  }
  addBackingTabs(r,build,routing);
  r.nativeRouting=routing;
  return r;
 }
 
-export function makeRoutedSocketSpecimen(profile,{clearance=.15,retentionLip=0}={}){
+export function makeRoutedSocketSpecimen(profile,{clearance=.15,retentionLip=0,vaulted=false,channelWidthMm,conical=false}={}){
  const width=Math.max(70,4*profile.flangeDiameter+20),depth=Math.max(40,profile.flangeDiameter+12);
- const height=profile.bodyHeight+4,spacing=Math.max(30,profile.flangeDiameter+5);
+ const roofRise=conical?Math.max(.8,(profile.bodyDiameter+clearance)/2):0;
+ const height=profile.bodyHeight+roofRise+4,spacing=Math.max(30,profile.flangeDiameter+5);
  const recipe={bounds:{width,depth,height},positive:[box([width,height,depth])],negative:[],
   serialSupport:{outline:[[-width/2,-depth/2],[width/2,-depth/2],[width/2,depth/2],[-width/2,depth/2]],thickness:height}};
  const pixelHoles=[-spacing/2,spacing/2].map((x,index)=>({id:'specimen-p'+(index+1),x,z:0,
-  profileId:profile.id,diameter:profile.bodyDiameter,clearance,rotation:0,entryFace:'underside',checked:true,
+  profileId:profile.id,diameter:profile.bodyDiameter,clearance,rotation:0,entryFace:'underside',checked:true,conical,
   socketProfile:{...profile,retentionLip}}));
  return applyBuildModules(recipe,{pixelBuilderVersion:1,pixelHoles,
-  serialRouting:{version:1,enabled:true,pitch:Math.max(50,spacing),inTail:250,outTail:250}});
+  serialRouting:{version:1,enabled:true,pitch:Math.max(50,spacing),inTail:250,outTail:250,vaulted,channelWidthMm}});
 }
 
 gearGenerator.visualFields=['wheelStyle','webStyle','reliefStyle','diameter','teeth','spokes','rimWidth','webWidth','reliefHeight'];

@@ -2,6 +2,13 @@ import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 
+import {studioFeatures,featureCategories} from '../studio-features.js';
+
+execFileSync(process.execPath,['scripts/generate-release-metadata.mjs','--check']);
+assert.equal(new Set(studioFeatures.map(feature=>feature.id)).size,studioFeatures.length);
+assert.equal(studioFeatures.filter(feature=>feature.action==='family').length,7);
+assert(studioFeatures.every(feature=>featureCategories[feature.category]&&feature.title&&feature.description));
+
 const changelog=readFileSync('CHANGELOG.md','utf8');
 const html=readFileSync('index.html','utf8');
 const releases=[...changelog.matchAll(/^## v(\d+\.\d+\.\d+(?:-[\w.]+)?) — (.+)$/gm)];

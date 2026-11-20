@@ -1,4 +1,6 @@
+import {tileWallPosition} from './studio-native-routing.js';
 import {putSocket} from './fabrication-v1.js';
+import {makePixelReplicaRecipe} from './pixel-replica.js';
 /* Shared solid recipes. Preview components may overlap; only prepareRecipe
  * Boolean results may reach manufacturing exporters. Units mm; Y-up. */
 function ringSolidGeometry(THREE,rings,top){
@@ -65,12 +67,19 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
  for(const hole of recipe.negative||[])if(hole.pixelHole){
   const ring=new THREE.Mesh(new THREE.TorusGeometry(hole.radius,.18,6,48),
    new THREE.MeshBasicMaterial({color:0xffbe47,depthTest:false}));
-  ring.rotation.x=-Math.PI/2;
   const [x,,z]=hole.position;
   const underside=hole.pixelEntryFace==='underside';
-  surfaceRay.set(new THREE.Vector3(x,underside?-100:recipe.bounds.height+100,z),new THREE.Vector3(0,underside?1:-1,0));
-  const surface=surfaceRay.intersectObjects(solidSurfaces,false)[0];
-  ring.position.set(x,(surface?.point.y??(underside?0:recipe.bounds.height))+(underside?-.3:.3),z);
+  const outward=new THREE.Vector3(0,underside?-1:1,0);
+  if(hole.surface){
+   outward.fromArray(hole.surface.normal);
+   ring.position.set(x,hole.surface.y,z);
+  }else{
+   surfaceRay.set(new THREE.Vector3(x,underside?-100:recipe.bounds.height+100,z),new THREE.Vector3(0,underside?1:-1,0));
+   const surface=surfaceRay.intersectObjects(solidSurfaces,false)[0];
+   ring.position.set(x,surface?.point.y??(underside?0:recipe.bounds.height),z);
+  }
+  ring.position.addScaledVector(outward,.3);
+  ring.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),outward);
   ring.renderOrder=5;
   ring.userData.previewOnly=true;
   ring.userData.pixelId=hole.pixelId;
@@ -89,7 +98,7 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
    text.fillStyle='#193146';text.fillRect(0,0,96,48);text.fillStyle='#fff9db';text.font='bold 32px sans-serif';text.textAlign='center';
    text.fillText('P'+hole.pixelHole.split(' ').at(-1),48,36);
    const tag=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthTest:false}));
-   tag.position.copy(ring.position);tag.position.y+=underside?-2:2;tag.scale.set(6,3,1);tag.renderOrder=6;
+   tag.position.copy(ring.position).addScaledVector(outward,2);tag.scale.set(6,3,1);tag.renderOrder=6;
    tag.userData.previewOnly=true;tag.userData.pixelLabel=hole.pixelId;group.add(tag);
   }
  }
@@ -115,11 +124,13 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
  }
  for(const link of recipe.nativeRouting?.links||[]){
   if(link.path.length<2)continue;
-  const points=[],point=p=>new THREE.Vector3(p.x,.15,p.z);
+  const guideY=(recipe.nativeRouting.surfaceY??0)+.15;
+  const front=recipe.nativeRouting.front;
+  const points=[],point=p=>front?new THREE.Vector3(...tileWallPosition(front,p.x,p.z,.15)):new THREE.Vector3(p.x,p.y===undefined?guideY:p.y+.15,p.z);
   for(let i=1;i<link.path.length;i++)points.push(point(link.path[i-1]),point(link.path[i]));
   const k=Math.floor((link.path.length-1)/2),a=point(link.path[k]),b=point(link.path[k+1]);
   const d=b.clone().sub(a).normalize(),tip=a.clone().lerp(b,.63),back=tip.clone().addScaledVector(d,-2.5);
-  const across=new THREE.Vector3(-d.z,0,d.x);
+  const across=front?new THREE.Vector3(d.y,-d.x,0):new THREE.Vector3(-d.z,0,d.x);
   points.push(tip,back.clone().addScaledVector(across,1.2),tip,back.clone().addScaledVector(across,-1.2));
   const guide=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(points),
    new THREE.LineBasicMaterial({color:link.reason?0xff3155:0x00d5c8,depthTest:false}));
@@ -128,24 +139,38 @@ export function previewRecipe(THREE, recipe, colours=[0x88bbff,0xffcf70]) {
  return group;
 }
 export function disposeGroup(group){group.traverse(node=>{if(node.userData.pixelLabel||node.userData.mountLabel)node.material?.map?.dispose();if(!node.isSprite)node.geometry?.dispose();if(Array.isArray(node.material))node.material.forEach(m=>m.dispose());else node.material?.dispose();});group.removeFromParent();}
-export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
+// The very same fitting transform is used by fabrication and Build's real
+// Manifold positive/cutter overlay. The incoming local +Y axis points INTO
+// the material. Rotation is the same authored pixel wire-port orientation.
+export function placeNativeSocketSolid(THREE,wasm,hold,solid,seat,rotation=0){
+ const [x,,z]=seat.position;
+ const turned=rotation?hold(solid.rotate([0,rotation,0])):solid;
+ if(!seat.surface)return hold(turned.translate([x,0,z]));
+ const inward=new THREE.Vector3(...seat.surface.normal).negate();
+ const frame=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),inward);
+ const angles=new THREE.Euler().setFromQuaternion(frame,'ZYX').toArray().slice(0,3);
+ return hold(hold(turned.rotate(angles.map(angle=>angle*180/Math.PI))).translate([x,seat.surface.y,z]));
+}
+
+// The Build preview uses the profile-shaped positive replica and the EXACT
+// production socket cutter. It does not replace the prepared manufacturing mesh.
+export function nativeFittingPreviews(THREE,wasm,recipe){
+ if(!(recipe.negative||[]).some(part=>part.kind==='pixel-seat'))return [];
+ if(recipe.dualMaterial||recipe.partitioned)throw Error('Shaped fitting preview requires single-material stock.');
+ return prepareRecipe(THREE,wasm,recipe,{inspectFittings:true});
+}
+export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{},inspectFittings=false}={}){
  const owned=[];const hold=solid=>(owned.push(solid),solid);
- const positionSeat=(solid,seat,rotation=0)=>{
-  const [x,,z]=seat.position;
-  const turned=rotation?hold(solid.rotate([0,rotation,0])):solid;
-  if(!seat.surface)return hold(turned.translate([x,0,z]));
-  const inward=new THREE.Vector3(...seat.surface.normal).negate();
-  const frame=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),inward);
-  const angles=new THREE.Euler().setFromQuaternion(frame,'ZYX').toArray().slice(0,3);
-  return hold(hold(turned.rotate(angles.map(angle=>angle*180/Math.PI))).translate([x,seat.surface.y,z]));
+ const positionSeat=(solid,seat,rotation=0)=>placeNativeSocketSolid(THREE,wasm,hold,solid,seat,rotation);
+ const socket=part=>{
+  const {profile}=part;
+  const roofRise=part.conical?Math.max(.8,part.radius):0;
+  const bore=putSocket(wasm,hold,{x:0,z:0},part.radius,profile.bodyHeight+roofRise+3,-3,profile,
+    {includeLocalWireRelief:part.includeLocalWireRelief,conical:part.conical});
+  return {...bore,solid:positionSeat(bore.solid,part,90-part.pixelRotation)};
  };
  const convert=part=>{
-  if(part.kind==='pixel-seat'){
-   const {profile}=part;
-   const bore=putSocket(wasm,hold,{x:0,z:0},part.radius,profile.bodyHeight+3,-3,profile,
-    {includeLocalWireRelief:part.includeLocalWireRelief});
-   return positionSeat(bore.solid,part,90-part.pixelRotation);
-  }
+  if(part.kind==='pixel-seat')return socket(part).solid;
   if(part.kind==='extrude'){
    // Fabricate from the planar contours rather than welding the display triangulation.
    const contours=[part.outline,...(part.holes||[])].map(loop=>loop.map(([x,z])=>[x,-z]));
@@ -173,8 +198,13 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
   onProgress('Joining physical bodies');let total=union(recipe.positive);
   if(recipe.secondary?.length&&!recipe.partitioned)total=hold(total.add(union(recipe.secondary)));
   const seats=(recipe.negative||[]).filter(part=>part.kind==='pixel-seat');
+  const previews=[];
+  const wireCuts=inspectFittings?(recipe.negative||[]).filter(part=>part.wireChannel).map(convert):[];
+  const wireSolid=wireCuts.length?hold(wasm.Manifold.union(wireCuts)):null;
   for(const seat of seats){
-   const {profile}=seat,stockHeight=profile.bodyHeight+2.8;
+   const warnings=[];
+   const warn=message=>{if(!inspectFittings)throw Error(message);warnings.push(message);};
+   const {profile}=seat,stockHeight=profile.bodyHeight+(seat.conical?Math.max(.8,seat.radius):0)+2.8;
    const stockRadius=Math.max(profile.maxDiameter/2+1,seat.includeLocalWireRelief?profile.boreDiameter*.675+4.8:0);
    const stock=hold(wasm.Manifold.cylinder(stockHeight,stockRadius,stockRadius,32));
    const envelope=positionSeat(hold(stock.rotate([-90,0,0])),seat);
@@ -183,14 +213,52 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
     const approach=hold(wasm.Manifold.cylinder(2.7,radius,radius,32));
     const opening=positionSeat(hold(hold(approach.rotate([-90,0,0])).translate([0,-3,0])),seat);
     if(hold(total.intersect(opening)).volume()>.05)
-     throw Error(seat.pixelHole+' has an obstructed insertion opening. Choose an exposed face.');
+     warn(seat.pixelHole+' has an obstructed insertion opening. Choose an exposed face.');
    }
    if(envelope.volume()-hold(total.intersect(envelope)).volume()>.05)
-    throw Error(seat.pixelHole+' needs '+(seat.surface?'continuous stock on its installation face':'continuous underside stock')+', including a 2.8 mm roof beyond the socket. Increase thickness or move the fitting.');
+    warn(seat.pixelHole+' needs '+(seat.surface?'continuous stock on its installation face':'continuous underside stock')+', including a 2.8 mm roof beyond the socket. Increase thickness or move the fitting.');
+   if(inspectFittings){
+    const bore=socket(seat),negative=bore.solid;
+    const replica=prepareRecipe(THREE,wasm,makePixelReplicaRecipe(profile)).bodies[0].mesh;
+    const positive=positionSeat(hold(new wasm.Manifold(replica)),seat,90-seat.pixelRotation);
+    if(positive.status()!=='NoError'||negative.status()!=='NoError')throw Error('Invalid physical fitting preview.');
+    const wireOverlap=wireSolid?hold(positive.intersect(wireSolid)).volume():0;
+    previews.push({wireOverlap,pixelId:seat.pixelId,positive:positive.getMesh(),negative:negative.getMesh(),
+     insertionDepth:bore.usableBodyDepth,nominalRoofAllowance:bore.remainingWall,
+     exposedVolume:hold(positive.subtract(total)).volume(),
+     collisionVolume:hold(hold(positive.intersect(total)).subtract(negative)).volume(),warnings});
+   }
    for(const other of recipe.negative||[]){
     if(other===seat||other.wireChannel)continue;
     if(hold(envelope.intersect(convert(other))).volume()>.05)
-     throw Error(seat.pixelHole+' lacks clearance from another cut. Move the fitting and check the roof.');
+     warn(seat.pixelHole+' lacks clearance from another cut. Move the fitting and check the roof.');
+   }
+  }
+  if(inspectFittings)return previews;
+  for(const recess of recipe.negative||[]){
+   if(!recess.fixingRecess)continue;
+   const [x,y,z]=recess.position;
+   // Protect 1 mm around the recess and 1.6 mm behind its shoulder.
+   const top=recess.fixingTopEntry,surfaceY=recess.fixingSurfaceY??0;
+   const shoulder=y+(top?-1:1)*recess.height/2;
+   const stockDepth=Math.abs(shoulder-surfaceY)+1.6,stockRadius=Math.max(recess.radius,recess.topRadius??0)+1;
+   const envelope=hold(hold(wasm.Manifold.cylinder(stockDepth,stockRadius,stockRadius,48))
+    .rotate([-90,0,0]).translate([x,top?surfaceY-stockDepth:surfaceY,z]));
+   if(envelope.volume()-hold(total.intersect(envelope)).volume()>.05)
+    throw Error(recess.fixingRecess+(top?' needs continuous planar top stock':' needs continuous underside stock')+', with 1 mm around the cut and 1.6 mm behind it.');
+   if(top){
+    const obstructionHeight=total.boundingBox().max[1]-surfaceY;
+    if(obstructionHeight>0){
+     const approach=hold(hold(wasm.Manifold.cylinder(obstructionHeight,stockRadius-1,stockRadius-1,48))
+      .rotate([-90,0,0]).translate([x,surfaceY,z]));
+     if(hold(total.intersect(approach)).volume()>.05)
+      throw Error(recess.fixingRecess+' needs an unobstructed top opening.');
+    }
+   }
+   for(const cut of recipe.negative){
+    if(cut.fixingId===recess.fixingId)continue;
+    if(hold(envelope.intersect(convert(cut))).volume()>.05)
+     throw Error(recess.fixingRecess+' is too close to another cut. Increase the separation or change the fixing profile.');
    }
   }
   if(recipe.nativeRouting?.ready){
@@ -199,10 +267,35 @@ export function prepareRecipe(THREE,wasm,recipe,{onProgress=()=>{}}={}){
    // STL still checks every exported triangle after this bounded simplification.
    const tolerance=.0001,cuts=[];
    total=hold(total.setTolerance(tolerance));
+   const {roofStock,front,surfaceY}=recipe.nativeRouting;
+   const routeFootprint=roofStock?convert({kind:'extrude',outline:front?.modelOutline??roofStock.outline,
+    height:front?.wallHeight??surfaceY??(total.boundingBox().max[1]+1)}):null;
    for(const part of recipe.negative){
     const cut=hold(convert(part).setTolerance(tolerance));
     if(hold(total.intersect(cut)).volume()<.1)
      throw Error((part.pixelHole||part.mountHole||part.tabHole||part.wireChannel||'Cut')+' does not cut the model.');
+    if(routeFootprint&&part.wireChannel&&part.junctionIds){
+     const top=['top','wave'].includes(recipe.nativeRouting.face);
+     const thickness=roofStock.thickness;
+     const stockOffset=[0,top?-thickness:thickness,0];
+     if(front){stockOffset[1]=0;stockOffset[front.axis]=-front.sign*thickness;}
+     const inward=hold(cut.translate(stockOffset));
+     const stockChecks=[[inward,front?'behind':top?'below':'above']];
+     if(part.sideStock)stockChecks.push([convert(part.sideStock),'beside']);
+     for(const [envelope,direction] of stockChecks){
+      let guard=hold(hold(envelope.subtract(cut)).intersect(routeFootprint));
+      for(const other of recipe.negative){
+       if(part.junctionIds.includes(other.pixelId))guard=hold(guard.subtract(convert(other)));
+      }
+      for(const other of recipe.negative){
+       if(other===part||part.junctionIds.includes(other.pixelId))continue;
+       if(hold(guard.intersect(convert(other))).volume()>.05)
+        throw Error(part.wireChannel+' intersects another cut '+direction+' the channel. Move the route or the conflicting feature.');
+      }
+      if(guard.volume()-hold(total.intersect(guard)).volume()>.05)
+       throw Error(part.wireChannel+' lacks continuous material '+direction+' the channel. Increase fitting backing or move the route.');
+     }
+    }
     cuts.push(cut);
    }
    const originalVolume=total.volume();

@@ -2,6 +2,8 @@ import {WORKSPACE_KEY} from '../studio-documents.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {chromium} from 'playwright';
+import * as THREE from 'three';
+import {STLLoader} from 'three/addons/loaders/STLLoader.js';
 const browser=await chromium.launch({headless:true,executablePath:process.env.CRYSTAL_FORGE_BROWSER_EXECUTABLE||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
 let page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
 const errors=[];page.on('pageerror',error=>errors.push(error.message));
@@ -588,8 +590,19 @@ try{
  assert.notEqual((await queue()).find(job=>job.id===crystalJob.id).requestId,pending.requestId);
  await page.waitForFunction(id=>window.__sensoryStudio.project.printJobs.find(job=>job.id===id)?.status==='prepared',crystalJob.id,{timeout:120000});
  async function useDownload(button){
-  const [download]=await Promise.all([page.waitForEvent('download'),button.click()]);
-  return {name:download.suggestedFilename(),bytes:await fs.readFile(await download.path())};
+  try{
+   const [download]=await Promise.all([page.waitForEvent('download'),button.click()]);
+   return {name:download.suggestedFilename(),bytes:await fs.readFile(await download.path())};
+  }catch(error){
+   // A click may return successfully when exportJob catches a failure.
+   // Keep the exact Print Centre report and state as regression evidence.
+   const card=await button.evaluate(node=>({
+    disabled:node.disabled,jobText:node.closest('[data-print-job]')?.innerText?.slice(0,1000)
+   })).catch(()=>({jobText:'Job card no longer available'}));
+   const status=await page.locator('#smsPrintStatus').textContent().catch(()=>null);
+   throw new Error('Print Centre download did not produce a file: '+error.message+
+    '\\nJob: '+JSON.stringify(card)+'\\nStatus: '+status);
+  }
  }
  function zipEntries(bytes){
   const entries=new Map();
@@ -599,6 +612,175 @@ try{
    entries.set(bytes.toString('utf8',offset+30,offset+30+nameSize),bytes.subarray(start,start+size));offset=start+size;
   }
   return entries;
+ }
+ function read3MFGeometry(xml){
+  assert.match(xml,/<model unit="millimeter"/);
+  const vertices=[...xml.matchAll(/<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"\/>/g)].flatMap(match=>match.slice(1).map(Number));
+  const indices=[...xml.matchAll(/<triangle v1="(\d+)" v2="(\d+)" v3="(\d+)"/g)].flatMap(match=>match.slice(1).map(Number));
+  assert(vertices.length>0&&indices.length>0);
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+  geometry.setIndex(indices);
+  return geometry;
+ }
+ async function sectionRanges(inspector){
+  await inspector.getByLabel('Cut section').check();
+  const axis=inspector.getByLabel('Section axis'),slider=inspector.getByRole('slider');
+  const ranges={};
+  for(const direction of ['X','Z']){
+   await axis.selectOption(direction);
+   ranges[direction]=await slider.evaluate(input=>[Number(input.min),Number(input.max)]);
+  }
+  return ranges;
+ }
+ function assertSectionBounds(geometry,{X,Z},label){
+  geometry.computeBoundingBox();
+  const {min,max}=geometry.boundingBox;
+  assert(Math.abs(X[0]-min.x)<.01&&Math.abs(X[1]-max.x)<.01,label+' section X matches the export');
+  assert(Math.abs(Z[0]+max.y)<.01&&Math.abs(Z[1]+min.y)<.01,label+' section Z matches the export');
+ }
+ async function renderedXSection(inspector,x){
+  const position=inspector.getByRole('slider');
+  await inspector.getByLabel('Section axis').selectOption('X');
+  const sectionX=await position.evaluate((slider,x)=>{
+   slider.value=x;
+   slider.dispatchEvent(new Event('input',{bubbles:true}));
+   return Number(slider.value);
+  },x);
+  const section=await page.evaluate(async x=>{
+   const {Mesh}=await import('three');
+   const previous=Mesh.prototype.onBeforeRender;
+   return new Promise((resolve,reject)=>{
+    const timeout=setTimeout(()=>{
+     Mesh.prototype.onBeforeRender=previous;
+     reject(new Error('The prepared cutaway was not rendered at X='+x));
+    },5000);
+    Mesh.prototype.onBeforeRender=function(renderer,scene,camera,geometry,material,...rest){
+     previous.call(this,renderer,scene,camera,geometry,material,...rest);
+     const plane=material.clippingPlanes?.[0];
+     if(plane?.normal.x!==1||Math.abs(plane.constant+x)>.0001)return;
+     clearTimeout(timeout);
+     Mesh.prototype.onBeforeRender=previous;
+     resolve({positions:Array.from(geometry.attributes.position.array),indices:Array.from(geometry.index.array)});
+    };
+   });
+  },sectionX);
+  const viewportMesh=new THREE.BufferGeometry();
+  const printPositions=[];
+  for(let i=0;i<section.positions.length;i+=3)
+   printPositions.push(section.positions[i],-section.positions[i+2],section.positions[i+1]);
+  viewportMesh.setAttribute('position',new THREE.Float32BufferAttribute(printPositions,3));
+  viewportMesh.setIndex(section.indices);
+  return {sectionX,viewportMesh};
+ }
+ async function verifyTabRemovalBounds(name,palette,{jobId,tab=2}={}){
+  const boundsJob=jobId?page.locator('[data-print-job="'+jobId+'"]'):page.locator('#smsJobs article').filter({hasText:name});
+  const boundsDisplay=page.locator('#smsModelDimensions');
+  const readBounds=async locator=>{
+   const match=(await locator.textContent()).match(/X × Y × Z: ([\d.]+) × ([\d.]+) × ([\d.]+) mm/);
+   assert(match,name+' displays bounds in export orientation');
+   return match.slice(1).map(Number);
+  };
+  const previousBounds=await readBounds(boundsDisplay);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await palette.getByRole('button',{name:'Remove T'+tab,exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('#smsModelDimensions').textContent.startsWith('Design preview'));
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await boundsJob.getByText('Stale',{exact:true}).waitFor();
+  for(const type of ['stl','3mf','export'])assert(await boundsJob.locator('[data-job-'+type+']').isDisabled());
+  await boundsJob.locator('[data-job-prepare]').click();
+  await boundsJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const updatedBounds=await readBounds(boundsDisplay);
+  assert(updatedBounds[1]<previousBounds[1]-1,name+' loses the removed tab protrusion');
+  const revisedSTL=await useDownload(boundsJob.locator('[data-job-stl]'));
+  const revisedMF=await useDownload(boundsJob.locator('[data-job-3mf]'));
+  const revisedPack=zipEntries((await useDownload(boundsJob.locator('[data-job-export]'))).bytes);
+  const dimensions=JSON.parse(revisedPack.get('print-job-manifest.json')).dimensionsMm;
+  const xml=zipEntries(revisedMF.bytes).get('3D/3dmodel.model').toString();
+  assert.match(xml,/<item objectid="[0-9]+" transform="1 0 0 0 1 0 0 0 1 0 0 0"/);
+  const stlGeometry=new STLLoader().parse(Uint8Array.from(revisedSTL.bytes).buffer);
+  const mfGeometry=read3MFGeometry(xml);
+  stlGeometry.computeBoundingBox();mfGeometry.computeBoundingBox();
+  for(const side of ['min','max'])
+   assert(stlGeometry.boundingBox[side].distanceTo(mfGeometry.boundingBox[side])<.001,name+' edited '+side+' agrees across files');
+  for(const geometry of [stlGeometry,mfGeometry]){
+   const actual=geometry.boundingBox.getSize(new THREE.Vector3()).toArray();
+   assert(actual.every((value,i)=>Math.abs(value-dimensions[i])<.001),name+' edited manifest matches export bounds');
+   assert.deepEqual(actual.map(value=>Number(value.toFixed(1))),updatedBounds);
+   geometry.dispose();
+  }
+  assert.deepEqual(await readBounds(boundsJob.getByText(/^Prepared X/)),updatedBounds);
+ }
+ async function finishNativeJourney(name,{inspectCurvedRoute=false}={}){
+
+  const {parameters,build}=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  const title='WT-021 '+name+' manufacturing journey';
+  await page.locator('#smsProjectTitle').fill(title);
+  await page.locator('#smsProjectTitle').press('Tab');
+  await page.locator('#smsLibrary').click();
+  await page.locator('#smsSaveProject').click();
+  await page.locator('#smsSavedProjects').getByRole('heading',{name:title,exact:true}).waitFor();
+  const backup=JSON.parse((await useDownload(page.locator('#smsBackup'))).bytes.toString());
+  assert.deepEqual(backup.project.models.find(model=>model.name===name).build,build);
+  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+  await page.reload();
+  await page.waitForFunction(name=>window.__sensoryStudio?.currentModel?.name===name,name);
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build),build);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await page.getByRole('button',{name:'Render actual model',exact:true}).click();
+  const inspection=page.locator('#smsLightInspector');
+  await inspection.getByText(/Prepared (?:manufacturing mesh|Light Pod)/).waitFor({timeout:120000});
+  const ranges=await sectionRanges(inspection);
+  let routeSection;
+  if(inspectCurvedRoute){
+   const [a,b]=build.pixelHoles;
+   const {sectionX,viewportMesh}=await renderedXSection(inspection,(a.x+b.x)/2);
+   routeSection={viewportMesh,point:new THREE.Vector3(sectionX,-(a.z+b.z)/2,(a.surface.y+b.surface.y)/2-1)};
+  }
+  await inspection.getByRole('button',{name:'Close inspection'}).click();
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  const job=page.locator('#smsJobs article').filter({hasText:name});
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const production=zipEntries((await useDownload(job.locator('[data-job-export]'))).bytes);
+  const stl=await useDownload(job.locator('[data-job-stl]'));
+  const cura=await useDownload(job.locator('[data-job-cura]'));
+  assert(stl.name.endsWith('.stl'));
+  assert(cura.name.endsWith('.curaprofile'));
+  assert.deepEqual(stl.bytes,[...production.entries()].find(([name])=>name.endsWith('.stl'))[1]);
+  assert.deepEqual(cura.bytes,[...production.entries()].find(([name])=>name.endsWith('.curaprofile'))[1]);
+  const threeMF=zipEntries((await useDownload(job.locator('[data-job-3mf]'))).bytes);
+  const manifest=JSON.parse(production.get('print-job-manifest.json'));
+  assert.equal(manifest.routing.channels.length,3);
+  assert.equal(manifest.coordinateFrame,'Z-up');
+  assert.equal(manifest.units,'mm');
+  const xml=threeMF.get('3D/3dmodel.model').toString();
+  assert.match(xml,/<item objectid="[0-9]+" transform="1 0 0 0 1 0 0 0 1 0 0 0"/);
+  const stlGeometry=new STLLoader().parse(Uint8Array.from(stl.bytes).buffer);
+  const mfGeometry=read3MFGeometry(xml);
+  assertSectionBounds(stlGeometry,ranges,name+' STL');
+  assertSectionBounds(mfGeometry,ranges,name+' 3MF');
+  if(routeSection){
+   const {viewportMesh,point}=routeSection;
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+   const walls=geometry=>{
+    const mesh=new THREE.Mesh(geometry,material);
+    return [-1,1].map(sign=>new THREE.Raycaster(point,new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0]?.distance);
+   };
+   const expected=walls(viewportMesh);
+   assert(expected.every(Number.isFinite));
+   assert(Math.abs(expected[0]+expected[1]-3.2)<.03,name+' rendered cutaway shows the calibrated route width');
+   for(const geometry of [stlGeometry,mfGeometry])
+    assert(walls(geometry).every((distance,i)=>Math.abs(distance-expected[i])<.01),name+' route walls match the rendered plane');
+   viewportMesh.dispose();material.dispose();
+  }
+  for(const key of ['min','max'])
+   assert(stlGeometry.boundingBox[key].distanceTo(mfGeometry.boundingBox[key])<.001,name+' matching print-space '+key);
+  const measured=stlGeometry.boundingBox.getSize(new THREE.Vector3()).toArray();
+  assert.equal(manifest.dimensionsMm.length,3);
+  assert(measured.every((size,axis)=>Math.abs(size-manifest.dimensionsMm[axis])<.001),name+' production dimensions match the downloaded mesh');
+  return {parameters,build,geometries:[
+   ['STL',stlGeometry],['3MF',mfGeometry]
+  ]};
  }
  const modelFile=await useDownload(tile.locator('[data-job-3mf]'));
  const printPack=await useDownload(tile.locator('[data-job-export]'));
@@ -813,15 +995,17 @@ try{
   assert(await serial.locator('[data-native-route]').isChecked());
   assert.match(await serial.innerText(),/Channels ready/);
   await shot('wt012-gear-routing');
+  const accepted=await page.evaluate(()=>window.__sensoryStudio.currentModel);
   await palette.locator('[data-pixel-previous]').click();
-  assert.match(await serial.innerText(),/No safe tangent-compatible path/);
+  await page.locator('#smsModelError').getByText(/No safe tangent-compatible path/).waitFor();
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),accepted);
   await page.locator('.sms-workspace-nav [data-tab=print]').click();
   await routedJob.getByText('Stale',{exact:true}).waitFor();
   assert(await routedJob.locator('[data-job-export]').isDisabled());
   await routedJob.locator('[data-job-prepare]').click();
-  await routedJob.getByText('Failed',{exact:true}).waitFor({timeout:120000});
-  assert(await routedJob.locator('[data-job-export]').isDisabled());
-  assert(await routedJob.locator('[data-job-3mf]').isDisabled());
+  await routedJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  assert(!(await routedJob.locator('[data-job-export]').isDisabled()));
+  assert(!(await routedJob.locator('[data-job-3mf]').isDisabled()));
   await page.locator('#smsNew').click();
   await page.getByRole('button',{name:/Browse Glowing Pebbles & Light Pods starting points/}).click();
   const tall=page.locator('#smsPicker [data-preset=beacon-tall]');
@@ -943,6 +1127,99 @@ try{
  assert.equal((await getHoles())[0].profileId,existingId,'Import leaves the installed fitting linked to its original profile');
  assert.equal((await getHoles())[0].clearance,.35);
  await shot('wt017-pixel-profile-build');
+ // CAL-02: independently measure linked and locally captured fits before and after a library edit.
+ const linkedModel=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+ await page.evaluate(()=>window.__sensoryStudio.addModel('waves',{flowStyle:'Parallel',dualMaterial:false},'Local clearance witness'));
+ await page.locator('.sms-workspace-nav [data-tab=build]').click();
+ await selector.selectOption({label:'Reusable 4.5 mm seed'});
+ await wavePalette.getByRole('button',{name:'Add pixel automatically',exact:true}).click();
+ await wavePalette.getByRole('button',{name:'P1',exact:true}).click();
+ await wavePalette.getByText('Record measured fit',{exact:true}).click();
+ const localFit=wavePalette.locator('[data-fit-calibration]');
+ await localFit.locator('[name=printedBoreDiameter]').fill('4.85');
+ await localFit.getByRole('button',{name:'Save measured fit'}).click();
+ const localModel=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+ assert.equal(localModel.build.pixelHoles[0].followProfileClearance,false);
+ const switchFitModel=async id=>{
+  await page.locator('[id="model-tab-'+id+'"]').click();
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+ };
+ const checkFitDownloads=async(model,diameter)=>{
+  await switchFitModel(model.id);
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  const job=page.locator('#smsJobs article').filter({hasText:model.name});
+  if(!await job.count())await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  else if(await job.getByText('Stale',{exact:true}).count())await job.locator('[data-job-prepare]').click();
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const stl=await useDownload(job.locator('[data-job-stl]'));
+  const mf=await useDownload(job.locator('[data-job-3mf]'));
+  const {x,z}=model.build.pixelHoles[0];
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(stl.bytes).buffer),
+   read3MFGeometry(zipEntries(mf.bytes).get('3D/3dmodel.model').toString())]){
+   const mesh=new THREE.Mesh(geometry,material);
+   const width=[-1,1].reduce((sum,sign)=>sum+new THREE.Raycaster(
+    new THREE.Vector3(x,-z,1),new THREE.Vector3(sign,0,0)).intersectObject(mesh)[0].distance,0);
+   assert(Math.abs(width-diameter)<.02,model.name+' exported '+width+' mm');
+   geometry.dispose();
+  }
+  material.dispose();
+ };
+ const saveFitProject=async title=>{
+  await page.locator('#smsProjectTitle').fill(title);
+  await page.locator('#smsProjectTitle').press('Tab');
+  await page.locator('#smsLibrary').click();
+  await page.locator('#smsSaveProject').click();
+  await page.locator('#smsSavedProjects').getByRole('heading',{name:title,exact:true}).waitFor();
+ };
+ const openFitProject=async title=>{
+  await page.locator('#smsLibrary').click();
+  page.once('dialog',dialog=>dialog.accept());
+  await page.getByRole('button',{name:'Open project '+title,exact:true}).first().click();
+  assert.equal(await page.locator('#smsProjectTitle').inputValue(),title);
+ };
+ await checkFitDownloads(linkedModel,4.85);
+ await checkFitDownloads(localModel,4.85);
+ await saveFitProject('Original shared calibration snapshot');
+ await switchFitModel(linkedModel.id);
+ await selector.selectOption({label:'Reusable 4.5 mm seed'});
+ await wavePalette.getByRole('button',{name:'Create / edit pixel profile'}).click();
+ await page.locator('#pixelSocketClearance').fill('.6');
+ await page.locator('#applyPixelSocketFit').click();
+ const savedFitModels=()=>page.evaluate(()=>window.__sensoryStudio.project.models);
+ const fits=await savedFitModels();
+ assert.equal(fits.find(model=>model.id===linkedModel.id).build.pixelHoles[0].clearance,.6);
+ assert.deepEqual(fits.find(model=>model.id===localModel.id).build,localModel.build);
+ await page.locator('.sms-workspace-nav [data-tab=print]').click();
+ const staleFitJob=page.locator('#smsJobs article').filter({hasText:linkedModel.name});
+ await staleFitJob.getByText('Stale',{exact:true}).waitFor();
+ assert(await staleFitJob.locator('[data-job-stl]').isDisabled());
+ assert(await staleFitJob.locator('[data-job-3mf]').isDisabled());
+ await checkFitDownloads(linkedModel,5.1);
+ await checkFitDownloads(localModel,4.85);
+ await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+ await page.reload();
+ await page.waitForFunction(()=>window.__sensoryStudio);
+ const reloadedFits=await savedFitModels();
+ assert.equal(reloadedFits.find(model=>model.id===linkedModel.id).build.pixelHoles[0].clearance,.6);
+ assert.deepEqual(reloadedFits.find(model=>model.id===localModel.id).build,localModel.build);
+ await saveFitProject('Revised shared calibration snapshot');
+ await switchFitModel(linkedModel.id);
+ await wavePalette.getByRole('button',{name:'P1',exact:true}).click();
+ const unsavedClearance=wavePalette.getByLabel('Diameter clearance (mm)');
+ await unsavedClearance.fill('.55');await unsavedClearance.press('Tab');
+ assert.equal((await getHoles())[0].clearance,.55);
+ assert(await page.locator('#smsGlobalUndo').isEnabled());
+ await openFitProject('Original shared calibration snapshot');
+ await switchFitModel(linkedModel.id);
+ assert(await page.locator('#smsGlobalUndo').isDisabled(),'A reopened snapshot has no undo history from a different revision');
+ await checkFitDownloads(linkedModel,4.85);
+ await checkFitDownloads(localModel,4.85);
+ await openFitProject('Revised shared calibration snapshot');
+ await checkFitDownloads(linkedModel,5.1);
+ await checkFitDownloads(localModel,4.85);
+ await switchFitModel(linkedModel.id);
+ await wavePalette.getByRole('button',{name:'P1',exact:true}).click();
  await checkNativeDoubleClick('waves',wavePalette,(await getHoles())[0]);
  const nativeFamilies=[
   ['tactile-tiles',{dualMaterial:false},false],
@@ -1010,6 +1287,15 @@ try{
  assert(dragged.x>changed[0].x+2,'Hold drag moves M1 along the solid face');
  assert.equal(dragged.entryFace,'top');
  await mountPalette.locator('[data-pixel-backing]').check();
+ const backingThickness=mountPalette.getByLabel('Fitting backing thickness (mm)');
+ assert.equal(await backingThickness.inputValue(),'4');
+ await backingThickness.fill('11');await backingThickness.press('Tab');
+ assert.equal(await backingThickness.inputValue(),'4','Rejects backing beyond the printable setting range');
+ await backingThickness.fill('8');await backingThickness.press('Tab');
+ assert.equal(await backingThickness.inputValue(),'8');
+ await mountPalette.getByRole('button',{name:'Reset backing thickness'}).click();
+ assert.equal(await backingThickness.inputValue(),'4');
+ await backingThickness.fill('8');await backingThickness.press('Tab');
  const addTab=mountPalette.getByRole('button',{name:'Add external tab',exact:true});
  await addTab.click();await addTab.click();
  const tabPosition=mountPalette.locator('[data-backing-tab="0"]');
@@ -1025,6 +1311,7 @@ try{
  await page.locator('.sms-workspace-nav [data-tab=build]').click();
  assert(await page.locator('.sms-palette').getByRole('button',{name:'M1',exact:true}).isVisible());
  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.backingTabs),savedTabs);
+ assert.equal(await backingThickness.inputValue(),'8','Fitting backing thickness survives save and reload');
  const dimensions=page.locator('#smsModelDimensions');
  await dimensions.filter({hasText:'Design preview'}).waitFor();
  await page.getByRole('button',{name:'Render actual model',exact:true}).click();
@@ -1048,7 +1335,19 @@ try{
   min[axis]=Math.min(min[axis],value);max[axis]=Math.max(max[axis],value);
  }
  assert.deepEqual(displayedDimensions,max.map((value,i)=>Number((value-min[i]).toFixed(1))));
- assert(zipEntries((await useDownload(tabJob.locator('[data-job-3mf]'))).bytes).has('3D/3dmodel.model'));
+ const tileHalfWidth=await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.width/2);
+ const backingTop=(x,z)=>Math.abs(x)>tileHalfWidth+5&&Math.abs(z-8)<.001;
+ let stlBackingTop=false;
+ for(let facet=0;facet<facetCount;facet++)for(let vertex=0;vertex<3;vertex++){
+  const offset=96+facet*50+vertex*12;
+  if(backingTop(tabSTL.bytes.readFloatLE(offset),tabSTL.bytes.readFloatLE(offset+8)))stlBackingTop=true;
+ }
+ assert(stlBackingTop,'STL contains the edited 8 mm backing top outside the Tile footprint');
+ const modelXml=zipEntries((await useDownload(tabJob.locator('[data-job-3mf]'))).bytes).get('3D/3dmodel.model');
+ assert(modelXml);
+ assert([...modelXml.toString().matchAll(/<vertex x="([^"]+)" y="[^"]+" z="([^"]+)"\/>/g)]
+  .some(([,x,z])=>backingTop(Number(x),Number(z))),
+  '3MF contains the same edited 8 mm backing top outside the Tile footprint');
 
 
  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
@@ -1172,11 +1471,17 @@ try{
  // Direct placement validates with the same worker as Print Centre before saving.
  for(const thickness of [25,3]){
   await page.evaluate(thickness=>window.__sensoryStudio.addModel('gears',{
-   diameter:80,bore:0,thickness,wheelStyle:'Cam',dualMaterial:false
+   diameter:120,bore:0,thickness,wheelStyle:'Cam',webStyle:'Solid',dualMaterial:false
   },'Direct socket '+thickness),thickness);
+  if(thickness===25){
+   await page.locator('.sms-workspace-nav [data-tab=design]').click();
+   await page.locator('.sms-palette [data-palette-key=diameter]').press('ArrowLeft');
+   assert(await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.diameter)<120);
+  }
   await page.locator('.sms-workspace-nav [data-tab=build]').click();
   await page.locator('[data-view=top]').click();
   await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await page.locator('[data-fit-profile="gumdrop"]').click();
   await page.getByRole('button',{name:'Place shaped socket in 3D'}).click();
   const target=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(0,0,'top'));
   assert(target);
@@ -1187,11 +1492,1449 @@ try{
    assert(socket.socketProfile.bodyHeight>0);
    assert(socket.surface.normal[1]>.999);
    assert.equal(socket.entryFace,'top');
+   // FIT-02: enabling a diagnostic overlay must never change saved model data.
+   const gearStateBefore=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
+   const nativeToggle=page.getByRole('checkbox',{name:'Show physical pixels and socket cutters'});
+   await nativeToggle.check();
+   const nativePreview=page.locator('[data-native-fit-preview-status]');
+   await page.waitForFunction(()=>/insertion|unavailable/.test(
+    document.querySelector('[data-native-fit-preview-status]')?.textContent||''),null,{timeout:60000});
+   assert.match(await nativePreview.innerText(),/insertion 22\.00 mm/,
+    'Gear preview: '+await nativePreview.innerText());
+   assert.match(await nativePreview.innerText(),/nominal cutter roof allowance .*mm/);
+   assert.match(await nativePreview.innerText(),/stock interference; 0\.00 mm³ overlap with wire cuts/);
+   await nativeToggle.uncheck();
+   assert.equal(await nativePreview.innerText(),'');
+   assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),gearStateBefore,
+    'Toggling Gear physical overlays must not mutate fittings, dimensions or saved model revision');
+   await page.keyboard.press('Escape');
+   await page.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+   const conflict=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(4,0,'top'));
+   assert(conflict);
+   await page.mouse.click(conflict.x,conflict.y);
+   await page.locator('[data-pixel-status]').filter({hasText:/lacks clearance from another cut/}).waitFor();
+   assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),gearStateBefore,
+    'Rejected adjacent shaped socket must preserve the original fitting and model revision');
+   await page.reload();
+   await page.waitForFunction(()=>window.__sensoryStudio?.currentModel?.build.pixelHoles?.length===1);
+   assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles),[socket],
+    'The original fitting and installation normal must survive reload after a rejected placement');
+   await page.locator('.sms-workspace-nav [data-tab=build]').click();
+   await page.locator('[data-view=top]').click();
+   await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+   await page.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+   const safePoint=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(33,0,'top'));
+   assert(safePoint);
+   await page.mouse.click(safePoint.x,safePoint.y);
+   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===2);
+   await page.keyboard.press('Escape');
+   const originalSecond=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[1]);
+   const acceptedDrag=await page.evaluate(id=>[
+    window.__sensoryStudio.pixelMarkerScreen(id),window.__sensoryStudio.fittingPointScreen(37,0,'top')
+   ],originalSecond.id);
+   assert(acceptedDrag.every(Boolean));
+   await page.mouse.move(acceptedDrag[0].x,acceptedDrag[0].y);
+   await page.mouse.down();
+   await page.waitForTimeout(225);
+   await page.mouse.move(acceptedDrag[1].x,acceptedDrag[1].y,{steps:6});
+   await page.mouse.up();
+   await page.waitForFunction(x=>window.__sensoryStudio.currentModel.build.pixelHoles[1].x>x+2,originalSecond.x);
+   const prior=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
+   const second=prior[1];
+   const [start,end]=await page.evaluate(id=>[
+    window.__sensoryStudio.pixelMarkerScreen(id),
+    window.__sensoryStudio.fittingPointScreen(5,0,'top')
+   ],second.id);
+   assert(start&&end);
+   await page.mouse.click(start.x,start.y);
+   await page.mouse.move(start.x,start.y);
+   await page.mouse.down();
+   await page.waitForTimeout(225);
+   await page.mouse.move(end.x,end.y,{steps:6});
+   await page.mouse.up();
+   await page.locator('[data-pixel-status]').filter({hasText:/lacks clearance from another cut/}).waitFor();
+   assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles),prior);
+   await page.reload();
+   await page.waitForFunction(()=>window.__sensoryStudio?.currentModel?.build.pixelHoles?.length===2);
+   assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles),prior,
+    'Rejected drag preserves both fitted poses, orientations and installation normals after reload');
+   await page.locator('.sms-workspace-nav [data-tab=build]').click();
+   const gearPalette=page.locator('.sms-palette');
+   for(const number of [1,2]){
+    await gearPalette.getByRole('button',{name:'P'+number,exact:true}).click();
+    const angle=gearPalette.locator('[data-pixel-field=rotation]');
+    await angle.fill('180');
+    await angle.press('Tab');
+   }
+   const gearSerial=gearPalette.getByRole('group',{name:'Serial LED string'});
+   const cutSerial=gearSerial.locator('[data-native-route]');
+   assert(!(await cutSerial.isDisabled()),await gearSerial.innerText());
+   await cutSerial.check();
+   await gearSerial.getByText('Channels ready for preparation.').waitFor();
+   await page.locator('[data-view=top]').click();
+   await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+   await gearPalette.getByRole('button',{name:'Place mounting hole in 3D'}).click();
+   const mountPoint=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(16,15,'top'));
+   assert(mountPoint);
+   await page.mouse.click(mountPoint.x,mountPoint.y);
+   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.manualMountHoles?.length===1);
+   await page.keyboard.press('Escape');
+   const beforeConflict=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
+   await gearPalette.getByRole('button',{name:'M1',exact:true}).click();
+   const mountZ=gearPalette.locator('[data-mount-field=z]');
+   await mountZ.fill('0');
+   await mountZ.press('Tab');
+   await gearPalette.locator('[data-pixel-status]').filter({hasText:/too close to Mount hole 1/}).waitFor();
+   assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),beforeConflict,
+    'Rejecting a mount that meets the channel preserves the route, mount and revision');
+   await gearPalette.getByRole('button',{name:'Place mounting hole in 3D'}).click();
+   const otherMountPoint=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(16,-15,'top'));
+   assert(otherMountPoint);
+   await page.mouse.click(otherMountPoint.x,otherMountPoint.y);
+   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.manualMountHoles?.length===2);
+   await page.keyboard.press('Escape');
+   await gearPalette.getByRole('button',{name:'M2',exact:true}).click();
+   const secondMountZ=gearPalette.locator('[data-mount-field=z]');
+   await secondMountZ.fill('-16');
+   await secondMountZ.press('Tab');
+   assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[1].z),-16);
+   await gearPalette.locator('[data-pixel-backing]').check();
+   const addExternalTab=gearPalette.getByRole('button',{name:'Add external tab',exact:true});
+   await addExternalTab.click();
+   await addExternalTab.click();
+   for(const [index,position] of [13,63].entries()){
+    const perimeter=gearPalette.locator('[data-backing-tab="'+index+'"]');
+    await perimeter.fill(String(position));
+    await perimeter.press('Tab');
+   }
+   assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.backingTabs),[{u:.13},{u:.63}]);
+   await gearSerial.getByText('Channels ready for preparation.').waitFor();
+   await gearPalette.getByRole('button',{name:'P1',exact:true}).click();
+   await gearPalette.getByText('Record measured fit',{exact:true}).click();
+   const calibration=gearPalette.locator('[data-fit-calibration]');
+   await calibration.locator('[name=printedBoreDiameter]').fill('12.5');
+   await calibration.getByRole('button',{name:'Save measured fit'}).click();
+   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].clearance===.5);
+   const retention=gearPalette.getByLabel('Retention lip (mm)');
+   await retention.fill('.2');await retention.press('Tab');
+   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].socketProfile.retentionLip===.2);
+   const bendRadius=gearPalette.getByLabel('Minimum bend radius (mm)');
+   await bendRadius.fill('5.5');await bendRadius.press('Tab');
+   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.serialRouting.minBendRadius===5.5);
+   const wireWidth=gearPalette.getByLabel('Requested wire-track width (mm)');
+   await wireWidth.fill('6');await wireWidth.press('Tab');
+   const calibratedBuild=await page.evaluate(()=>window.__sensoryStudio.currentModel.build);
+   assert.equal(calibratedBuild.serialRouting.channelWidthMm,6);
+   assert.equal(calibratedBuild.serialRouting.minBendRadius,5.5);
+   assert.equal(calibratedBuild.pixelHoles[0].clearance,.5);
+   await page.locator('#smsProjectTitle').fill('WT-021 Gear manufacturing journey');
+   await page.locator('#smsProjectTitle').press('Tab');
+   await page.locator('#smsLibrary').click();
+   await page.locator('#smsSaveProject').click();
+   await page.locator('#smsSavedProjects').getByRole('heading',{name:'WT-021 Gear manufacturing journey',exact:true}).waitFor();
+   const gearBackup=JSON.parse((await useDownload(page.locator('#smsBackup'))).bytes.toString());
+   assert.deepEqual(gearBackup.project.models.find(model=>model.name==='Direct socket 25').build,calibratedBuild);
+   await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+   await page.reload();
+   await page.waitForFunction(()=>window.__sensoryStudio?.currentModel?.build.serialRouting?.enabled);
+   assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build),calibratedBuild);
+   await page.locator('.sms-workspace-nav [data-tab=build]').click();
+   await page.getByRole('button',{name:'Render actual model',exact:true}).click();
+   const gearInspection=page.locator('#smsLightInspector');
+   await gearInspection.getByText('Prepared manufacturing mesh').waitFor({timeout:120000});
+   await gearInspection.getByLabel('Cut section').check();
+   await gearInspection.getByRole('button',{name:'Close inspection'}).click();
+   await page.locator('.sms-workspace-nav [data-tab=print]').click();
+   const gearJob=page.locator('#smsJobs article').filter({hasText:'Direct socket 25'});
+   await gearJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+   const gearPack=zipEntries((await useDownload(gearJob.locator('[data-job-export]'))).bytes);
+   assert([...gearPack.keys()].some(name=>name.endsWith('.stl')));
+   assert.equal(JSON.parse(gearPack.get('print-job-manifest.json')).routing.channels.length,3);
+   const gear3mf=zipEntries((await useDownload(gearJob.locator('[data-job-3mf]'))).bytes);
+   assert(gear3mf.has('3D/3dmodel.model'));
+   const gearSTL=[...gearPack.entries()].find(([name])=>name.endsWith('.stl'))[1];
+   const standaloneSTL=await useDownload(gearJob.locator('[data-job-stl]'));
+   assert.deepEqual(standaloneSTL.bytes,gearSTL);
+   const standaloneCura=await useDownload(gearJob.locator('[data-job-cura]'));
+   assert(standaloneCura.name.endsWith('.curaprofile'));
+   assert.deepEqual(standaloneCura.bytes,[...gearPack.entries()].find(([name])=>name.endsWith('.curaprofile'))[1]);
+   const [fitting]=calibratedBuild.pixelHoles;
+   const mounts=calibratedBuild.manualMountHoles;
+   const gearDiameter=gearBackup.project.models.find(model=>model.name==='Direct socket 25').parameters.diameter;
+   const halfBacking=(gearDiameter+24)/2;
+   const stlGeometry=new STLLoader().parse(Uint8Array.from(gearSTL).buffer);
+   const threeMFGeometry=read3MFGeometry(gear3mf.get('3D/3dmodel.model').toString());
+   for(const [format,geometry] of [['STL',stlGeometry],['3MF',threeMFGeometry]]){
+    const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+    const mesh=new THREE.Mesh(geometry,material);
+    const hit=(origin,direction)=>new THREE.Raycaster(new THREE.Vector3(...origin),new THREE.Vector3(...direction)).intersectObject(mesh)[0]?.point;
+    const centre=[fitting.x,-fitting.z,fitting.surface.y-5];
+    const left=hit(centre,[-1,0,0]),right=hit(centre,[1,0,0]);
+    assert(left&&right&&Math.abs(left.distanceTo(right)-12.5)<.02,format+' calibrated bore exported from Print Centre');
+    const other=calibratedBuild.pixelHoles[1];
+    const groove=[(fitting.x+other.x)/2,-(fitting.z+other.z)/2,fitting.surface.y-1];
+    const grooveA=hit(groove,[0,-1,0]),grooveB=hit(groove,[0,1,0]);
+    assert(grooveA&&grooveB&&Math.abs(grooveA.distanceTo(grooveB)-6)<.04,format+' actual routed wire width is independent of fit calibration');
+    for(const mount of mounts){
+     assert.equal(hit([mount.x,-mount.z,-1],[0,0,1]),undefined,format+' routed project retains the mounting through-hole');
+    }
+    for(const sign of [-1,1]){
+     const tabHoleX=sign*.04*halfBacking,tabHoleY=sign*(halfBacking+5.05);
+     assert.equal(hit([tabHoleX,tabHoleY,-1],[0,0,1]),undefined,format+' external tab has a through-hole');
+     const tabTop=hit([tabHoleX+2.5,tabHoleY,10],[0,0,-1]);
+     assert(tabTop&&Math.abs(tabTop.z-4)<.01,format+' fixing walls are joined to the printed backing at 4 mm thickness');
+    }
+    material.dispose();geometry.dispose();
+   }
   }else{
    await page.locator('[data-pixel-status]').filter({hasText:/continuous stock/}).waitFor();
    assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length??0),0);
   }
   await page.keyboard.press('Escape');
+ }
+ // FIT-01: place and drag a shaped fitting on a real vertical Tile face.
+ {
+  await page.evaluate(()=>window.__sensoryStudio.addModel('tactile-tiles',{
+   width:100,depth:80,thickness:20,outline:'square',relief:2,pattern:'terraces',dualMaterial:false
+  },'FIT-01 Tile side'));
+  await page.locator('.sms-workspace-nav [data-tab=design]').click();
+  await page.locator('.sms-palette [data-palette-key=width]').press('ArrowRight');
+  assert(await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.width)>100);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await page.locator('[data-view=front]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await page.locator('[data-fit-profile=seed]').click();
+  await page.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+  const canvas=await page.locator('#viewport canvas').boundingBox();
+  await page.mouse.click(canvas.x+canvas.width/2,canvas.y+canvas.height/2+28);
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===1);
+  await page.keyboard.press('Escape');
+  const getSeat=()=>page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0]);
+  const seat=await getSeat();
+  assert.deepEqual(seat.surface.normal,[0,0,1]);
+  const marker=await page.evaluate(id=>window.__sensoryStudio.pixelMarkerScreen(id),seat.id);
+  assert(marker);
+  await page.mouse.move(marker.x,marker.y);
+  await page.mouse.down();
+  await page.waitForTimeout(225);
+  await page.mouse.move(marker.x+25,marker.y,{steps:6});
+  assert.deepEqual(await getSeat(),seat,'A side drag previews without changing the saved seat');
+  await page.mouse.up();
+  await page.waitForFunction(x=>window.__sensoryStudio.currentModel.build.pixelHoles[0].x>x+1,seat.x);
+  const moved=await getSeat();
+  assert.equal(moved.id,seat.id);
+  assert(Math.abs(moved.z-seat.z)<1e-6);
+  assert.deepEqual(moved.surface.normal,seat.surface.normal);
+  const sidePosition=page.locator('.sms-palette');
+  const positionX=sidePosition.getByLabel('X (mm)',{exact:true}),positionZ=sidePosition.getByLabel('Z (mm)',{exact:true});
+  const exactX=Math.round((moved.x+1)*100)/100;
+  await positionX.fill(String(exactX));await positionX.press('Tab');
+  await page.waitForFunction(x=>window.__sensoryStudio.currentModel.build.pixelHoles[0].x===x,exactX);
+  const exactSide=await getSeat();
+  assert.deepEqual(exactSide.surface,moved.surface);
+  await positionZ.fill(String(moved.z+1));await positionZ.press('Tab');
+  await page.locator('#smsModelError').getByText(/Move along the current installation face/).waitFor();
+  assert.deepEqual(await getSeat(),exactSide);
+  assert.equal(Number(await positionZ.inputValue()),moved.z);
+  await page.locator('#smsGlobalUndo').click();
+  assert.deepEqual(await getSeat(),moved);
+  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+  await page.reload();
+  await page.waitForFunction(()=>window.__sensoryStudio?.currentModel?.build.pixelHoles?.length===1);
+  assert.deepEqual(await getSeat(),moved);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await page.locator('[data-view=front]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await page.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+  const sideMarker=await page.evaluate(id=>window.__sensoryStudio.pixelMarkerScreen(id),moved.id);
+  await page.mouse.click(sideMarker.x+125,sideMarker.y);
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===2);
+  await page.keyboard.press('Escape');
+  const sideSerial=page.locator('.sms-palette').getByRole('group',{name:'Serial LED string'});
+  const enable=sideSerial.locator('[data-native-route]');
+  assert(!(await enable.isDisabled()),await sideSerial.innerText());
+  await enable.check();
+  await sideSerial.getByText('Channels ready for preparation.').waitFor();
+  const sidePalette=page.locator('.sms-palette');
+  await sidePalette.locator('[data-pixel-backing]').check();
+  const addTab=sidePalette.getByRole('button',{name:'Add external tab',exact:true});
+  await addTab.click();
+  await addTab.click();
+  for(const [index,position] of [12,75].entries()){
+   const perimeter=sidePalette.locator('[data-backing-tab="'+index+'"]');
+   await perimeter.fill(String(position));
+   await perimeter.press('Tab');
+  }
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.backingTabs),[{u:.12},{u:.75}]);
+  const beforeBacking=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
+  const thickness=sidePalette.getByLabel('Fitting backing thickness (mm)');
+  await thickness.fill('10');
+  await thickness.press('Tab');
+  await sidePalette.locator('[data-pixel-status]').filter({hasText:/above the fitting backing/}).waitFor();
+  assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),beforeBacking);
+  await page.locator('[data-view=top]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await sidePalette.getByRole('button',{name:'Place mounting hole in 3D'}).click();
+  for(const [index,x] of [-20,20].entries()){
+   const target=await page.evaluate(x=>window.__sensoryStudio.fittingPointScreen(x,-10,'top'),x);
+   assert(target);
+   await page.mouse.click(target.x,target.y);
+   await page.waitForFunction(n=>window.__sensoryStudio.currentModel.build.manualMountHoles?.length===n,index+1);
+  }
+  await page.keyboard.press('Escape');
+  const mountZ=sidePalette.locator('[data-mount-field=z]');
+  await mountZ.fill('-12');
+  await mountZ.press('Tab');
+  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[1].z),-12);
+  await sidePalette.getByRole('button',{name:'P1',exact:true}).click();
+  await sidePalette.getByText('Record measured fit',{exact:true}).click();
+  const calibration=sidePalette.locator('[data-fit-calibration]');
+  await calibration.locator('[name=printedBoreDiameter]').fill('5.5');
+  await calibration.getByRole('button',{name:'Save measured fit'}).click();
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].clearance===.5);
+  const {parameters,build,geometries}=await finishNativeJourney('FIT-01 Tile side');
+  const [a,b]=build.pixelHoles;
+  const width=parameters.width+24,depth=parameters.depth+24;
+  const tabHoles=[[-width/2+.12*2*(width+depth),depth/2+5.05],[-depth/2,-depth/2-5.05]];
+  for(const [format,geometry] of geometries){
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+   const mesh=new THREE.Mesh(geometry,material);
+   const hit=(origin,direction)=>new THREE.Raycaster(new THREE.Vector3(...origin),new THREE.Vector3(...direction)).intersectObject(mesh)[0]?.point;
+   const bore=[a.x,-a.z+4,a.surface.y];
+   const left=hit(bore,[-1,0,0]),right=hit(bore,[1,0,0]);
+   assert(left&&right&&Math.abs(left.distanceTo(right)-5.5)<.02,format+' calibrated seed socket in the vertical wall');
+   const route=[(a.x+b.x)/2,-a.z+.8,(a.surface.y+b.surface.y)/2];
+   const lower=hit(route,[0,0,-1]),upper=hit(route,[0,0,1]);
+   assert(lower&&upper&&Math.abs(lower.distanceTo(upper)-3.2)<.03,format+' routing survives calibrated fit and backing edits');
+   for(const hole of build.manualMountHoles)assert.equal(hit([hole.x,-hole.z,-1],[0,0,1]),undefined);
+   for(const [x,y] of tabHoles){
+    assert.equal(hit([x,y,-1],[0,0,1]),undefined,format+' external tab fixing hole cuts through');
+    assert(Math.abs((hit([x+2.5,y,10],[0,0,-1])?.z??0)-4)<.01,format+' external backing tab is 4 mm thick');
+   }
+   material.dispose();geometry.dispose();
+  }
+  await verifyTabRemovalBounds('FIT-01 Tile side',sidePalette);
+ }
+ // FIT-01/FIT-03: confirmed curved Wave seats and a surface-following wired export.
+ {
+  await page.evaluate(()=>window.__sensoryStudio.addModel('waves',{
+   width:160,depth:100,thickness:15,amplitude:1,frequency:.5,variation:0,direction:0,dualMaterial:false
+  },'FIT-03 gentle Wave'));
+  await page.locator('.sms-workspace-nav [data-tab=design]').click();
+  await page.locator('.sms-palette [data-palette-key=width]').press('ArrowRight');
+  assert(await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.width)>160);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await page.locator('[data-view=top]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await page.locator('[data-fit-profile=seed]').click();
+  await page.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+  const getSeats=()=>page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
+  for(const [index,x] of [-40,-20].entries()){
+   const target=await page.evaluate(x=>window.__sensoryStudio.fittingPointScreen(x,0,'top'),x);
+   assert(target);
+   await page.mouse.click(target.x,target.y);
+   await page.waitForFunction(count=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===count,index+1);
+  }
+  await page.keyboard.press('Escape');
+  const seats=await getSeats();
+  await page.locator('.sms-palette').getByRole('button',{name:'P1',exact:true}).click();
+  const dragPoints=await page.evaluate(id=>[
+   window.__sensoryStudio.pixelMarkerScreen(id),window.__sensoryStudio.fittingPointScreen(-44,0,'top')
+  ],seats[0].id);
+  assert(dragPoints.every(Boolean));
+  await page.mouse.move(dragPoints[0].x,dragPoints[0].y);
+  await page.mouse.down();
+  await page.waitForTimeout(225);
+  await page.mouse.move(dragPoints[1].x,dragPoints[1].y,{steps:6});
+  await page.mouse.up();
+  await page.waitForFunction(x=>window.__sensoryStudio.currentModel.build.pixelHoles[0].x<x-2,seats[0].x);
+  const beforeConvexFit=await getSeats();
+  assert.notDeepEqual(beforeConvexFit[0].surface,seats[0].surface,'The drag records its new physical installation pose');
+  await page.locator('#smsGlobalUndo').click();
+  assert.deepEqual(await getSeats(),seats,'Undo restores both sockets with their exact saved surface normals');
+  await page.locator('#smsGlobalRedo').click();
+  assert.deepEqual(await getSeats(),beforeConvexFit,'Redo restores the dragged socket with its surface normal');
+  await page.locator('.sms-palette').getByRole('button',{name:'P1',exact:true}).click();
+  await page.locator('#viewport canvas').press('ArrowLeft');
+  await page.waitForFunction(x=>window.__sensoryStudio.currentModel.build.pixelHoles[0].x===x,beforeConvexFit[0].x-1);
+  assert.notDeepEqual((await getSeats())[0].surface,beforeConvexFit[0].surface);
+  const typedX=Number((beforeConvexFit[0].x-2).toFixed(1));
+  const xField=page.locator('.sms-palette').getByLabel('X (mm)',{exact:true});
+  await xField.fill(String(typedX));await xField.press('Tab');
+  await page.waitForFunction(x=>window.__sensoryStudio.currentModel.build.pixelHoles[0].x===x,typedX);
+  const moved=await getSeats();
+  assert.notDeepEqual(moved[0].surface,beforeConvexFit[0].surface);
+  await xField.fill('199');await xField.press('Tab');
+  await page.locator('#smsModelError').getByText(/Move along the current installation face/).waitFor();
+  assert.equal(Number(await xField.inputValue()),typedX);
+  assert.deepEqual(await getSeats(),moved);
+  await page.locator('#smsGlobalUndo').click();
+  await page.locator('#smsGlobalUndo').click();
+  assert.deepEqual(await getSeats(),beforeConvexFit);
+  await page.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+  const curvedFailure=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(40,0,'top'));
+  assert(curvedFailure);
+  await page.mouse.click(curvedFailure.x,curvedFailure.y);
+  await page.locator('.sms-palette [data-pixel-status]').filter({hasText:/continuous stock/}).waitFor();
+  await page.keyboard.press('Escape');
+  assert.deepEqual(await getSeats(),beforeConvexFit);
+  assert(seats.every(hole=>Math.abs(hole.surface.normal[0])>.005));
+  assert.notDeepEqual(seats[0].surface.normal,seats[1].surface.normal);
+  const wavePalette=page.locator('.sms-palette');
+  for(const number of [1,2]){
+   await wavePalette.getByRole('button',{name:'P'+number,exact:true}).click();
+   const angle=wavePalette.locator('[data-pixel-field=rotation]');
+   await angle.fill('180');
+   await angle.press('Tab');
+  }
+  const waveSerial=wavePalette.getByRole('group',{name:'Serial LED string'});
+  const machine=waveSerial.locator('[data-native-route]');
+  assert(!(await machine.isDisabled()),await waveSerial.innerText());
+  await machine.check();
+  await waveSerial.getByText('Channels ready for preparation.').waitFor();
+  const acceptedRoute=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  const vault=waveSerial.getByLabel('Vault wire-track roofs for underside-down printing');
+  await vault.click();
+  await page.locator('#smsModelError').getByText(/Turn off the vaulted option for a Wave route/).waitFor();
+  assert.equal(await vault.isChecked(),false);
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),acceptedRoute);
+  await wavePalette.locator('[data-pixel-backing]').check();
+  const addTab=wavePalette.getByRole('button',{name:'Add external tab',exact:true});
+  await addTab.click();
+  await addTab.click();
+  for(const [index,position] of [13,63].entries()){
+   const perimeter=wavePalette.locator('[data-backing-tab="'+index+'"]');
+   await perimeter.fill(String(position));
+   await perimeter.press('Tab');
+  }
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.backingTabs),[{u:.13},{u:.63}]);
+  await wavePalette.getByRole('button',{name:'Place mounting hole in 3D'}).click();
+  for(const [index,x] of [-20,20].entries()){
+   const target=await page.evaluate(x=>window.__sensoryStudio.fittingPointScreen(x,-20,'top'),x);
+   assert(target);
+   await page.mouse.click(target.x,target.y);
+   await page.waitForFunction(n=>window.__sensoryStudio.currentModel.build.manualMountHoles?.length===n,index+1);
+  }
+  await page.keyboard.press('Escape');
+  const mountZ=wavePalette.locator('[data-mount-field=z]');
+  await mountZ.fill('-22');
+  await mountZ.press('Tab');
+  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[1].z),-22);
+  await wavePalette.getByRole('button',{name:'P1',exact:true}).click();
+  await wavePalette.getByText('Record measured fit',{exact:true}).click();
+  const calibration=wavePalette.locator('[data-fit-calibration]');
+  await calibration.locator('[name=printedBoreDiameter]').fill('5.4');
+  await calibration.getByRole('button',{name:'Save measured fit'}).click();
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].clearance===.4);
+  const {parameters,build,geometries}=await finishNativeJourney('FIT-03 gentle Wave',{inspectCurvedRoute:true});
+  const [a,b]=build.pixelHoles;
+  const width=parameters.width+24,depth=parameters.depth+24;
+  const tabX=-width/2+.13*2*(width+depth);
+  const tabY=depth/2+5.05;
+  for(const [format,geometry] of geometries){
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+   const mesh=new THREE.Mesh(geometry,material);
+   const hit=(origin,direction)=>new THREE.Raycaster(new THREE.Vector3(...origin),new THREE.Vector3(...direction)).intersectObject(mesh)[0]?.point;
+   const [nx,ny,nz]=a.surface.normal;
+   const bore=[a.x-4*nx,-a.z+4*nz,a.surface.y-4*ny];
+   const left=hit(bore,[0,-1,0]),right=hit(bore,[0,1,0]);
+   assert(left&&right&&Math.abs(left.distanceTo(right)-5.4)<.02,format+' calibrated seat follows the curved face normal');
+   const route=[(a.x+b.x)/2,-(a.z+b.z)/2,(a.surface.y+b.surface.y)/2-1];
+   const first=hit(route,[0,-1,0]),last=hit(route,[0,1,0]);
+   assert(first&&last&&Math.abs(first.distanceTo(last)-3.2)<.03,format+' Wave routing retains its width');
+   for(const hole of build.manualMountHoles)assert.equal(hit([hole.x,-hole.z,-1],[0,0,1]),undefined);
+   for(const sign of [-1,1]){
+    const x=sign*tabX,y=sign*tabY;
+    assert.equal(hit([x,y,-1],[0,0,1]),undefined,format+' Wave tab fixing hole cuts through');
+    assert(Math.abs((hit([x+2.5,y,10],[0,0,-1])?.z??0)-4)<.01,format+' Wave backing tab retains 4 mm of stock');
+   }
+   material.dispose();geometry.dispose();
+  }
+  const job=page.locator('#smsJobs article').filter({hasText:'FIT-03 gentle Wave'});
+  const rotationBuild=page.locator('.sms-workspace-nav [data-tab=build]');
+  const rotationPrint=page.locator('.sms-workspace-nav [data-tab=print]');
+  await rotationBuild.click();
+  await wavePalette.getByRole('button',{name:'P1',exact:true}).click();
+  const rotationControl=wavePalette.getByLabel('Body rotation (°)');
+  const savedRotation=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  await rotationControl.fill('90');await rotationControl.press('Tab');
+  await page.locator('#smsModelError').getByText(/No safe tangent|Chosen IN edge|approaches an edge/i).waitFor();
+  assert.equal(Number(await rotationControl.inputValue()),180);
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),savedRotation);
+  await rotationPrint.click();
+  await job.getByText('Prepared',{exact:true}).waitFor();
+  assert(!(await job.locator('[data-job-stl]').isDisabled()));
+  await rotationBuild.click();
+  await rotationControl.fill('179');await rotationControl.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].rotation===179);
+  await rotationPrint.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  assert(await job.locator('[data-job-stl]').isDisabled());
+  assert(await job.locator('[data-job-3mf]').isDisabled());
+  await job.locator('[data-job-prepare]').click();
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const rotatedSTL=await useDownload(job.locator('[data-job-stl]'));
+  const rotatedMF=await useDownload(job.locator('[data-job-3mf]'));
+  const routePoint=new THREE.Vector3((a.x+b.x)/2,-(a.z+b.z)/2,(a.surface.y+b.surface.y)/2-1);
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(rotatedSTL.bytes).buffer),
+   read3MFGeometry(zipEntries(rotatedMF.bytes).get('3D/3dmodel.model').toString())]){
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),mesh=new THREE.Mesh(geometry,material);
+   const width=[-1,1].reduce((sum,sign)=>sum+new THREE.Raycaster(routePoint,new THREE.Vector3(0,sign,0))
+    .intersectObject(mesh)[0].distance,0);
+   assert(Math.abs(width-3.2)<.08);
+   geometry.dispose();material.dispose();
+  }
+  await rotationBuild.click();
+  await wavePalette.getByRole('button',{name:'P2',exact:true}).click();
+  const sequence=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  await wavePalette.getByRole('button',{name:'Move earlier',exact:true}).click();
+  await page.locator('#smsModelError').getByText(/No safe tangent|Chosen IN edge|approaches an edge/i).waitFor();
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),sequence);
+  await rotationPrint.click();
+  await job.getByText('Prepared',{exact:true}).waitFor();
+  await rotationBuild.click();
+  await waveSerial.getByRole('button',{name:'Reverse pixel order and wiring'}).click();
+  await page.waitForFunction(id=>window.__sensoryStudio.currentModel.build.pixelHoles[0].id===id,b.id);
+  const reversed=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
+  assert.deepEqual(reversed.map(({id,rotation})=>({id,rotation})),[{id:b.id,rotation:0},{id:a.id,rotation:359}]);
+  await rotationPrint.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  assert(await job.locator('[data-job-stl]').isDisabled());
+  assert(await job.locator('[data-job-3mf]').isDisabled());
+  await job.locator('[data-job-prepare]').click();
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const reversedSTL=await useDownload(job.locator('[data-job-stl]'));
+  const reversedMF=await useDownload(job.locator('[data-job-3mf]'));
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(reversedSTL.bytes).buffer),
+   read3MFGeometry(zipEntries(reversedMF.bytes).get('3D/3dmodel.model').toString())]){
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),mesh=new THREE.Mesh(geometry,material);
+   const width=[-1,1].reduce((sum,sign)=>sum+new THREE.Raycaster(routePoint,new THREE.Vector3(0,sign,0))
+    .intersectObject(mesh)[0].distance,0);
+   assert(Math.abs(width-3.2)<.08);
+   geometry.dispose();material.dispose();
+  }
+  await verifyTabRemovalBounds('FIT-03 gentle Wave',wavePalette);
+ }
+ // Independent stationary backed journeys. Each uses its own model, placement, calibration and actual files.
+ const backedFamilies=[
+  {type:'characters',name:'Layered Character',key:'width',source:{character:'Cloud',construction:'Layered',width:90,depth:8,dualMaterial:false}},
+  {type:'light-pods',name:'Solid Beacon Pod',key:'width',source:{shellForm:'Beacon',illuminated:false,width:80,depth:68,height:32,dualMaterial:false}},
+  {type:'control-caps',name:'Stationary Rotary Cap',key:'diameter',source:{controlStyle:'Rotary knob',shaft:0,diameter:70,height:19,dualMaterial:false}}
+ ];
+ const compactProfile='Measured compact backing pixel';
+ for(const {type,name,key,source} of backedFamilies){
+  await page.evaluate(({type,source,name})=>window.__sensoryStudio.addModel(type,source,name),{type,source,name});
+  await page.locator('.sms-workspace-nav [data-tab=design]').click();
+  await page.locator('.sms-palette [data-palette-key="'+key+'"]').press('ArrowRight');
+  const shape=await page.evaluate(key=>window.__sensoryStudio.currentModel.parameters[key],key);
+  assert(shape>source[key],name+' accepts a Design size edit');
+  const {width:designX,depth:designY}=await page.evaluate(type=>{
+   const {registry,currentModel}=window.__sensoryStudio;
+   return registry.get(type).recipe(currentModel.parameters).bounds;
+  },type);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  const palette=page.locator('.sms-palette');
+  await palette.locator('[data-pixel-backing]').check();
+  const thickness=palette.getByLabel('Fitting backing thickness (mm)');
+  await thickness.fill('10');
+  await thickness.press('Tab');
+  assert.equal(await thickness.inputValue(),'10');
+  if(type==='control-caps'){
+   const moving=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
+   await palette.getByRole('button',{name:'Add external tab',exact:true}).click();
+   await palette.locator('[data-pixel-status]').filter({hasText:/Stationary display/}).waitFor();
+   assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),moving);
+   await page.locator('.sms-workspace-nav [data-tab=design]').click();
+   await palette.getByRole('button',{name:'Stationary display',exact:true}).click();
+   assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.parameters.knobInstallation),'Stationary display');
+   await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  }
+  if(type==='characters'){
+   await palette.locator('[data-fit-profile=seed]').click();
+   await palette.getByRole('button',{name:'Create / edit pixel profile'}).click();
+   for(const [id,value] of Object.entries({pixelName:compactProfile,pixelBodyDiameter:'5',pixelBodyHeight:'6',
+    pixelFlangeDiameter:'6',pixelFlangeHeight:'.5',pixelCapHeight:'1.2',pixelWireWidth:'2',pixelWireDepth:'1.5',pixelSocketClearance:'.25'}))
+    await page.locator('#'+id).fill(value);
+   await page.locator('#applyPixelSocketFit').click();
+  }
+  await palette.getByRole('button',{name:/Measured compact backing pixel/}).click();
+  await page.locator('[data-view=bottom]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  const fitting=palette.getByRole('button',{name:'Place shaped socket in 3D'});
+  await fitting.click();
+  for(const [index,x] of [-15,15].entries()){
+   const screen=await page.evaluate(x=>window.__sensoryStudio.fittingPointScreen(x,0,'underside'),x);
+   assert(screen);
+   await page.mouse.click(screen.x,screen.y);
+   await page.waitForFunction(n=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===n,index+1);
+  }
+  await page.keyboard.press('Escape');
+  const seats=()=>page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
+  const [,second]=await seats();
+  assert.equal(second.entryFace,'underside');
+  assert.equal(second.socketProfile.bodyHeight,6);
+  const beforeRetention=await seats();
+  const retention=palette.getByLabel('Retention lip (mm)');
+  await retention.fill('.4');await retention.press('Tab');
+  await palette.locator('[data-pixel-status]').filter({hasText:/Cannot cut the selected retention lip/}).waitFor();
+  assert.deepEqual(await seats(),beforeRetention);
+  const drag=await page.evaluate(id=>[window.__sensoryStudio.pixelMarkerScreen(id),
+   window.__sensoryStudio.fittingPointScreen(20,0,'underside')],second.id);
+  assert(drag.every(Boolean));
+  await page.mouse.move(drag[0].x,drag[0].y);
+  await page.mouse.down();
+  await page.waitForTimeout(225);
+  await page.mouse.move(drag[1].x,drag[1].y,{steps:6});
+  await page.mouse.up();
+  await page.waitForFunction(x=>window.__sensoryStudio.currentModel.build.pixelHoles[1].x>x+2,second.x);
+  const placed=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  const [firstSeat,draggedSeat]=placed.build.pixelHoles;
+  const rejected=await page.evaluate(({firstSeat,draggedSeat})=>[
+   window.__sensoryStudio.pixelMarkerScreen(draggedSeat.id),
+   window.__sensoryStudio.fittingPointScreen(firstSeat.x+1,firstSeat.z,'underside')
+  ],{firstSeat,draggedSeat});
+  assert(rejected.every(Boolean),name+' can test overlap on real stock');
+  await page.mouse.move(rejected[0].x,rejected[0].y);
+  await page.mouse.down();
+  await page.waitForTimeout(225);
+  await page.mouse.move(rejected[1].x,rejected[1].y,{steps:6});
+  await page.mouse.up();
+  await palette.locator('[data-pixel-status]').getByText(/overlap|clearance|continuous .*stock/i).waitFor();
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),placed,
+   name+' refuses the overlapping drag without changing either saved cutter pose');
+  const serial=palette.getByRole('group',{name:'Serial LED string'});
+  const route=serial.locator('[data-native-route]');
+  assert(!(await route.isDisabled()),await serial.innerText());
+  await route.check();
+  await serial.getByText('Channels ready for preparation.').waitFor();
+  const addTab=palette.getByRole('button',{name:'Add external tab',exact:true});
+  await addTab.click();
+  await addTab.click();
+  for(const [index,position] of [13,63].entries()){
+   const perimeter=palette.locator('[data-backing-tab="'+index+'"]');
+   await perimeter.fill(String(position));
+   await perimeter.press('Tab');
+  }
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.backingTabs),[{u:.13},{u:.63}]);
+  await palette.getByRole('button',{name:'Place mounting hole in 3D'}).click();
+  for(const [index,x] of [-8,8].entries()){
+   const point=await page.evaluate(x=>window.__sensoryStudio.fittingPointScreen(x,-14,'underside'),x);
+   assert(point);
+   await page.mouse.click(point.x,point.y);
+   await page.waitForFunction(n=>window.__sensoryStudio.currentModel.build.manualMountHoles?.length===n,index+1);
+  }
+  await page.keyboard.press('Escape');
+  const mountZ=palette.locator('[data-mount-field=z]');
+  const mounted=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
+  await mountZ.fill('0');
+  await mountZ.press('Tab');
+  await palette.locator('[data-pixel-status]').filter({hasText:/too close to Mount hole/}).waitFor();
+  assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),mounted);
+  await mountZ.fill('-16');
+  await mountZ.press('Tab');
+  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[1].z),-16);
+  await palette.getByRole('button',{name:'P1',exact:true}).click();
+  await palette.getByText('Record measured fit',{exact:true}).click();
+  const calibration=palette.locator('[data-fit-calibration]');
+  await calibration.locator('[name=printedBoreDiameter]').fill('5.45');
+  await calibration.getByRole('button',{name:'Save measured fit'}).click();
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].clearance===.45);
+  const {build,geometries}=await finishNativeJourney(name);
+  const [a,b]=build.pixelHoles;
+  const width=designX+24,depth=designY+24;
+  const tabX=-width/2+.13*2*(width+depth),tabY=depth/2+5.05;
+  for(const [format,geometry] of geometries){
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+   const mesh=new THREE.Mesh(geometry,material);
+   const hit=(origin,direction)=>new THREE.Raycaster(new THREE.Vector3(...origin),new THREE.Vector3(...direction)).intersectObject(mesh)[0]?.point;
+   const bore=[a.x,-a.z,3];
+   const left=hit(bore,[0,-1,0]),right=hit(bore,[0,1,0]);
+   assert(left&&right&&Math.abs(left.distanceTo(right)-5.45)<.02,name+' '+format+' calibrated 5.45 mm bore');
+   const wiring=[(a.x+b.x)/2,-(a.z+b.z)/2,.8];
+   const first=hit(wiring,[0,-1,0]),last=hit(wiring,[0,1,0]);
+   assert(first&&last&&Math.abs(first.distanceTo(last)-3.2)<.03,name+' '+format+' independently retains 3.2 mm wire width');
+   for(const hole of build.manualMountHoles)assert.equal(hit([hole.x,-hole.z,-1],[0,0,1]),undefined,name+' '+format+' manual through-hole');
+   for(const sign of [-1,1]){
+    const x=sign*tabX,y=sign*tabY;
+    assert.equal(hit([x,y,-1],[0,0,1]),undefined,name+' '+format+' external tab through-hole');
+    assert(Math.abs((hit([x+2.5,y,15],[0,0,-1])?.z??0)-10)<.01,name+' '+format+' connected outward tab is 10 mm thick');
+   }
+   material.dispose();geometry.dispose();
+  }
+  await verifyTabRemovalBounds(name,palette);
+  const tabJob=page.locator('#smsJobs article').filter({hasText:name});
+  const tabProfile=type==='light-pods'?'Countersink':'Counterbore';
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await palette.locator('[data-tab-profile="0"]').selectOption(tabProfile);
+  await page.waitForFunction(profile=>window.__sensoryStudio.currentModel.build.backingTabs[0].profile===profile,tabProfile);
+  const recess=palette.locator('[data-tab-recess=recessDepth]');
+  await recess.fill('3');await recess.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.backingTabs[0].recessDepth===3);
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await tabJob.getByText('Stale',{exact:true}).waitFor();
+  assert(await tabJob.locator('[data-job-stl]').isDisabled());
+  assert(await tabJob.locator('[data-job-3mf]').isDisabled());
+  await tabJob.locator('[data-job-prepare]').click();
+  await tabJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const tabSTL=await useDownload(tabJob.locator('[data-job-stl]'));
+  const tabMF=await useDownload(tabJob.locator('[data-job-3mf]'));
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(tabSTL.bytes).buffer),
+   read3MFGeometry(zipEntries(tabMF.bytes).get('3D/3dmodel.model').toString())]){
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),mesh=new THREE.Mesh(geometry,material);
+   const hit=(origin,direction)=>new THREE.Raycaster(new THREE.Vector3(...origin),new THREE.Vector3(...direction)).intersectObject(mesh)[0]?.point;
+   const span=height=>hit([tabX,tabY,height],[-1,0,0]).distanceTo(hit([tabX,tabY,height],[1,0,0]));
+   assert(Math.abs(span(.6)-(tabProfile==='Countersink'?4.76:5.1))<.02);
+   assert(Math.abs(span(4)-3.4)<.02);
+   const floor=hit([tabX+2,tabY,-1],[0,0,1]),top=hit([tabX+2,tabY,11],[0,0,-1]);
+   assert(floor&&Math.abs(floor.z-(tabProfile==='Countersink'?3*(2.55-2)/.85:3))<.02);
+   assert(top&&Math.abs(top.z-10)<.01,name+' keeps the measured stock behind the recess');
+   geometry.dispose();material.dispose();
+  }
+  console.log(name+' manufacturing journey verified');
+ }
+ // FIT-02: actual Gear and Tile profile/cutter overlay UI parity.
+ await page.evaluate(()=>window.__sensoryStudio.addModel('tactile-tiles',{
+  pattern:'terraces',width:90,depth:90,thickness:20,relief:2,dualMaterial:false
+ },'FIT-02 Tile underside'));
+ await page.locator('.sms-workspace-nav [data-tab=build]').click();
+ await page.locator('[data-view=bottom]').click();
+ await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+ await page.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+ const tilePoint=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(0,0,'underside'));
+ assert(tilePoint,'Tile fitting needs a physical underside');
+ await page.mouse.click(tilePoint.x,tilePoint.y);
+ await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===1,{timeout:120000});
+ const tileStateBefore=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
+ const tileToggle=page.getByRole('checkbox',{name:'Show physical pixels and socket cutters'});
+ await tileToggle.check();
+ const tilePreview=page.locator('[data-native-fit-preview-status]');
+ await page.waitForFunction(()=>/insertion|unavailable/.test(
+  document.querySelector('[data-native-fit-preview-status]')?.textContent||''),null,{timeout:60000});
+ assert.match(await tilePreview.innerText(),/insertion 9\.00 mm/,
+  'Tile preview: '+await tilePreview.innerText());
+ assert.match(await tilePreview.innerText(),/stock interference; 0\.00 mm³ overlap with wire cuts/);
+ await tileToggle.uncheck();
+ assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),tileStateBefore,
+  'Toggling Tile physical overlays must not mutate fittings, dimensions or saved model revision');
+ await page.keyboard.press('Escape');
+ // Edit a real recessed fixing, download both revisions and check that stale exports are blocked.
+ {
+  const witness='Recessed fixing witness';
+  await page.evaluate(name=>window.__sensoryStudio.addModel('gears',{mode:'Decorative',wheelStyle:'Rounded lobes',
+   webStyle:'Solid',diameter:100,thickness:10,bore:0,reliefStyle:'None',dualMaterial:false},name),witness);
+  const buildTab=page.locator('.sms-workspace-nav [data-tab=build]');
+  const printTab=page.locator('.sms-workspace-nav [data-tab=print]');
+  await buildTab.click();
+  const enabled=page.locator('[data-build=mounting]');
+  await enabled.evaluate(node=>{for(let p=node.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS')p.open=true;});
+  await enabled.check();
+  await page.locator('[data-build=mountStyle]').selectOption('Underside counterbores');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.mountStyle==='Underside counterbores');
+  const diameter=page.locator('[data-build=holeDiameter]');
+  await diameter.fill('4');await diameter.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.holeDiameter===4);
+  const job=page.locator('#smsJobs article').filter({hasText:witness});
+  const measureFixing=async expected=>{
+   await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+   const stl=await useDownload(job.locator('[data-job-stl]'));
+   const mf=await useDownload(job.locator('[data-job-3mf]'));
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+   for(const geometry of [new STLLoader().parse(Uint8Array.from(stl.bytes).buffer),
+    read3MFGeometry(zipEntries(mf.bytes).get('3D/3dmodel.model').toString())]){
+    const mesh=new THREE.Mesh(geometry,material);
+    const hit=(x,y,z,dx,dy,dz)=>new THREE.Raycaster(new THREE.Vector3(x,y,z),new THREE.Vector3(dx,dy,dz)).intersectObject(mesh)[0];
+    for(const x of [-27.5,27.5]){
+     const span=z=>[-1,1].reduce((sum,sign)=>sum+hit(x,0,z,0,sign,0).distance,0);
+     assert(Math.abs(span(2)-expected)<.005);
+     assert(Math.abs(span(.4)-expected*1.5)<.005);
+     const shoulder=hit(x,expected*.625,-1,0,0,1).point.z;
+     const top=hit(x,expected*.625,11,0,0,-1).point.z;
+     assert(Math.abs(shoulder-1.4)<.005&&Math.abs(top-shoulder-8.6)<.005);
+    }
+    geometry.dispose();
+   }
+   material.dispose();
+  };
+  await printTab.click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  await measureFixing(4);
+  await buildTab.click();
+  await diameter.evaluate(node=>{for(let p=node.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS')p.open=true;});
+  const prior=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
+  await diameter.fill('9');await diameter.press('Tab');
+  assert.equal(Number(await diameter.inputValue()),4);
+  assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),prior);
+  await diameter.fill('5.05');await diameter.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.holeDiameter===5.05);
+  await printTab.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  assert(await job.locator('[data-job-stl]').isDisabled());
+  assert(await job.locator('[data-job-3mf]').isDisabled());
+  await job.locator('[data-job-prepare]').click();
+  await measureFixing(5.05);
+  await buildTab.click();
+  await enabled.evaluate(node=>{for(let p=node.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS')p.open=true;});
+  await enabled.uncheck();
+  await page.locator('[data-view=bottom]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  const palette=page.locator('.sms-palette');
+  await palette.getByRole('button',{name:'Place mounting hole in 3D'}).click();
+  const point=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(-20,0,'underside'));
+  assert(point);await page.mouse.click(point.x,point.y);
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.manualMountHoles?.length===1);
+  await page.keyboard.press('Escape');
+  await palette.locator('[data-mount-profile]').selectOption('Counterbore');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[0].profile==='Counterbore');
+  const depth=palette.locator('[data-mount-recess=recessDepth]');
+  await depth.fill('3');await depth.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[0].recessDepth===3);
+  const manualAccepted=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
+  await depth.fill('8.5');await depth.press('Tab');
+  assert.equal(Number(await depth.inputValue()),3);
+  assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),manualAccepted);
+  const {x,z}=JSON.parse(manualAccepted).build.manualMountHoles[0];
+  await printTab.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  await job.locator('[data-job-prepare]').click();
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const manualSTL=await useDownload(job.locator('[data-job-stl]'));
+  const manualMF=await useDownload(job.locator('[data-job-3mf]'));
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(manualSTL.bytes).buffer),
+   read3MFGeometry(zipEntries(manualMF.bytes).get('3D/3dmodel.model').toString())]){
+   const mesh=new THREE.Mesh(geometry,material);
+   const hit=(y,height,dy,dz)=>new THREE.Raycaster(new THREE.Vector3(x,y,height),new THREE.Vector3(0,dy,dz)).intersectObject(mesh)[0];
+   assert(Math.abs(hit(-z,1,1,0).distance+hit(-z,1,-1,0).distance-5.1)<.01);
+   assert(Math.abs(hit(-z,4,1,0).distance+hit(-z,4,-1,0).distance-3.4)<.01);
+   assert(Math.abs(hit(-z+2,-1,0,1).point.z-3)<.01);
+   geometry.dispose();
+  }
+  await buildTab.click();
+  await page.locator('[data-view=top]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await palette.getByRole('button',{name:'Place mounting hole in 3D'}).click();
+  const upper=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(20,0,'top'));
+  assert(upper);await page.mouse.click(upper.x,upper.y);
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.manualMountHoles?.length===2);
+  await page.keyboard.press('Escape');
+  await palette.locator('[data-mount-profile]').selectOption('Countersink');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[1].profile==='Countersink');
+  const topMount=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[1]);
+  assert.equal(topMount.entryFace,'top');
+  await printTab.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  await job.locator('[data-job-prepare]').click();
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const topSTL=await useDownload(job.locator('[data-job-stl]'));
+  const topMF=await useDownload(job.locator('[data-job-3mf]'));
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(topSTL.bytes).buffer),
+   read3MFGeometry(zipEntries(topMF.bytes).get('3D/3dmodel.model').toString())]){
+   const mesh=new THREE.Mesh(geometry,material);
+   const width=height=>[-1,1].reduce((sum,side)=>sum+new THREE.Raycaster(
+    new THREE.Vector3(topMount.x,-topMount.z,height),new THREE.Vector3(0,side,0)).intersectObject(mesh)[0].distance,0);
+   assert(Math.abs(width(9.3)-4.25)<.01);
+   assert(Math.abs(width(8)-3.4)<.01);
+   geometry.dispose();
+  }
+  material.dispose();
+  await buildTab.click();
+  await palette.locator('[data-pixel-backing]').check();
+  await palette.getByRole('button',{name:'Add external tab'}).click();
+  const tabProfile=palette.locator('[data-tab-profile="0"]');
+  await tabProfile.selectOption('Counterbore');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.backingTabs?.[0]?.profile==='Counterbore');
+  const tabDepth=palette.locator('[data-tab-recess=recessDepth]');
+  const savedTab=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
+  await tabDepth.fill('3');await tabDepth.press('Tab');
+  await page.locator('#smsModelError').getByText(/Tab 1 recess needs continuous underside stock/).waitFor();
+  assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),savedTab);
+  assert.equal(Number(await tabDepth.inputValue()),1.4);
+  const thickness=palette.getByLabel('Fitting backing thickness (mm)');
+  await thickness.fill('8');await thickness.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelBackingThickness===8);
+  await tabDepth.fill('3');await tabDepth.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.backingTabs[0].recessDepth===3);
+  await thickness.fill('4');await thickness.press('Tab');
+  await page.locator('#smsModelError').getByText(/Tab 1 recess needs continuous underside stock/).waitFor();
+  assert.equal(Number(await thickness.inputValue()),8);
+  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelBackingThickness),8);
+  await printTab.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  await job.locator('[data-job-prepare]').click();
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  assert((await useDownload(job.locator('[data-job-stl]'))).bytes.length>84);
+  assert(zipEntries((await useDownload(job.locator('[data-job-3mf]'))).bytes).has('3D/3dmodel.model'));
+  const original=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  const modelState=()=>page.evaluate(()=>window.__sensoryStudio.currentModel);
+  await page.locator('#smsLibrary').click();
+  await page.locator('#smsLibraryAll').click();
+  const projectCard=page.locator('#smsProjectModels article').filter({has:page.getByRole('heading',{name:witness,exact:true})}).first();
+  await projectCard.getByRole('button',{name:'Save to library',exact:true}).click();
+  const libraryCard=page.locator('#smsSavedModels article').filter({has:page.getByRole('heading',{name:witness,exact:true})});
+  await libraryCard.getByRole('button',{name:'Linked copy',exact:true}).click();
+  const linked=await modelState();
+  assert.equal(linked.link.revision,1);
+  assert.deepEqual(linked.build,original.build);
+  await buildTab.click();
+  assert(await tabProfile.isDisabled());
+  await page.locator('#smsLibrary').click();
+  await libraryCard.getByRole('button',{name:'Independent copy',exact:true}).click();
+  const independent=await modelState();
+  assert.equal(independent.link,null);
+  assert.deepEqual(independent.build,original.build);
+  await buildTab.click();
+  await tabDepth.fill('2.75');await tabDepth.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.backingTabs[0].recessDepth===2.75);
+  await page.reload();await page.waitForFunction(()=>window.__sensoryStudio);
+  const copies=await page.evaluate(ids=>Object.fromEntries(window.__sensoryStudio.project.models
+   .filter(model=>ids.includes(model.id)).map(model=>[model.id,model.build.backingTabs[0].recessDepth])),
+   [original.id,linked.id,independent.id]);
+  assert.deepEqual(copies,{[original.id]:3,[linked.id]:3,[independent.id]:2.75});
+  await page.locator('#model-tab-'+original.id).click();
+  await buildTab.click();
+  await page.getByRole('button',{name:'Render actual model',exact:true}).click();
+  const originalInspector=page.locator('#smsLightInspector');
+  await originalInspector.getByText(/Prepared manufacturing mesh/).waitFor({timeout:120000});
+  await originalInspector.getByLabel('Cut section').check();
+  await tabDepth.fill('3.25');await tabDepth.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.backingTabs[0].recessDepth===3.25);
+  await originalInspector.getByText(/Preview only/).waitFor();
+  assert(await originalInspector.getByRole('slider').isHidden());
+  await page.locator('#smsGlobalUndo').click();
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.backingTabs[0].recessDepth===3);
+  assert.equal(Number(await tabDepth.inputValue()),3);
+  await page.locator('#smsGlobalRedo').click();
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.backingTabs[0].recessDepth===3.25);
+  assert.equal(Number(await tabDepth.inputValue()),3.25);
+  await printTab.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  assert(await job.locator('[data-job-stl]').isDisabled());
+  assert(await job.locator('[data-job-3mf]').isDisabled());
+  await page.locator('#smsLibrary').click();
+  await projectCard.getByRole('button',{name:'Save to library',exact:true}).click();
+  await page.locator('#model-tab-'+linked.id).click();
+  assert.equal((await modelState()).build.backingTabs[0].recessDepth,3);
+  await page.getByRole('button',{name:'Accept library revision 2'}).click();
+  assert.equal((await modelState()).link.revision,2);
+  assert.equal((await modelState()).build.backingTabs[0].recessDepth,3.25);
+  assert.equal(await page.evaluate(id=>window.__sensoryStudio.project.models.find(model=>model.id===id)
+   .build.backingTabs[0].recessDepth,independent.id),2.75);
+  await printTab.click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  const linkedJobId=await page.evaluate(id=>window.__sensoryStudio.project.printJobs.find(item=>item.modelId===id).id,linked.id);
+  const linkedJob=page.locator('[data-print-job="'+linkedJobId+'"]');
+  await linkedJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const linkedSTL=await useDownload(linkedJob.locator('[data-job-stl]'));
+  const linkedMF=await useDownload(linkedJob.locator('[data-job-3mf]'));
+  await buildTab.click();
+  await page.getByRole('button',{name:'Render actual model',exact:true}).click();
+  const inspector=page.locator('#smsLightInspector');
+  await inspector.getByText('Prepared manufacturing mesh', {exact:false}).waitFor();
+  const ranges=await sectionRanges(inspector);
+  const position=inspector.getByRole('slider');
+  const {sectionX,viewportMesh}=await renderedXSection(inspector,topMount.x);
+  const sectionMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  const profileAt=geometry=>{
+   const mesh=new THREE.Mesh(geometry,sectionMaterial);
+   return [8,9.3,9.9].map(height=>[-1,1].map(sign=>new THREE.Raycaster(
+    new THREE.Vector3(sectionX,-topMount.z,height),new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0]?.distance));
+  };
+  const expectedProfile=profileAt(viewportMesh).flat();
+  assert(expectedProfile.every(Number.isFinite),'The visible cutaway contains the top pilot and taper walls');
+  viewportMesh.dispose();
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(linkedSTL.bytes).buffer),
+   read3MFGeometry(zipEntries(linkedMF.bytes).get('3D/3dmodel.model').toString())]){
+   assertSectionBounds(geometry,ranges,'Linked Gear');
+   const profile=profileAt(geometry).flat();
+   assert(profile.every((value,index)=>Math.abs(value-expectedProfile[index])<.01),
+    'The exported pilot and taper walls match the visible cutaway at the same X plane');
+   geometry.dispose();
+  }
+  sectionMaterial.dispose();
+  const inspected=await modelState();
+  await position.press('ArrowRight');
+  assert.deepEqual(await modelState(),inspected);
+  await inspector.getByRole('button',{name:'Close inspection'}).click();
+  await page.locator('#model-tab-'+original.id).click();
+  await printTab.click();
+  const originalJobId=await page.evaluate(id=>window.__sensoryStudio.project.printJobs.find(item=>item.modelId===id).id,original.id);
+  const originalJob=page.locator('[data-print-job="'+originalJobId+'"]');
+  await originalJob.locator('[data-job-prepare]').click();
+  await originalJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  await verifyTabRemovalBounds(witness,palette,{jobId:originalJobId,tab:1});
+ }
+ {
+  await page.evaluate(()=>window.__sensoryStudio.addModel('waves',{width:100,depth:70,thickness:2,amplitude:1,variation:0},'Thin fixing witness'));
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  const mounting=page.locator('[data-build=mounting]');
+  await mounting.evaluate(node=>{for(let p=node.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS')p.open=true;});
+  await mounting.check();
+  const beforeFixing=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
+  const profile=page.locator('[data-build=mountStyle]');
+  await profile.selectOption('Underside countersinks');
+  await page.locator('#smsModelError').getByText(/needs continuous underside stock/).waitFor();
+  assert.equal(await profile.inputValue(),'Through holes');
+  assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),beforeFixing);
+ }
+ // FAB-02: conical native underside roofs preserve the measured bore and reject insufficient stock.
+ for(const thickness of [13,18]){
+  const name='Conical Gear '+thickness;
+  await page.evaluate(({name,thickness})=>window.__sensoryStudio.addModel('gears',{mode:'Decorative',
+   wheelStyle:'Rounded lobes',webStyle:'Solid',diameter:100,thickness,bore:0,reliefStyle:'None',dualMaterial:false},name),{name,thickness});
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  const palette=page.locator('.sms-palette');
+  await palette.locator('[data-fit-profile=seed]').click();
+  await page.locator('[data-view=bottom]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await palette.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+  const target=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(0,0,'underside'));
+  assert(target);await page.mouse.click(target.x,target.y);
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===1);
+  await page.keyboard.press('Escape');
+  const control=palette.getByLabel('Conical socket roof');
+  const before=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  await control.click();
+  if(thickness===13){
+   await page.locator('#smsModelError').getByText(/needs .* mm of stock for its socket and roof/).waitFor();
+   assert.equal(await control.isChecked(),false);
+   assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),before);
+   continue;
+  }
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].conical===true);
+  const acceptedCone=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  const measuredDiameter=palette.getByLabel('Measured body diameter (mm)');
+  await measuredDiameter.fill('20');await measuredDiameter.press('Tab');
+  await page.locator('#smsModelError').getByText(/needs .* mm of stock for its socket and roof/).waitFor();
+  assert.equal(Number(await measuredDiameter.inputValue()),before.build.pixelHoles[0].diameter);
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),acceptedCone);
+  await palette.getByRole('button',{name:'Create / edit pixel profile'}).click();
+  assert(await page.locator('#routeSpecimenConical').isChecked());
+  assert.equal(Number(await page.locator('#pixelSocketClearance').inputValue()),before.build.pixelHoles[0].clearance);
+  const couponSTL=await useDownload(page.locator('#routeSpecimenSTL'));
+  const couponMF=await useDownload(page.locator('#routeSpecimen3MF'));
+  await page.locator('#closePixelProfileBtn').click();
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(couponSTL.bytes).buffer),
+   read3MFGeometry(zipEntries(couponMF.bytes).get('3D/3dmodel.model').toString())]){
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),mesh=new THREE.Mesh(geometry,material);
+   const apex=new THREE.Raycaster(new THREE.Vector3(-15,0,-1),new THREE.Vector3(0,0,1)).intersectObject(mesh)[0]?.point.z;
+   const installed=before.build.pixelHoles[0];
+   assert(Math.abs(apex-installed.socketProfile.bodyHeight-(installed.diameter+installed.clearance)/2)<.01);
+   geometry.dispose();material.dispose();
+  }
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  const job=page.locator('#smsJobs article').filter({hasText:name});
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const stl=await useDownload(job.locator('[data-job-stl]'));
+  const mf=await useDownload(job.locator('[data-job-3mf]'));
+  const {x,z,diameter,clearance,socketProfile}=before.build.pixelHoles[0];
+  const radius=(diameter+clearance)/2,material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(stl.bytes).buffer),
+   read3MFGeometry(zipEntries(mf.bytes).get('3D/3dmodel.model').toString())]){
+   const mesh=new THREE.Mesh(geometry,material);
+   const ray=(height,dy,dz)=>new THREE.Raycaster(new THREE.Vector3(x,-z,height),
+    new THREE.Vector3(0,dy,dz)).intersectObject(mesh)[0];
+   const apex=ray(-1,0,1).point.z;
+   assert(Math.abs(apex-socketProfile.bodyHeight-radius)<.01);
+   assert(Math.abs(ray(6,1,0).distance+ray(6,-1,0).distance-2*radius)<.01);
+   assert(Math.abs(ray(10,1,0).distance+ray(10,-1,0).distance-2*(radius-1))<.01);
+   geometry.dispose();
+  }
+  material.dispose();
+ }
+ // FAB-01: validate a bent underside vault before saving and measure the print files.
+ {
+  const name='Vaulted underside Tile';
+  await page.evaluate(name=>window.__sensoryStudio.addModel('tactile-tiles',{
+   width:100,depth:80,thickness:12,outline:'square',relief:2,pattern:'terraces',dualMaterial:false
+  },name),name);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  const palette=page.locator('.sms-palette');
+  await palette.locator('[data-fit-profile=seed]').click();
+  await page.locator('[data-view=bottom]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await palette.getByRole('button',{name:'Place LED fitting in 3D'}).click();
+  for(const [i,x] of [-15,15].entries()){
+   const target=await page.evaluate(x=>window.__sensoryStudio.fittingPointScreen(x,0,'underside'),x);
+   assert(target);await page.mouse.click(target.x,target.y);
+   await page.waitForFunction(count=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===count,i+1);
+  }
+  await page.keyboard.press('Escape');
+  const serial=palette.getByRole('group',{name:'Serial LED string'});
+  await serial.getByRole('button',{name:'Pin automatic IN opening'}).click();
+  const edge=serial.getByLabel('IN perimeter position (%)');
+  const automatic=Number(await edge.inputValue()),offset=(automatic+98)%100;
+  await edge.fill(String(offset));await edge.press('Tab');
+  await serial.getByLabel('Cut serial channels').check();
+  await serial.getByText('Channels ready for preparation.').waitFor();
+  await serial.getByLabel('Vault wire-track roofs for underside-down printing').click();
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.serialRouting.vaulted===true);
+  assert.equal(await serial.getByLabel('Vault wire-track roofs for underside-down printing').isChecked(),true);
+  const accepted=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  await edge.fill(String((offset+50)%100));await edge.press('Tab');
+  await page.locator('#smsModelError').getByText(/Chosen IN edge|Chosen OUT edge|Cable budget exceeded|No safe tangent|channel approaches/i).waitFor();
+  assert.equal(Number(await edge.inputValue()),offset);
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),accepted);
+  const width=serial.getByLabel('Requested wire-track width (mm)');
+  await width.fill('5');await width.press('Tab');
+  await page.locator('#smsModelError').getByText(/Channels cross or leave insufficient web/).waitFor();
+  assert.equal(Number(await width.inputValue()),3.2);
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),accepted);
+  await width.fill('4');await width.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.serialRouting.channelWidthMm===4);
+  const validEdge=offset+.3;
+  await edge.fill(String(validEdge));await edge.press('Tab');
+  await page.waitForFunction(value=>window.__sensoryStudio.currentModel.build.serialRouting.inEdgePercent===value,validEdge);
+  const tail=serial.getByLabel('IN tail limit (mm)');
+  await tail.fill('150');await tail.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.serialRouting.inTail===150);
+  const reverse=serial.getByRole('button',{name:'Reverse pixel order and wiring'});
+  await reverse.click();
+  await page.waitForFunction(value=>window.__sensoryStudio.currentModel.build.serialRouting.outEdgePercent===value,validEdge);
+  const reversedRoute=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.serialRouting);
+  assert.equal(reversedRoute.inEdgePercent,null);
+  assert.equal(reversedRoute.inTail,200);
+  assert.equal(reversedRoute.outTail,150);
+  await reverse.click();
+  await page.waitForFunction(value=>window.__sensoryStudio.currentModel.build.serialRouting.inEdgePercent===value,validEdge);
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  const job=page.locator('#smsJobs article').filter({hasText:name});
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const stl=await useDownload(job.locator('[data-job-stl]'));
+  const mf=await useDownload(job.locator('[data-job-3mf]'));
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(stl.bytes).buffer),
+   read3MFGeometry(zipEntries(mf.bytes).get('3D/3dmodel.model').toString())]){
+   const mesh=new THREE.Mesh(geometry,material);
+   const section=height=>[-1,1].reduce((sum,sign)=>sum+new THREE.Raycaster(
+    new THREE.Vector3(0,0,height),new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0].distance,0);
+   assert(Math.abs(section(1)-4)<.02);
+   assert(Math.abs(section(2.8)-2.2)<.02);
+   geometry.dispose();
+  }
+  material.dispose();
+  const buildTab=page.locator('.sms-workspace-nav [data-tab=build]');
+  const printTab=page.locator('.sms-workspace-nav [data-tab=print]');
+  await buildTab.click();
+  await edge.fill('');await edge.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.serialRouting.inEdgePercent===null);
+  for(const [i,label] of ['P1','P2'].entries()){
+   await palette.getByRole('button',{name:label,exact:true}).click();
+   const diameter=palette.getByLabel('Measured body diameter (mm)');
+   await diameter.fill('8');await diameter.press('Tab');
+   await page.waitForFunction(i=>window.__sensoryStudio.currentModel.build.pixelHoles[i].diameter===8,i);
+  }
+  await width.fill('6');await width.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.serialRouting.channelWidthMm===6);
+  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+  await page.reload();
+  await page.waitForFunction(()=>window.__sensoryStudio?.currentModel?.build.serialRouting.channelWidthMm===6);
+  await printTab.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  assert(await job.locator('[data-job-stl]').isDisabled());
+  assert(await job.locator('[data-job-3mf]').isDisabled());
+  await job.locator('[data-job-prepare]').click();
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const wideSTL=await useDownload(job.locator('[data-job-stl]'));
+  const wideMF=await useDownload(job.locator('[data-job-3mf]'));
+  const wideMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(wideSTL.bytes).buffer),
+   read3MFGeometry(zipEntries(wideMF.bytes).get('3D/3dmodel.model').toString())]){
+   const mesh=new THREE.Mesh(geometry,wideMaterial);
+   for(const y of [-2.85,0,2.85]){
+    const opening=new THREE.Raycaster(new THREE.Vector3(-51,y,1.5),new THREE.Vector3(1,0,0),0,102);
+    assert.equal(opening.intersectObject(mesh).length,0,'The wide lower track clears both bores and exterior apertures');
+   }
+   for(const x of [-49.9,0,49.9]){
+    const width=[-1,1].reduce((sum,sign)=>sum+new THREE.Raycaster(
+     new THREE.Vector3(x,0,1.5),new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0].distance,0);
+    assert(Math.abs(width-6)<.02);
+   }
+   geometry.dispose();
+  }
+  wideMaterial.dispose();
+ }
+ // DIM-03/CAL-01: change the fitted bore and retention independently on a measured flanged Gear socket.
+ {
+  const name='Gear independent socket calibration',profileName='Measured flanged calibration profile';
+  await page.evaluate(name=>window.__sensoryStudio.addModel('gears',{mode:'Decorative',wheelStyle:'Rounded lobes',
+   webStyle:'Solid',diameter:100,thickness:18,bore:0,reliefStyle:'None',dualMaterial:false},name),name);
+  const buildTab=page.locator('.sms-workspace-nav [data-tab=build]');
+  const printTab=page.locator('.sms-workspace-nav [data-tab=print]');
+  await buildTab.click();
+  const palette=page.locator('.sms-palette');
+  await palette.locator('[data-fit-profile=seed]').click();
+  await palette.getByRole('button',{name:'Create / edit pixel profile'}).click();
+  await page.locator('#pixelKind').selectOption('gumdrop');
+  for(const [id,value] of Object.entries({pixelName:profileName,pixelBodyDiameter:'8',pixelBodyHeight:'9',
+   pixelFlangeDiameter:'9',pixelFlangeHeight:'1.2',pixelCapHeight:'1.2',pixelWireWidth:'2.4',pixelWireDepth:'1.6',pixelSocketClearance:'.3'}))
+   await page.locator('#'+id).fill(value);
+  await page.locator('#applyPixelSocketFit').click();
+  await palette.getByRole('button',{name:new RegExp(profileName)}).click();
+  await page.locator('[data-view=bottom]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  await palette.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+  const target=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(0,0,'underside'));
+  assert(target);await page.mouse.click(target.x,target.y);
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===1);
+  await page.keyboard.press('Escape');
+  const hole=()=>page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0]);
+  const original=await hole();
+  const job=page.locator('#smsJobs article').filter({hasText:name});
+  const measure=async expected=>{
+   await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+   const stl=await useDownload(job.locator('[data-job-stl]'));
+   const mf=await useDownload(job.locator('[data-job-3mf]'));
+   for(const geometry of [new STLLoader().parse(Uint8Array.from(stl.bytes).buffer),
+    read3MFGeometry(zipEntries(mf.bytes).get('3D/3dmodel.model').toString())]){
+    const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),mesh=new THREE.Mesh(geometry,material);
+    const rays=(z,dy,dz)=>new THREE.Raycaster(new THREE.Vector3(original.x,-original.z,z),
+     new THREE.Vector3(0,dy,dz)).intersectObject(mesh)[0];
+    const boreAt=z=>rays(z,1,0).distance+rays(z,-1,0).distance;
+    for(const [index,height] of [.7,2.8,5].entries())assert(Math.abs(boreAt(height)-expected[index])<.02);
+    assert(Math.abs(rays(-1,0,1).point.z-9)<.01);
+    geometry.dispose();material.dispose();
+   }
+  };
+  await printTab.click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  await measure([9.3,8.3,8.3]);
+  await buildTab.click();
+  const clearance=palette.getByLabel('Diameter clearance (mm)');
+  await clearance.fill('.6');await clearance.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].clearance===.6);
+  await printTab.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  assert(await job.locator('[data-job-stl]').isDisabled());
+  await job.locator('[data-job-prepare]').click();
+  await measure([9.6,8.6,8.6]);
+  await buildTab.click();
+  const retention=palette.getByLabel('Retention lip (mm)');
+  await retention.fill('.4');await retention.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles[0].socketProfile.retentionLip===.4);
+  assert.deepEqual((await hole()).socketProfile,{...original.socketProfile,retentionLip:.4});
+  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+  await page.reload();
+  await page.waitForFunction(()=>window.__sensoryStudio?.currentModel?.build.pixelHoles?.[0]?.socketProfile.retentionLip===.4);
+  await printTab.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  assert(await job.locator('[data-job-3mf]').isDisabled());
+  await job.locator('[data-job-prepare]').click();
+  await measure([9.6,7.8,8.6]);
+ }
+ // FIT-01/FIT-03: place and route directly on planar Tile walls.
+ for(const [view,axis,sign,distance,halfSpan] of [['back',1,1,40,50],['left',0,-1,50,40],['right',0,1,50,40]]){
+  const name='Routed Tile '+view;
+  await page.evaluate(name=>window.__sensoryStudio.addModel('tactile-tiles',{width:100,depth:80,thickness:20,
+   outline:'square',relief:2,pattern:'terraces',dualMaterial:false},name),name);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await page.locator('[data-view='+view+']').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  const palette=page.locator('.sms-palette');
+  await palette.locator('[data-fit-profile=seed]').click();
+  await palette.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+  const canvas=await page.locator('#viewport canvas').boundingBox();
+  const {camera,target}=await page.evaluate(()=>window.__crystalForgeViewMetrics());
+  const projection=new THREE.PerspectiveCamera(46,canvas.width/canvas.height,.1,5000);
+  projection.position.fromArray(camera);projection.lookAt(new THREE.Vector3(...target));projection.updateMatrixWorld();
+  for(const [i,along] of [-15,15].entries()){
+   const point=new THREE.Vector3(...(axis===1?[-along,10,-distance]:[sign*distance,10,-sign*along])).project(projection);
+   await page.mouse.click(canvas.x+(point.x+1)*canvas.width/2,canvas.y+(1-point.y)*canvas.height/2);
+   await page.waitForFunction(count=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===count,i+1);
+  }
+  await page.keyboard.press('Escape');
+  const holes=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
+  const modelAxis=axis===1?'z':'x',modelSign=axis===1?-1:sign,normalIndex=axis===1?2:0;
+  assert(holes.every(hole=>Math.abs(hole[modelAxis]-modelSign*distance)<.01&&
+   Math.abs(hole.surface.normal[normalIndex]-modelSign)<.00001),JSON.stringify(holes));
+  const serial=palette.getByRole('group',{name:'Serial LED string'});
+  await serial.getByLabel('Cut serial channels').check();
+  await serial.getByText('Channels ready for preparation.').waitFor();
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  const job=page.locator('#smsJobs article').filter({hasText:name});
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const stl=await useDownload(job.locator('[data-job-stl]'));
+  const mf=await useDownload(job.locator('[data-job-3mf]'));
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),height=holes[0].surface.y;
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(stl.bytes).buffer),
+   read3MFGeometry(zipEntries(mf.bytes).get('3D/3dmodel.model').toString())]){
+   const mesh=new THREE.Mesh(geometry,material);
+   const hit=(origin,direction,far=Infinity)=>new THREE.Raycaster(
+    new THREE.Vector3(...origin),new THREE.Vector3(...direction),0,far).intersectObject(mesh)[0]?.point;
+   const point=(along,outward)=>axis===0?[sign*(distance+outward),along,height]:[along,sign*(distance+outward),height];
+   const inward=axis===0?[-sign,0,0]:[0,-sign,0];
+   for(const along of [5-halfSpan,0,halfSpan-5]){
+    const middle=point(along,-1);
+    const bottom=hit(middle,[0,0,-1]),top=hit(middle,[0,0,1]);
+    assert(bottom&&top&&Math.abs(top.z-bottom.z-3.2)<.02,JSON.stringify({view,along,bottom,top,height}));
+    const floor=hit(point(along,1),inward);
+    assert(floor&&Math.abs(floor.getComponent(axis)-sign*(distance-1.8))<.02);
+   }
+   assert.equal(hit(point(-halfSpan-1,-1),axis===0?[0,1,0]:[1,0,0],2*halfSpan+2),undefined);
+   geometry.dispose();
+  }
+  material.dispose();
+ }
+ // FIT-03: place two shaped sockets on a measured Wave that varies in both horizontal directions.
+ {
+  const name='Two-axis routed Wave';
+  await page.evaluate(name=>window.__sensoryStudio.addModel('waves',{width:160,depth:100,thickness:15,
+   amplitude:1,frequency:.5,variation:.1,direction:12,dualMaterial:false},name),name);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await page.locator('[data-view=top]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  const palette=page.locator('.sms-palette');
+  await palette.locator('[data-fit-profile=seed]').click();
+  await palette.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+  for(const [i,x] of [-40,-20].entries()){
+   const target=await page.evaluate(x=>window.__sensoryStudio.fittingPointScreen(x,-18,'top'),x);
+   assert(target);await page.mouse.click(target.x,target.y);
+   await page.waitForFunction(count=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===count,i+1);
+  }
+  await page.keyboard.press('Escape');
+  const holes=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
+  assert(holes.every(hole=>Math.abs(hole.surface.normal[0])>.001&&Math.abs(hole.surface.normal[2])>.001));
+  for(const label of ['P1','P2']){
+   await palette.getByRole('button',{name:label,exact:true}).click();
+   const rotation=palette.getByLabel('Body rotation (°)');
+   await rotation.fill('180');await rotation.press('Tab');
+  }
+  const serial=palette.getByRole('group',{name:'Serial LED string'});
+  await serial.getByRole('button',{name:'Pin automatic IN opening'}).click();
+  const edge=serial.getByLabel('IN perimeter position (%)');
+  const originalEdge=Number(await edge.inputValue());
+  await edge.fill(String(originalEdge+2));await edge.press('Tab');
+  await serial.getByLabel('Cut serial channels').check();
+  await serial.getByText('Channels ready for preparation.').waitFor();
+  const accepted=await page.evaluate(()=>window.__sensoryStudio.currentModel);
+  const minBend=serial.getByLabel('Minimum bend radius (mm)');
+  await minBend.fill('60');await minBend.press('Tab');
+  await page.locator('#smsModelError').getByText(/Chosen IN edge/).waitFor();
+  assert.equal(Number(await minBend.inputValue()),5);
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),accepted);
+  await minBend.fill('6');await minBend.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.serialRouting.minBendRadius===6);
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  const job=page.locator('#smsJobs article').filter({hasText:name});
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const stl=await useDownload(job.locator('[data-job-stl]'));
+  const mf=await useDownload(job.locator('[data-job-3mf]'));
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(stl.bytes).buffer),
+   read3MFGeometry(zipEntries(mf.bytes).get('3D/3dmodel.model').toString())]){
+   const mesh=new THREE.Mesh(geometry,material);
+   const span=[-1,1].reduce((sum,sign)=>sum+new THREE.Raycaster(new THREE.Vector3(0,18,14.5),
+    new THREE.Vector3(0,sign,0)).intersectObject(mesh)[0].distance,0);
+   assert(Math.abs(span-3.2)<.03);
+   const lead=new THREE.Raycaster(new THREE.Vector3(-39,18,14.5),new THREE.Vector3(1,0,0),0,120);
+   assert.equal(lead.intersectObject(mesh).length,0);
+   geometry.dispose();
+  }
+  material.dispose();
+ }
+ // DIM-05: blind hardware pockets retain the stock behind each cut.
+ for(const [type,parameters,backing] of [
+  ['tactile-tiles',{width:100,depth:80,thickness:6,outline:'square',relief:1,pattern:'terraces',dualMaterial:false}],
+  ['gears',{mode:'Decorative',wheelStyle:'Rounded lobes',webStyle:'Solid',diameter:100,thickness:6,bore:0,
+   reliefStyle:'None',dualMaterial:false}],
+  ['waves',{width:100,depth:80,thickness:8,amplitude:1,dualMaterial:false},true],
+  ['characters',{character:'Cloud',construction:'Layered',width:90,depth:8,dualMaterial:false},true],
+  ['light-pods',{shellForm:'Beacon',illuminated:false,width:80,depth:68,height:32,dualMaterial:false},true],
+  ['control-caps',{controlStyle:'Rotary knob',knobInstallation:'Stationary display',shaft:0,diameter:70,height:19,dualMaterial:false},true]
+ ]){
+  const name='Blind hardware '+type;
+  await page.evaluate(({type,parameters,name})=>window.__sensoryStudio.addModel(type,parameters,name),{type,parameters,name});
+  await page.getByRole('searchbox',{name:'Find tools and downloads'}).fill('magnet');
+  await page.getByRole('button',{name:'Open mounting and attachments'}).click();
+  await page.waitForFunction(()=>document.activeElement?.matches('[data-new-mount-profile]'));
+  await page.locator('[data-view=bottom]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  const palette=page.locator('.sms-palette');
+  if(backing){
+   await palette.locator('[data-pixel-backing]').check();
+   const thickness=palette.getByLabel('Fitting backing thickness (mm)');
+   await thickness.fill('8');await thickness.press('Tab');
+   assert.equal(await thickness.inputValue(),'8');
+  }
+  const placementProfile=palette.getByLabel('New mounting profile');
+  const place=palette.getByRole('button',{name:'Place mounting hole in 3D'});
+  for(const [i,x,kind] of [[0,-20,'Magnet pocket'],[1,20,'Threaded insert pilot']]){
+   await placementProfile.selectOption(kind);
+   await place.click();
+   const point=await page.evaluate(x=>window.__sensoryStudio.fittingPointScreen(x,0,'underside'),x);
+   assert(point);await page.mouse.click(point.x,point.y);
+   await page.waitForFunction(({i,kind})=>window.__sensoryStudio.currentModel.build.manualMountHoles?.[i]?.profile===kind,{i,kind});
+   await page.keyboard.press('Escape');
+  }
+  await place.click();
+  const conflict=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(-15,0,'underside'));
+  assert(conflict);await page.mouse.click(conflict.x,conflict.y);
+  await page.locator('#smsModelError').getByText(/overlaps|clearance from another/).waitFor();
+  assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles.length),2);
+  await page.keyboard.press('Escape');
+  if(backing){
+   await palette.locator('[data-fit-profile=seed]').click();
+   await palette.getByRole('button',{name:'Place LED fitting in 3D'}).click();
+   const led=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(0,0,'underside'));
+   assert(led);await page.mouse.click(led.x,led.y);
+   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===1);
+   await page.keyboard.press('Escape');
+   await placementProfile.selectOption('Magnet pocket');
+   await place.click();
+   const blocked=await page.evaluate(()=>window.__sensoryStudio.fittingPointScreen(6,0,'underside'));
+   assert(blocked);await page.mouse.click(blocked.x,blocked.y);
+   await page.locator('#smsModelError').getByText(/another pixel/).waitFor();
+   assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.manualMountHoles.length),2);
+   await page.keyboard.press('Escape');
+  }
+  const diameter=palette.getByLabel('Pocket diameter (mm)');
+  const depth=palette.getByLabel('Pocket depth (mm)');
+  const model=()=>page.evaluate(()=>window.__sensoryStudio.currentModel);
+  for(const [index,kind,width,targetDepth] of [[0,'Magnet pocket',6.2,3],[1,'Threaded insert pilot',4.1,4]]){
+   await palette.getByRole('button',{name:'M'+(index+1),exact:true}).click();
+   assert.equal((await model()).build.manualMountHoles[index].profile,kind);
+   const movedX=(await model()).build.manualMountHoles[index].x+1;
+   await page.locator('#viewport canvas').press('ArrowRight');
+   await page.waitForFunction(({index,movedX})=>window.__sensoryStudio.currentModel.build.manualMountHoles[index].x===movedX,{index,movedX});
+   await diameter.fill(String(width));await diameter.press('Tab');
+   await page.waitForFunction(({index,width})=>window.__sensoryStudio.currentModel.build.manualMountHoles[index].recessDiameter===width,{index,width});
+   if(index===0){
+    await depth.fill('3');await depth.press('Tab');
+    await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.manualMountHoles[0].recessDepth===3);
+    if(!backing){
+     const accepted=await model();
+     await depth.fill('5.9');await depth.press('Tab');
+     await page.locator('#smsModelError').getByText(/M1 magnet pocket needs continuous underside stock/).waitFor();
+     assert.equal(Number(await depth.inputValue()),targetDepth);
+     assert.deepEqual(await model(),accepted);
+    }
+   }
+  }
+  const {build}=await model();
+  await page.locator('#smsSaveState').filter({hasText:'Saved locally'}).waitFor();
+  await page.reload();
+  await page.waitForFunction(name=>window.__sensoryStudio?.currentModel?.name===name,name);
+  assert.deepEqual((await model()).build.manualMountHoles,build.manualMountHoles);
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  const job=page.locator('#smsJobs article').filter({hasText:name});
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const stl=await useDownload(job.locator('[data-job-stl]'));
+  const mf=await useDownload(job.locator('[data-job-3mf]'));
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(stl.bytes).buffer),
+   read3MFGeometry(zipEntries(mf.bytes).get('3D/3dmodel.model').toString())]){
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),mesh=new THREE.Mesh(geometry,material);
+   for(const [index,{x,z,recessDiameter}] of build.manualMountHoles.entries()){
+    const ray=(height,dx,dz)=>new THREE.Raycaster(new THREE.Vector3(x,-z,height),new THREE.Vector3(dx,0,dz)).intersectObject(mesh)[0];
+    const span=ray(1,-1,0).distance+ray(1,1,0).distance;
+    assert(Math.abs(span-recessDiameter)<.01);
+    assert(Math.abs(ray(-1,0,1).point.z-[3,4][index])<.01);
+   }
+   geometry.dispose();material.dispose();
+  }
  }
  assert.deepEqual(errors,[]);
  console.log('Unified Home, Design, Build, Library and Quick Print screenshots captured.');

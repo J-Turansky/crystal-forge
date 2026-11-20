@@ -1,3 +1,4 @@
+import {installFeatureCatalogue} from './studio-features.js';
 import {makePixelReplicaRecipe} from './pixel-replica.js';
 import {prepareRecipe} from './studio-geometry.js';
 import {makeRoutedSocketSpecimen} from './studio-catalogue.js';
@@ -13,7 +14,7 @@ import {routingSummary,renderFeedback,installConciseHelp} from './routing-feedba
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {TransformControls} from 'three/addons/controls/TransformControls.js';
 import {generateFormation,crystalGeometry,crystalOrientation,baseGeometry,baseAccentSpecs,baseSurfaceHeight,crystalRootOffset,exportSTL} from './geometry-v3.js';
-import {loadManifold,setThreeInstance,saveSTL,save3MF,encodeSTL,makeCalibrationStrip,makePixelSeatCoupon,makeDetachableMountPlate,splitPreparedMesh,splitPreparedMeshGrid,makeSplitPinCoupon,makeDetachablePlate,makeSteppedPixelCoupon} from './fabrication-v1.js';
+import {crystalFittingPreview,loadManifold,setThreeInstance,saveSTL,save3MF,encodeSTL,makeCalibrationStrip,makePixelSeatCoupon,makeDetachableMountPlate,splitPreparedMesh,splitPreparedMeshGrid,makeSplitPinCoupon,makeDetachablePlate,makeSteppedPixelCoupon} from './fabrication-v1.js';
 import {buildProductionPack} from './production-pack.js';
 import {planSplitJoints} from './split-joints.js';
 import {planBedAwareSplit} from './bed-split.js';
@@ -44,10 +45,10 @@ installResizablePanels();
 const defaults={
  requireAccessiblePassages:false,
   title:'Untitled cluster',batchSelectionIds:[],count:16,height:155,width:130,crystalSize:1,widthRandomness:0,studioBrightness:.85,seed:42,pattern:'Central Spire',spacing:42,leanMode:'Organic / natural',leanAmount:35,angleRandomness:32,
-  familyMix:'Quartz',familyWeights:{Quartz:1,Shard:1,Blade:1,Cubic:1,'Double terminated':1,Fantasy:1},bottomScale:1,topScale:.80,cornerRadius:.7,shoulderRound:0,tipRound:3.5,
+  familyMix:'Quartz',familyWeights:{Quartz:1,Shard:1,Blade:1,Cubic:1,'Double terminated':1,Fantasy:1},bottomScale:1,topScale:.80,cornerRadius:.7,shoulderRound:0,tipRound:3.5,tipStyle:'Rounded',
   tipFlat:.25,tipLength:.27,roundSteps:3,
   baseType:'integrated',baseHeight:25,baseDome:0,baseEdgeRadius:0,baseProfile:'Plinth + dome',domeFalloff:1.8,sideWall:100,baseWidth:3,baseStyle:'Fitted',undersideAccess:false,baseVault:false,vaultSupportPitch:25,wallThickness:1.2,lightPorts:false,lightPortDiameter:3.2,lightPortReach:55,
-  showPixels:false,pixelCount:1,pixelProfileId:'gumdrop',pixelProfiles:[],lightingMode:'single',glowPreview:false,glowColour:'0x77c4ff',pixelDiameter:12,pixelFit:.15,pixelRetentionLip:0,fitCalibration:null,fitCouponLast:null,fitCouponStyle:'stepped',cutSockets:true,hollowCrystals:false,targetedLightPaths:false,lightBoreDiameter:4,lightReach:85,pixelPlacement:'auto',manualPixelHoles:[],mountPlacement:'auto',manualMountHoles:[],splitParts:false,autoBedSplit:false,splitX:0,splitAlignment:false,splitPinDiameter:5,splitPinDepth:7,splitPinClearance:.25,plateThickness:4,mountPlateThickness:4.5,mount:'None',mountHoleDiameter:4.5,mountHoleDepth:9,mountSpacing:40,wireChannels:false,wireExit:true,wireMode:'string',pixelStringSpacing:50,pixelSnapMaxMove:5,wireMinBendRadius:5,wireInputTailLength:0,wireOutputTailLength:0,wireDirectionArrows:true,wireShowLengths:true,wirePairSpacing:7,wireWidth:3,wireDepth:2,wireSlack:0,manualEdgeTabs:null,tabCount:4,tabHolesPerTab:2,tabHoleDiameter:4.5,tabThickness:5,tabWall:3,
+  showPixels:false,pixelCount:1,pixelProfileId:'gumdrop',pixelProfiles:[],lightingMode:'single',glowPreview:false,glowColour:'0x77c4ff',pixelDiameter:12,pixelFit:.15,pixelRetentionLip:0,socketConical:false,fitCalibration:null,fitCouponLast:null,fitCouponStyle:'stepped',cutSockets:true,hollowCrystals:false,targetedLightPaths:false,lightBoreDiameter:4,lightReach:85,pixelPlacement:'auto',manualPixelHoles:[],mountPlacement:'auto',manualMountHoles:[],splitParts:false,autoBedSplit:false,splitX:0,splitAlignment:false,splitPinDiameter:5,splitPinDepth:7,splitPinClearance:.25,plateThickness:4,mountPlateThickness:4.5,mount:'None',mountHoleDiameter:4.5,mountHoleDepth:9,mountSpacing:40,wireChannels:false,wireExit:true,wireMode:'string',pixelStringSpacing:50,pixelSnapMaxMove:5,wireMinBendRadius:5,wireInputTailLength:0,wireOutputTailLength:0,wireDirectionArrows:true,wireShowLengths:true,wirePairSpacing:7,wireWidth:3,wireDepth:2,wireVaulted:false,wireSlack:0,manualEdgeTabs:null,edgeManualMounts:false,tabCount:4,tabHolesPerTab:2,tabHoleDiameter:4.5,tabThickness:5,tabWall:3,
   printer:'Ultimaker 3 Extended',printerX:220,printerY:220,printerZ:220,curaNozzle:.4,curaMaterial:'PLA',curaQuality:60,curaQualityType:'auto',curaIntent:'light',overhang:45,preserveLocked:true,snap:true,hardwareSnap:false,hardwareSnapStep:5,
   colour:0x8bbcff,mode:'simple',floatView:false,hardwareColourMode:false,evenLighting:true
 };
@@ -144,6 +145,17 @@ function syncShapeControls(){
  const multi=s.lightingMode==='multi';
  $('multiplePixelsRow').classList.toggle('show',multi);
  for(const e of document.querySelectorAll('[data-state="pixelCount"]'))e.disabled=!multi;
+}
+function applyCrystalPixelProfile(id){
+ mergePixelLibrary();
+ const profile=allPixelProfiles(s).find(item=>item.id===id);
+ if(!profile)return false;
+ s.pixelProfileId=id;s.pixelDiameter=profile.bodyDiameter;
+ if(profile.measuredFit&&!Object.hasOwn(s.pixelClearanceByProfile||{},id)){
+  const {printedBoreDiameter,bodyDiameter}=profile.measuredFit;
+  s.pixelClearanceByProfile={...s.pixelClearanceByProfile,[id]:Math.round((printedBoreDiameter-bodyDiameter)*100)/100};
+ }
+ return true;
 }
 function refreshPixelProfileOptions(){
  const select=$('pixelProfileSelect');if(!select)return;
@@ -487,13 +499,40 @@ function rebuildBase(){
  }
  updateAppearance();
 }
-function updateLEDs(){
- while(pixelGroup.children.length){const m=pixelGroup.children[0];pixelGroup.remove(m);m.geometry?.dispose();m.material?.dispose()}
+let fittingPreviewRequest=0;
+async function updateLEDs(){
+ const request=++fittingPreviewRequest,group=pixelGroup;
+ const report=message=>{
+  for(const output of document.querySelectorAll('#pixelFittingPreviewStatus,[data-build-fit-preview-status]'))output.textContent=message;
+ };
+ while(group.children.length){const m=group.children[0];group.remove(m);m.geometry?.dispose();m.material?.dispose()}
+ report('');
  if(!s.showPixels)return;
- for(const p of planHardware(crystals,s).sockets){
-  const m=new THREE.Mesh(new THREE.SphereGeometry(3,10,8),new THREE.MeshBasicMaterial({color:0xffdc58,depthTest:false}));
-  m.position.set(p.x,1,p.z);m.renderOrder=95;pixelGroup.add(m);
- }
+ if(!s.cutSockets||!baseMesh){report('Enable pixel socket cuts and a base to preview the fit.');return;}
+ const stock=baseMesh;
+ const sockets=planHardware(crystals,s).sockets;
+ try{
+  const wasm=await loadManifold();
+  if(request!==fittingPreviewRequest||group!==pixelGroup)return;
+  const messages=[];
+  sockets.forEach((pos,index)=>{
+   try{
+    const profile=resolveSocketProfile(s,pos);
+    const replica=prepareRecipe(THREE,wasm,makePixelReplicaRecipe(profile));
+    const roof=baseSurfaceHeight(crystals,s,pos.x,pos.z);
+    const preview=crystalFittingPreview(wasm,replica.bodies[0].mesh,stock,pos,roof,profile,s);
+    for(const [kind,geometry,color,opacity] of [
+     ['negative',preview.negative,0x46beff,.16],
+     ['positive',preview.positive,preview.collisionVolume>.01?0xff6161:0xffdc58,.42]
+    ]){
+     const mesh=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color,opacity,transparent:true,depthTest:false,depthWrite:false}));
+     mesh.name='crystal-fitting-'+kind;mesh.renderOrder=kind==='positive'?96:95;group.add(mesh);
+    }
+    messages.push('P'+(index+1)+' · insertion '+preview.insertionDepth.toFixed(2)+' mm · centre roof '+preview.remainingRoof.toFixed(2)+' mm · '+preview.exposedVolume.toFixed(2)+' mm³ outside base · '+preview.collisionVolume.toFixed(2)+' mm³ interfering with base');
+   }catch(error){messages.push('P'+(index+1)+' · '+error.message);}
+  });
+  report(messages.join(' | ')||'No accepted pixel sockets to preview.');
+ }catch(error){if(request===fittingPreviewRequest)report(error.message);}
 }
 
 function selectCrystal(id,commit=true){
@@ -780,8 +819,7 @@ document.querySelectorAll('[data-state]').forEach(e=>{
   if(key==='familyMix')$('familyWeightsControls').hidden=value!=='Mixed';
   if(key==='pixelFit'&&s.fitCalibration){s.fitCalibration=null;syncFitCalibration()}
    if(key==='pixelProfileId'){
-    const profile=allPixelProfiles(s).find(p=>p.id===value);
-    if(profile)s.pixelDiameter=profile.bodyDiameter;
+    applyCrystalPixelProfile(value);
     syncForm();
    }
   if(key==='mount'){$('edgeTabSettings').hidden=value!=='Edge fixing tabs';$('detachablePlateSettings').hidden=value!=='Detachable plate'}
@@ -1037,42 +1075,71 @@ function applyTheme(theme,save=true){
 $('themeBtn').onclick=()=>applyTheme(activeTheme==='light'?'dark':'light');
 applyTheme(activeTheme,false);
 
-// Keyboard-accessible Help and Changelog, available from any workspace.
+// Help, features and release history share one keyboard-accessible dialog.
+const info=$('infoOverlay');
+const infoTabs=[...info.querySelectorAll('[data-info]')];
+const infoTitles={help:'Help',features:'Features',changelog:'What’s new'};
+const renderFeatures=installFeatureCatalogue($('infoFeatures'),{
+ canNavigate:feature=>feature.action==='help'||!!window.__sensoryStudio?.canOpenFeature(feature),
+ navigate:feature=>{
+  if(feature.action==='help'){showInfoTab('help');$('infoTabHelp').focus();return;}
+  if(!window.__sensoryStudio?.canOpenFeature(feature))return;
+  closeInfo();window.__sensoryStudio.openFeature(feature);
+ }
+});
 let returnFocus=null;
 function showInfo(tab='help'){
  returnFocus=document.activeElement;
- $('infoOverlay').hidden=false;
+ info.hidden=false;
  showInfoTab(tab);
  $('closeInfo').focus();
 }
 function showInfoTab(tab){
- const which=tab==='changelog'?'changelog':'help';
- $('infoTitle').textContent=which==='help'?'Crystal Forge — Help':'Crystal Forge — What’s new';
- document.querySelectorAll('[data-info]').forEach(button=>{
-  const on=button.dataset.info===which;
-  button.classList.toggle('active',on);
-  button.setAttribute('aria-selected',on?'true':'false');
- });
- document.querySelectorAll('[data-info-pane]').forEach(panel=>panel.hidden=panel.dataset.infoPane!==which);
- const active=$('infoOverlay').querySelector('[data-info-pane="'+which+'"]');
- if(active)active.scrollTop=0;
+ $('infoTitle').textContent='Crystal Forge — '+infoTitles[tab];
+ for(const button of infoTabs){
+  const selected=button.dataset.info===tab;
+  button.classList.toggle('active',selected);
+  button.setAttribute('aria-selected',String(selected));
+  button.tabIndex=selected?0:-1;
+ }
+ for(const panel of info.querySelectorAll('[data-info-pane]')){
+  panel.hidden=panel.dataset.infoPane!==tab;
+  if(!panel.hidden)panel.scrollTop=0;
+ }
+ if(tab==='features')renderFeatures();
 }
 function closeInfo(){
- if($('infoOverlay').hidden)return;
- $('infoOverlay').hidden=true;
- if(returnFocus&&typeof returnFocus.focus==='function')returnFocus.focus();
+ if(info.hidden)return;
+ info.hidden=true;
+ returnFocus?.focus();
 }
 $('helpBtn').onclick=()=>showInfo('help');
 $('changelogBtn').onclick=()=>showInfo('changelog');
 $('closeInfo').onclick=closeInfo;
-document.querySelectorAll('[data-info]').forEach(button=>button.onclick=()=>showInfoTab(button.dataset.info));
-$('infoOverlay').addEventListener('pointerdown',e=>{if(e.target===$('infoOverlay'))closeInfo()});
-document.addEventListener('keydown',e=>{
- if(!$('infoOverlay').hidden){
-  if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeInfo()}
+for(const [i,button] of infoTabs.entries()){
+ button.onclick=()=>showInfoTab(button.dataset.info);
+ button.onkeydown=event=>{
+  const target={ArrowLeft:(i+infoTabs.length-1)%infoTabs.length,ArrowRight:(i+1)%infoTabs.length,Home:0,End:infoTabs.length-1}[event.key];
+  if(target===undefined)return;
+  event.preventDefault();
+  const next=infoTabs[target];
+  showInfoTab(next.dataset.info);next.focus();
+ };
+}
+info.addEventListener('pointerdown',event=>{if(event.target===info)closeInfo();});
+document.addEventListener('keydown',event=>{
+ if(!info.hidden){
+  if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();closeInfo();}
+  if(event.key==='Tab'){
+   const focusable=[...info.querySelectorAll('button:not(:disabled),input,select,a[href],summary,[tabindex]')]
+    .filter(node=>node.tabIndex>=0&&node.getClientRects().length);
+   const first=focusable[0],last=focusable.at(-1);
+   if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}
+   if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
+  }
   return;
  }
- if(e.key==='?'&&!(e.target instanceof HTMLInputElement)){e.preventDefault();showInfo('help')}
+ if(event.key==='?'&&!(event.target instanceof HTMLInputElement)){event.preventDefault();showInfo('help');}
 });
 
 // Reusable pixel profiles are stored in both browser library and editable projects.
@@ -1098,18 +1165,21 @@ $('pixelProfileDiagram').addEventListener('click',e=>{
  if(field&&PIXEL_DIMENSIONS.some(dim=>dim.field===field))$(field).focus();
 });
 function closePixelEditor(){$('pixelProfileOverlay').hidden=true;$('editPixelProfileBtn').focus()}
-let editingPixelProfileId=null;
-function openPixelProfileEditor(id,duplicate=false){
+let editingPixelProfileId=null,routedCouponRetention;
+function openPixelProfileEditor(id,duplicate=false,fit){
  const profiles=allPixelProfiles({pixelProfiles:readPixelFitProfiles()});
- const p=profiles.find(profile=>profile.id===id);
+ const savedProfile=profiles.find(profile=>profile.id===id);
+ const p=fit?.measurements?{...savedProfile,...fit.measurements,id}:savedProfile;
  if(!p){setStatus('Import the missing pixel profile or choose another profile.');return;}
  editingPixelProfileId=duplicate?null:p.id;
 
  for(const [k,id] of Object.entries(pixelFields))$(id).value=p[k];
  if(duplicate)$('pixelName').value=p.name+' copy';
  updatePixelProfileDiagram();
- $('pixelSocketClearance').value=p.measuredFit
-  ?(p.measuredFit.printedBoreDiameter-p.measuredFit.bodyDiameter).toFixed(2):s.pixelFit;
+ $('pixelSocketClearance').value=fit?.clearance??(p.measuredFit
+  ?(p.measuredFit.printedBoreDiameter-p.measuredFit.bodyDiameter).toFixed(2):s.pixelFit);
+ $('routeSpecimenConical').checked=fit?.conical??false;
+ routedCouponRetention=fit?.retentionLip;
  $('pixelSocketStatus').textContent='';
  $('pixelProfileOverlay').hidden=false;$('pixelName').focus();
 }
@@ -1176,7 +1246,8 @@ for(const format of ['stl','3mf']){
    const values=Object.fromEntries(Object.entries(pixelFields).map(([key,id])=>
     [key,key==='name'||key==='kind'?$(id).value:$(id).valueAsNumber]));
    const profile=normalisePixelProfile(values),clearance=socketFitFromEditor();
-   const recipe=makeRoutedSocketSpecimen(profile,{clearance,retentionLip:s.pixelRetentionLip});
+   const recipe=makeRoutedSocketSpecimen(profile,{clearance,retentionLip:routedCouponRetention??s.pixelRetentionLip,
+    conical:$('routeSpecimenConical').checked});
    const files=exportMaterialBodies(prepareRecipe(THREE,await loadManifold(),recipe),{name:'two-pixel-route-test'});
    download(new Blob([format==='stl'?files.stls[0].bytes:files.threeMF],
     {type:format==='stl'?'model/stl':'model/3mf'}),'two-pixel-route-test.'+format);
@@ -1665,7 +1736,13 @@ installCollapsibleSections();
 installConciseHelp();
 if(studioBootstrap&&!new URLSearchParams(location.search).has('legacy'))studioBridge=installSensoryStudio({THREE,scene,camera,orbit,renderer,bootstrap:studioBootstrap,adapter:{
  capture:()=>({settings:clone(s),crystals:clone(crystals),selectedId}),
- bounds:()=>{const size=modelBounds().getSize(new THREE.Vector3());return {width:size.x,depth:size.z,height:size.y};},
+ bounds:()=>{
+  const bounds=new THREE.Box3();
+  for(const mesh of [...crystalMeshes,...(baseMesh?[baseMesh]:[]),...baseAccents])
+   if(mesh.visible)bounds.expandByObject(mesh,true);
+  const size=bounds.getSize(new THREE.Vector3());
+  return {width:size.x,depth:size.z,height:size.y};
+ },
  status:setStatus,download,undo,canUndo:delta=>historyIndex+delta>=0&&historyIndex+delta<history.length,vault:()=>cloudVault,
  crystalSelectedPixel:()=>{
   const pixel=hardwareUI.getSelectedPixel();
@@ -1675,7 +1752,8 @@ if(studioBootstrap&&!new URLSearchParams(location.search).has('legacy'))studioBr
   const pixel=hardwareUI.getSelectedPixel();
   if(!pixel)throw Error('Select a Crystal pixel first.');
   const profile=resolveSocketProfile(s,pixel);
-  const coupon=makePixelSeatCoupon(await loadManifold(),{...s,pixelProfileId:profile.id,pixelDiameter:profile.bodyDiameter});
+  const coupon=makePixelSeatCoupon(await loadManifold(),{...s,pixelProfileId:profile.id,pixelDiameter:profile.bodyDiameter},
+   {trackWidthMm:Math.max(1.5,Math.min(9,Number(s.wireWidth)||3))});
   try{
    const save=format==='3mf'?save3MF:saveSTL;
    save(coupon.geometry,'pixel-fit-crystal-p'+(pixel.index+1)+'.'+format);
@@ -1687,9 +1765,7 @@ if(studioBootstrap&&!new URLSearchParams(location.search).has('legacy'))studioBr
  openPixelProfileEditor,
  activeCrystalPixelProfile:()=>s.pixelProfileId,
  selectCrystalPixelProfile:id=>{
-  const profiles=readPixelFitProfiles(),profile=allPixelProfiles({pixelProfiles:profiles}).find(p=>p.id===id);
-  if(!profile)return;
-  s.pixelProfiles=profiles;s.pixelProfileId=id;s.pixelDiameter=profile.bodyDiameter;
+  if(!applyCrystalPixelProfile(id))return;
   syncForm();rebuild();snapshot();
  },
  exportPixelProfiles:()=>download(new Blob([JSON.stringify({version:1,pixelProfiles:readPixelFitProfiles()},null,2)],
@@ -1708,7 +1784,7 @@ if(studioBootstrap&&!new URLSearchParams(location.search).has('legacy'))studioBr
   }
   if(next.length>30)throw Error('Import would exceed 30 custom profiles. Existing profiles were preserved.');
   localStorage.setItem(pixelLibraryKey,JSON.stringify(next));
-  s.pixelProfiles=next;syncForm();setStatus('Pixel profile library imported. Conflicting profiles were saved as copies.');
+  mergePixelLibrary();syncForm();setStatus('Pixel profile library imported. Conflicting profiles were saved as copies.');
  },
  pixelFitProfiles:()=>readPixelFitProfiles(),
  savePixelFitProfile:profile=>{

@@ -1,5 +1,67 @@
 # Crystal Forge — Changelog
 
+## Unreleased — WT-021 draft PR #102 (not deployed)
+
+Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
+
+- Crystal’s edge-tab editor shows automatic positions and offers an Add action when the manual list is empty.
+
+- Choose a native screw, magnet or threaded insert profile before placing a mount. Blind pockets have editable diameter and depth. Build checks the remaining stock before saving.
+
+- Native cable routes validate minimum bend-radius edits before saving, preserving the last valid setting when a bend cannot fit.
+
+- Gentle Wave cable grooves can follow height changes in both directions across the actual mesh. Steeper relief still requires another supported installation surface.
+
+- Rectangular Tactile Tiles support serial cable grooves on any of their four planar walls. Build checks the actual material surrounding the groove before preparation.
+
+- Native serial wiring can reverse pixel order, fitting directions, pinned openings and tail limits together. Build rejects an unsafe reordering before saving.
+
+- Rotating a shaped fitting on an enabled cable route checks the resulting geometry before saving.
+
+- Numeric movement and keyboard nudges for shaped fittings recheck the installation surface and preserve the last accepted position if stock is missing.
+
+- Crystal uses the measured clearance when selecting an imported profile for the first time. A locally adjusted clearance stays with its existing profile.
+
+- Shaped socket profile and bore size edits are checked against the manufactured geometry before saving.
+
+- Wide native cable tracks extend into round sockets far enough to preserve clearance at the join when the bore can accommodate the track.
+
+- Build checks vaulted channel clearance and supporting roof material before enabling a vault or saving changes to its route settings.
+
+- Native shaped pixel sockets support a conical roof on level underside faces. Build validates the extra roof height before saving. The routed test coupon can use the selected socket’s measurements, clearance, retention and conical roof.
+
+- External backing tabs support underside counterbores and countersinks with editable recess dimensions. Build rejects edits that leave insufficient tab stock.
+
+- Individually placed underside and supported planar top mounts support counterbores and countersinks with exact recess diameter and depth. Build checks the available material before saving.
+
+- Build checks the actual material around recessed screw fixings before saving. Thin stock and nearby cuts that remove the supporting material are refused.
+- Build restores the last accepted fixing diameter after an out-of-range edit and preserves exact fractional diameters.
+- Native serial routing accepts a minimum bend radius from 1 to 60 mm. Preparation refuses routes that cannot meet the bend constraint.
+- Build validates socket retention before saving. Profiles without enough straight body stock show how to adjust the setting.
+- Open the Features tab from Help or What’s New to search all seven model builders and open the relevant workspace.
+- What’s New takes its version, current notes, unreleased changes and earlier releases directly from this changelog.
+- Rotary Caps support an explicit Stationary display mode for fixed external tabs. The moving-control mode refuses attached fixing ears.
+- Crystal edge tabs can be used with separately placed manual through-holes. Build rejects a mounting edit that blocks a previously valid cable route.
+- External-tab backing preserves eligible Gear top, Wave surface and Tile front routes. Tile backing changes that would obstruct a front channel are rejected.
+- Native wiring and manual through-mounts can share a model when the holes clear the channels. Build refuses conflicting mount edits and preserves the saved route.
+- Gentle parallel Waves support an open serial groove that follows the measured surface between shaped sockets and out to the perimeter.
+- Square Tactile Tiles can cut a flat serial groove between shaped fittings on the front wall. Preparation checks the remaining wall and rejects intersecting cuts.
+- Shaped socket selection rings and port guides now follow the actual socket opening and installation normal on side and sloped surfaces.
+- Suitable solid decorative Gears can route flat serial grooves between shaped top-face pixel sockets. Preparation checks the floor and side walls.
+- Native underside route preparation checks for continuous material above and beside the actual channel and catches intersecting cuts outside its socket junctions.
+- Build now exposes 3–10 mm fitting backing thickness with a 4 mm reset. Existing shaped sockets and enabled cable routes are checked before the thickness change is saved.
+- Build fitting previews now show insertion obstruction and insufficient surrounding stock from manufacturing checks, warn about nearby cut conflicts, and report overlap between the measured pixel and wire cuts.
+- Introduced physical positive profile and real negative Manifold cutter previews in Crystal and targeted Gear-top / Tile-underside workflows, with exact cutter-envelope tests. **Other families, route stock protection and arbitrary-face routing remain incomplete.**
+- Rebuilt the socket cutter as a connected profile after finding a measured 0.62463 mm³ positive-envelope mismatch; added stricter fail-closed export mesh checks.
+- Improved route-roof and independent physical-wire-width versus bore-fit acceptance tests.
+- Archived original Codex briefs and added a token-efficient overnight execution protocol, acceptance register, progress log and recovery pointer in PR #102.
+
+**Codex rule:** after each independently tested *user-visible* milestone, update this draft section with concise impact and limitations in the same batched source/test commit. Synchronise in-app What's New/version data through UX-01. Never mislabel a draft-only change as shipped.
+
+## v0.16.0-dev.35.12 — Integrate Crystal tips and vaulted wire tracks
+
+- Choose global Crystal tip shapes and optionally vault native underside wire tracks while preserving their usable dimensions.
+
 ## v0.16.0-dev.35.10 — Validate direct shaped socket placement
 
 - Place a shaped socket on eligible native model surfaces and verify its opening and stock before saving.

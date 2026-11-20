@@ -388,14 +388,22 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
    }
   }
   if(s.mount==='Edge fixing tabs'){
-   html.push('<div class="divider"></div><b>Editable edge tabs</b><p class="note">Add, Shift-drag or delete tabs along the perimeter.</p>');
-   for(let i=0;i<(s.manualEdgeTabs||[]).length;i++){
+   const tabs=s.manualEdgeTabs;
+   html.push('<div class="divider"></div><b>Edge tab positions</b>');
+   if(!Array.isArray(tabs)&&plan.tabs.length){
+    html.push('<p class="note">Automatic positions · '+plan.tabs.length+' tabs.</p><button type="button" data-edit-tab-positions>Make edge tabs editable</button>');
+   }else if(!tabs?.length){
+    html.push('<button type="button" data-edit-tab-positions>Add edge tab</button>');
+   }else html.push('<p class="note">Add, Shift-drag or delete tabs along the perimeter.</p>');
+   for(let i=0;i<(tabs||[]).length;i++){
     const u=Number(s.manualEdgeTabs[i].u||0),bad=!plan.tabs.some(t=>t.index===i);
     html.push('<div class="buttonrow"><label>Tab '+(i+1)+' · perimeter <input type="number" min="0" max="99.9" step=".5" data-tab-u="'+i+'" value="'+(u*100).toFixed(1)+'"> %</label><button data-remove-tab="'+i+'">✕ Delete</button></div>'+
       (bad?'<p class="note warning">Tab conflicts with another feature and will not be cut.</p>':''));
    }
   }
   list.innerHTML=html.join('')||'<p class="note">Use Place / move to make existing automatic holes editable, or add new holes by clicking the model.</p>';
+  const tabEditor=list.querySelector('[data-edit-tab-positions]');
+  if(tabEditor)tabEditor.onclick=()=>manuallyPlace('tab');
   list.querySelectorAll('[data-pixel-edge]').forEach(select=>select.onchange=()=>{
    const p=s.manualPixelHoles[Number(select.dataset.pixelEdge)],result=setPixelEdgeMode(getCrystals(),s,p.id,select.value);
    if(result.valid){applyWireDraft(result.settings);onEdit();requestMovementGuide({pixelId:p.id});onStatus('Edge wire configured. Drag the teal IN or orange OUT handle around the perimeter.');}
@@ -559,7 +567,9 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
   else return false;
   const next=planHardware(getCrystals(),{...s,mountPlacement:'manual',manualMountHoles:holes,
    mount:s.mount==='None'?'Custom dual holes':s.mount});
-  return !next.invalidManualMounts.some(p=>p.index===(replaceIndex===null?holes.length-1:replaceIndex));
+  const previous=getPlan();
+  return !next.invalidManualMounts.some(p=>p.index===(replaceIndex===null?holes.length-1:replaceIndex))&&
+   next.tabs.length>=previous.tabs.length&&(!previous.wirePlan?.enabled||!previous.wirePlan.ready||next.wirePlan.ready);
  }
  function findPoint(e){
   const rect=renderer.domElement.getBoundingClientRect();
@@ -631,6 +641,7 @@ export function createHardwareEditor({THREE,scene,renderer,camera,orbit,gizmo,ge
    s.pixelCount=s.manualPixelHoles.length;
   }else if(kind==='mount'){
    if(s.mount==='None')s.mount='Custom dual holes';
+   if(s.mount==='Edge fixing tabs')s.edgeManualMounts=true;
    if(s.mountPlacement!=='manual'){
     s.manualMountHoles=plan.mounts.map(p=>({id:p.id,x:+p.x.toFixed(1),z:+p.z.toFixed(1)}));
     s.mountPlacement='manual';

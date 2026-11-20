@@ -45,7 +45,12 @@ export function addPixelHoleCuts(recipe,holes=[],{routed=false}={}){
     profile.flangeDiameter<0||profile.flangeDiameter>38||profile.flangeHeight<0||profile.flangeHeight+profile.capHeight>=profile.bodyHeight||
     profile.wireWidth<0||profile.wireWidth>12||profile.wireDepth<0||profile.wireDepth>8||profile.retentionLip<0||profile.retentionLip>.7)
     throw Error(label+' has invalid measured socket dimensions.');
-   if(!hole.surface&&height<profile.bodyHeight+2.8)throw Error(label+' needs '+(profile.bodyHeight+2.8).toFixed(1)+' mm of stock for its socket and roof.');
+   const conical=hole.conical===true;
+   if(conical&&((hole.surface&&!(hole.surface.normal?.[1]<=-.9999))||(!hole.surface&&hole.entryFace!=='underside')))
+    throw Error(label+' needs a level underside installation face for its conical roof.');
+   const roofHeight=profile.bodyHeight+(conical?Math.max(.8,bore):0)+2.8;
+   if(!hole.surface&&height<roofHeight)throw Error(label+' needs '+roofHeight.toFixed(1)+' mm of stock for its socket and roof.');
+   cut.conical=conical;
    cut.kind='pixel-seat';
    cut.surface=hole.surface;
    cut.includeLocalWireRelief=!routed;
@@ -68,7 +73,7 @@ export function pixelHoleMarkup(hole,index,escape,disabled,profiles){
  return '<fieldset><legend>P'+(index+1)+'</legend><label>Pixel profile<select data-pixel-field="profileId" data-pixel-index="'+index+'"'+disabled+'>'+
   profiles.map(profile=>'<option value="'+escape(profile.id)+'"'+
   (profile.id===hole.profileId?' selected':'')+'>'+escape(profile.name)+'</option>').join('')+'</select></label>'+
-  number('x','X (mm)','step=".1"')+number('z','Z (mm)','step=".1"')+
+  number('x','X (mm)','step="any"')+number('z','Z (mm)','step="any"')+
   number('rotation','Body rotation (°)','min="0" max="359" step="1"')+
   number('diameter','Measured body diameter (mm)','min="2" max="30" step=".1"')+
   number('clearance','Diameter clearance (mm)','min="-.5" max=".8" step=".05"')+

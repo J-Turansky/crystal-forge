@@ -2,6 +2,14 @@
 
 **Read this file first, then `docs/AI_HANDOVER.md`.** For a new feature or geometry change, also read `docs/PROJECT_VISION.md`, `docs/FEATURE_SPECIFICATIONS.md`, `docs/DESIGN_DECISIONS.md` and `docs/TESTING.md`. These are project-specific instructions for both ChatGPT and Codex; they complement the source code and never override a newer explicit user request.
 
+## Active WT-021 handoff and branch exception (20 November 2026)
+
+The owner has explicitly authorised continuing WT-021 **only in existing draft PR #102**, on `wt021/integrated-release`. This **overrides the general new-task / separate-PR branching advice below for WT-021 only**. Do not open a new PR, merge, deploy, make PR #102 ready for review, or push to `main`. `main` triggers GitHub Pages deployment.
+
+Read in order: [`prompts/START_HERE.md`](prompts/START_HERE.md) → [`prompts/021-complete-seven-builder-manufacturing-parity.md`](prompts/021-complete-seven-builder-manufacturing-parity.md) (original approved source archived from planning) → [`docs/WT021_CODEX_HANDOFF.md`](docs/WT021_CODEX_HANDOFF.md) → [`docs/WT021_COMPLETION_REGISTER.md`](docs/WT021_COMPLETION_REGISTER.md) → [`docs/WT021_INDEPENDENT_AUDIT.md`](docs/WT021_INDEPENDENT_AUDIT.md). **For overnight Codex runs, additionally read [the unattended runbook](prompts/active/WT021_OVERNIGHT_RUNBOOK.md) and [durable session log](docs/WT021_RUN_LOG.md). Front-load any genuine permission requests, then continue the queued authorised work and checkpoint often; do not halt for routine choices. Do not claim you can bypass hard quotas or mandatory platform approvals.** Confirm exact-head CI before claiming acceptance. The full [historical prompt archive](prompts/README.md) and [documentation hub](docs/README.md) are accessible on the same branch.
+
+Preserve #79 for unfinished software parity, #10 for owner's Cura/real-print evidence and #90 separately. Green CI on current implemented fixtures **does not** verify the outstanding seven-family acceptance requirements.
+
 ## Mission and invariants
 
 Crystal Forge is a browser-based editor for designing **stylised, touch-considerate, 3D-printable illuminated crystal clusters** for a participatory creative installation. It must be approachable to a visual maker, interactive and reproducible, and must not silently sacrifice printability or illumination for appearance.
@@ -41,7 +49,7 @@ See `docs/ARCHITECTURE.md` for data flow and boundaries.
 - For UI changes: test actual user interactions, keyboard/viewport behaviour, selection, LocalStorage/JSON round-trip, controls in Simple/Advanced, and rerender/invalidation. Inspect console/page errors and screenshots, not only HTML strings.
 - Run `npm run test:static`, `npm test`, and `npm run test:browser` where the environment supports them. Browser tests need Chromium and a server on port 4321. See `docs/TESTING.md` for exact commands, budget and manual Cura checks.
 - **Never assert tests ran unless their specific run/log evidence exists.** GitHub Actions green for an older commit is not evidence for a newer commit. A passed mesh test is not a real print.
-- For significant changes, update affected specs/ADR/roadmap, `CHANGELOG.md` for user-visible changes, and `docs/AI_HANDOVER.md` with current verified state. Keep `index.html`'s displayed version and in-app changelog consistent with release tags; documentation-only changes need no app version bump.
+- For significant changes, update affected specs/ADR/roadmap, `CHANGELOG.md` for user-visible changes, and `docs/AI_HANDOVER.md` with current verified state. **For WT-021 overnight work, update the draft `CHANGELOG.md` after each tested user-visible milestone, keep `docs/WT021_OVERNIGHT_SUMMARY.md` updated during the session, and implement UX-01's app Features & What's New per `docs/WT021_FEATURE_CATALOGUE_BRIEF.md`. Before cutoff or normal end, post one PR #102 report link and a Codex chat recap when possible.** Keep `index.html`'s displayed version and in-app changelog consistent with release tags; documentation-only changes need no app version bump.
 - Commit on a branch, open a PR to main, review diff and test results, and merge only after validation and user/reviewer approval for significant work. Do not force-push over newer work, silently resolve conflicts, or deploy unfinished features.
 
 ## Sharing work between ChatGPT and Codex
