@@ -4,6 +4,7 @@ Draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) co
 
 ## Latest checkpoint
 
+- Native journey tests compare prepared X and Z section ranges with fresh STL and 3MF coordinates. Moving the section slider on the revised linked Gear leaves the saved model untouched. A valid recess edit hides the previous cutaway and disables both prior downloads until preparation.
 - Chromium verified that the recessed Gear build survives library copies and reload. Independent edits stayed local, and the linked copy accepted revision 2 explicitly before preparing fresh STL and 3MF.
 - Native external backing tabs accept underside counterbores and countersinks. Export probes measured a 5.1 mm counterbore, 3.4 mm pilot, 3 mm depth and 5 mm remaining stock. Chromium verified the two downloads and confirmed that insufficient recess or backing edits preserve the saved model.
 - Planar Gear tops accept manually placed screw recesses alongside underside fixings. Manifold and independently decoded STL and 3MF verify the top taper. Thin or buried stock is refused. Focused Chromium prepared and downloaded a Gear with both faces in use.

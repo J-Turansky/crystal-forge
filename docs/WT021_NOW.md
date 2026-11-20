@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** PAR-03, expand prepared section and export parity across native builders.
+- **Target:** PAR-03, compare the prepared section profiles at critical holes and routes across native builders.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** The recessed Gear library scenario passed linking, independent edit/reload, explicit revision acceptance and fresh STL/3MF downloads. Next exercise native prepared cutaways with a revised fixture and independent section probes.
+- **Next test:** The full unified Chromium suite passed native cutaway/export range comparisons. Focused Chromium passed stale Gear cutaway withdrawal and disabled downloads. Next measure profiles at known cutaway planes.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

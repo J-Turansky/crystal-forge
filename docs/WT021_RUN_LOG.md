@@ -176,3 +176,7 @@
 ### 2026-11-20 - recessed library copy and update
 
 - Focused Chromium verified that a linked Gear retains a read-only mounting setup, an independent copy keeps its own edited depth after reload, and accepting a new linked revision refreshes the tab depth and enables fresh STL/3MF preparation.
+
+### 2026-11-20 - prepared section bounds
+
+- Compared the prepared section control ranges to downloaded STL and 3MF for five native journey fixtures and the updated linked Gear. The full unified Chromium journey suite passed. A focused follow-up passed withdrawal of the stale cutaway and both stale downloads after the original Gear depth edit. The revised linked model then prepared successfully, and slider movement left the saved model untouched.

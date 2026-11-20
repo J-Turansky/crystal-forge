@@ -623,6 +623,22 @@ try{
   geometry.setIndex(indices);
   return geometry;
  }
+ async function sectionRanges(inspector){
+  await inspector.getByLabel('Cut section').check();
+  const axis=inspector.getByLabel('Section axis'),slider=inspector.getByRole('slider');
+  const ranges={};
+  for(const direction of ['X','Z']){
+   await axis.selectOption(direction);
+   ranges[direction]=await slider.evaluate(input=>[Number(input.min),Number(input.max)]);
+  }
+  return ranges;
+ }
+ function assertSectionBounds(geometry,{X,Z},label){
+  geometry.computeBoundingBox();
+  const {min,max}=geometry.boundingBox;
+  assert(Math.abs(X[0]-min.x)<.01&&Math.abs(X[1]-max.x)<.01,label+' section X matches the export');
+  assert(Math.abs(Z[0]+max.y)<.01&&Math.abs(Z[1]+min.y)<.01,label+' section Z matches the export');
+ }
  async function finishNativeJourney(name){
   const {parameters,build}=await page.evaluate(()=>window.__sensoryStudio.currentModel);
   const title='WT-021 '+name+' manufacturing journey';
@@ -641,7 +657,7 @@ try{
   await page.getByRole('button',{name:'Render actual model',exact:true}).click();
   const inspection=page.locator('#smsLightInspector');
   await inspection.getByText(/Prepared (?:manufacturing mesh|Light Pod)/).waitFor({timeout:120000});
-  await inspection.getByLabel('Cut section').check();
+  const ranges=await sectionRanges(inspection);
   await inspection.getByRole('button',{name:'Close inspection'}).click();
   await page.locator('.sms-workspace-nav [data-tab=print]').click();
   const job=page.locator('#smsJobs article').filter({hasText:name});
@@ -662,7 +678,8 @@ try{
   assert.match(xml,/<item objectid="[0-9]+" transform="1 0 0 0 1 0 0 0 1 0 0 0"/);
   const stlGeometry=new STLLoader().parse(Uint8Array.from(stl.bytes).buffer);
   const mfGeometry=read3MFGeometry(xml);
-  stlGeometry.computeBoundingBox();mfGeometry.computeBoundingBox();
+  assertSectionBounds(stlGeometry,ranges,name+' STL');
+  assertSectionBounds(mfGeometry,ranges,name+' 3MF');
   for(const key of ['min','max'])
    assert(stlGeometry.boundingBox[key].distanceTo(mfGeometry.boundingBox[key])<.001,name+' matching print-space '+key);
   const measured=stlGeometry.boundingBox.getSize(new THREE.Vector3()).toArray();
@@ -2099,8 +2116,18 @@ try{
   assert.deepEqual(copies,{[original.id]:3,[linked.id]:3,[independent.id]:2.75});
   await page.locator('#model-tab-'+original.id).click();
   await buildTab.click();
+  await page.getByRole('button',{name:'Render actual model',exact:true}).click();
+  const originalInspector=page.locator('#smsLightInspector');
+  await originalInspector.getByText(/Prepared manufacturing mesh/).waitFor({timeout:120000});
+  await originalInspector.getByLabel('Cut section').check();
   await tabDepth.fill('3.25');await tabDepth.press('Tab');
   await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.backingTabs[0].recessDepth===3.25);
+  await originalInspector.getByText(/Preview only/).waitFor();
+  assert(await originalInspector.getByRole('slider').isHidden());
+  await printTab.click();
+  await job.getByText('Stale',{exact:true}).waitFor();
+  assert(await job.locator('[data-job-stl]').isDisabled());
+  assert(await job.locator('[data-job-3mf]').isDisabled());
   await page.locator('#smsLibrary').click();
   await projectCard.getByRole('button',{name:'Save to library',exact:true}).click();
   await page.locator('#model-tab-'+linked.id).click();
@@ -2115,8 +2142,23 @@ try{
   const linkedJobId=await page.evaluate(id=>window.__sensoryStudio.project.printJobs.find(item=>item.modelId===id).id,linked.id);
   const linkedJob=page.locator('[data-print-job="'+linkedJobId+'"]');
   await linkedJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
-  assert((await useDownload(linkedJob.locator('[data-job-stl]'))).bytes.length>84);
-  assert(zipEntries((await useDownload(linkedJob.locator('[data-job-3mf]'))).bytes).has('3D/3dmodel.model'));
+  const linkedSTL=await useDownload(linkedJob.locator('[data-job-stl]'));
+  const linkedMF=await useDownload(linkedJob.locator('[data-job-3mf]'));
+  await buildTab.click();
+  await page.getByRole('button',{name:'Render actual model',exact:true}).click();
+  const inspector=page.locator('#smsLightInspector');
+  await inspector.getByText('Prepared manufacturing mesh', {exact:false}).waitFor();
+  const ranges=await sectionRanges(inspector);
+  const position=inspector.getByRole('slider');
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(linkedSTL.bytes).buffer),
+   read3MFGeometry(zipEntries(linkedMF.bytes).get('3D/3dmodel.model').toString())]){
+   assertSectionBounds(geometry,ranges,'Linked Gear');
+   geometry.dispose();
+  }
+  const inspected=await modelState();
+  await position.press('ArrowRight');
+  assert.deepEqual(await modelState(),inspected);
+  await inspector.getByRole('button',{name:'Close inspection'}).click();
  }
  {
   await page.evaluate(()=>window.__sensoryStudio.addModel('waves',{width:100,depth:70,thickness:2,amplitude:1,variation:0},'Thin fixing witness'));
