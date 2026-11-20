@@ -61,6 +61,7 @@ Only in the draft integration branch; **not a production release**. Owner approv
 ## v0.16.0-dev.35.18 — Studio keyboard navigation and recovery
 
 - Move between Studio tool search results with the arrow keys. Escape clears the search and returns focus to the search field.
+- Help includes safe troubleshooting steps and a downloadable browser report that excludes projects and account details.
 
 ## v0.16.0-dev.35.17 — Keyboard tooltip accessibility
 

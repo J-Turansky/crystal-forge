@@ -3,6 +3,7 @@
 ## Independent documentation and QA
 
 - [Coordination issue #105](https://github.com/connorturansky-svg/crystal-forge/issues/105) tracks live claims, review branches and exact-head evidence for Jordan's separate work.
+- [UX-02 draft #109](https://github.com/connorturansky-svg/crystal-forge/pull/109) covers shared Studio accessibility and usability. See [the UX-02 test matrix](TESTING.md#ux-02-keyboard-regression-checks) for coverage and limitations. The Help browser report is independent of the reserved startup-recovery PR #90; it neither changes saved data nor verifies asset delivery.
 - The [Studio backup and recovery guide](BACKUP_RECOVERY.md) explains the existing WT-016 Library workflow. It changes no runtime behavior or saved formats. `tests/unified-studio-browser.test.mjs` covers review, cancel, merge, active-project preservation and a corrupt file in Chromium; private GitHub requests are mocked in `tests/studio-vault.test.mjs`.
 
 ## WT-020 review baseline

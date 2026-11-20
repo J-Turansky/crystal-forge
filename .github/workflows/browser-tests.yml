@@ -111,6 +111,7 @@ jobs:
           {
             node tests/exact-value-accessibility-browser.mjs &&
             node tests/studio-tool-finder-browser.mjs &&
+            node tests/studio-help-diagnostics-browser.mjs &&
             npm run test:browser
           } > browser-run.log 2>&1
           status=$?
