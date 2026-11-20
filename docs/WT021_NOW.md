@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** FIT-03 and FIT-01, extend native supported side-face routing beyond the current Tile front face.
+- **Target:** FIT-03 and FIT-01, extend the Tile wall routing frame to perpendicular planar walls.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** Wave reversal and rejected reorder passed. Pinned Tile confirms opening and tail swaps. Next inspect the front-face routing frame and add a validated opposite or perpendicular Tile wall with matching exported apertures.
+- **Next test:** Rear Tile wall routing passed Manifold and Chromium. Next support a perpendicular wall using explicit horizontal/normal axes and verify stock checks and both real apertures.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

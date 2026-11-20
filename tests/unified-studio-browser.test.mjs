@@ -957,15 +957,17 @@ try{
   assert(await serial.locator('[data-native-route]').isChecked());
   assert.match(await serial.innerText(),/Channels ready/);
   await shot('wt012-gear-routing');
+  const accepted=await page.evaluate(()=>window.__sensoryStudio.currentModel);
   await palette.locator('[data-pixel-previous]').click();
-  assert.match(await serial.innerText(),/No safe tangent-compatible path/);
+  await page.locator('#smsModelError').getByText(/No safe tangent-compatible path/).waitFor();
+  assert.deepEqual(await page.evaluate(()=>window.__sensoryStudio.currentModel),accepted);
   await page.locator('.sms-workspace-nav [data-tab=print]').click();
   await routedJob.getByText('Stale',{exact:true}).waitFor();
   assert(await routedJob.locator('[data-job-export]').isDisabled());
   await routedJob.locator('[data-job-prepare]').click();
-  await routedJob.getByText('Failed',{exact:true}).waitFor({timeout:120000});
-  assert(await routedJob.locator('[data-job-export]').isDisabled());
-  assert(await routedJob.locator('[data-job-3mf]').isDisabled());
+  await routedJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  assert(!(await routedJob.locator('[data-job-export]').isDisabled()));
+  assert(!(await routedJob.locator('[data-job-3mf]').isDisabled()));
   await page.locator('#smsNew').click();
   await page.getByRole('button',{name:/Browse Glowing Pebbles & Light Pods starting points/}).click();
   const tall=page.locator('#smsPicker [data-preset=beacon-tall]');
@@ -2628,6 +2630,52 @@ try{
   assert(await job.locator('[data-job-3mf]').isDisabled());
   await job.locator('[data-job-prepare]').click();
   await measure([9.6,7.8,8.6]);
+ }
+ // FIT-01/FIT-03: place and route directly on the opposite planar Tile wall.
+ {
+  const name='Rear wall Tile';
+  await page.evaluate(name=>window.__sensoryStudio.addModel('tactile-tiles',{width:100,depth:80,thickness:20,
+   outline:'square',relief:2,pattern:'terraces',dualMaterial:false},name),name);
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await page.locator('[data-view=back]').click();
+  await page.waitForFunction(()=>window.__crystalForgeViewMetrics().settled);
+  const palette=page.locator('.sms-palette');
+  await palette.locator('[data-fit-profile=seed]').click();
+  await palette.getByRole('button',{name:'Place shaped socket in 3D'}).click();
+  const canvas=await page.locator('#viewport canvas').boundingBox();
+  for(const [i,offset] of [-65,65].entries()){
+   await page.mouse.click(canvas.x+canvas.width/2+offset,canvas.y+canvas.height/2+28);
+   await page.waitForFunction(count=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===count,i+1);
+  }
+  await page.keyboard.press('Escape');
+  const holes=await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles);
+  assert(holes[0].x>holes[1].x);
+  assert(holes.every(hole=>Math.abs(hole.z+40)<.01&&Math.abs(hole.surface.normal[2]+1)<.00001),JSON.stringify(holes));
+  const serial=palette.getByRole('group',{name:'Serial LED string'});
+  await serial.getByLabel('Cut serial channels').check();
+  await serial.getByText('Channels ready for preparation.').waitFor();
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await page.getByRole('button',{name:'Prepare current model',exact:true}).click();
+  const job=page.locator('#smsJobs article').filter({hasText:name});
+  await job.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const stl=await useDownload(job.locator('[data-job-stl]'));
+  const mf=await useDownload(job.locator('[data-job-3mf]'));
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),height=holes[0].surface.y;
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(stl.bytes).buffer),
+   read3MFGeometry(zipEntries(mf.bytes).get('3D/3dmodel.model').toString())]){
+   const mesh=new THREE.Mesh(geometry,material);
+   const hit=(origin,direction,far=Infinity)=>new THREE.Raycaster(
+    new THREE.Vector3(...origin),new THREE.Vector3(...direction),0,far).intersectObject(mesh)[0]?.point;
+   for(const x of [-45,0,45]){
+    const bottom=hit([x,39,height],[0,0,-1]),top=hit([x,39,height],[0,0,1]);
+    assert(bottom&&top&&Math.abs(top.z-bottom.z-3.2)<.02,JSON.stringify({x,bottom,top,height}));
+    const floor=hit([x,41,height],[0,-1,0]);
+    assert(floor&&Math.abs(floor.y-38.2)<.02);
+   }
+   assert.equal(hit([-51,39,height],[1,0,0],102),undefined);
+   geometry.dispose();
+  }
+  material.dispose();
  }
  assert.deepEqual(errors,[]);
  console.log('Unified Home, Design, Build, Library and Quick Print screenshots captured.');

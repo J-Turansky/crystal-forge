@@ -236,3 +236,7 @@
 ### 2026-11-20 - native cable order and reversal
 
 - An enabled native route validates sequence edits before saving. Reversal changes pixel order and direction and swaps the saved perimeter pins and tail budgets. Focused Wave and Tile browser fixtures passed rejected reorder, fresh reversed Wave STL/3MF, and pinned Tile lead swaps.
+
+### 2026-11-20 - rear Tile wall routing
+
+- Rear-wall Tile routes use mirrored socket coordinates, cutter transforms and stock checks. Chromium placed real sockets from the rear view and independently measured 3.2 mm width, 1.8 mm depth and an open path through both exterior apertures. Manifold rejects mixed faces and a cut that breaches the rear-route guard. Updated the older Gear journey to expect unsafe reorder rollback rather than preparation of an already invalid edit. The previous PR browser workflow failed on that assertion. The corrected full local Chromium suite passed.

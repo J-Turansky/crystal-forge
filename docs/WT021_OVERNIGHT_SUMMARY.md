@@ -1,9 +1,10 @@
 # WT-021 overnight checkpoint
 
-[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `87a4d90cd52e089ae842e38e5dd9b8b0ffa094ed`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
+[PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102) remains open and draft. The latest published checkpoint when this report was updated was `b1a0bfc457be3ffe9bb364bfce840777a305da0d`. Exact-head CI will report on the PR. [Current PR checks](https://github.com/connorturansky-svg/crystal-forge/pull/102/checks)
 
 ## Latest checkpoint
 
+- Rectangular Tile routes now support shaped sockets on the rear wall. Manifold and Chromium verify 3.2 mm width, 1.8 mm depth and both apertures in STL and 3MF. Mixed faces and a nearby cut that removes surrounding stock are rejected.
 - Native routes can reverse the pixel sequence, socket directions, pinned openings and tail limits together. Focused Chromium verified an unsafe Wave reorder preserves the prepared job. The validated reversal produces fresh 3.2 mm files, and the Tile fixture confirms the pin and unequal tail limits swap sides.
 - A routed Wave rejects a 90° socket rotation while its valid job remains downloadable. A valid rotation to 179° invalidates the previous files and prepares a 3.2 mm route in fresh STL and 3MF.
 - Exact typed coordinates and keyboard nudges resolve shaped sockets against the real surface before saving. Chromium verified curved Wave movement and tangent movement along a vertical Tile face, plus rollback when the move would leave the face.

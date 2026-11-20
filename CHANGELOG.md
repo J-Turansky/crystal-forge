@@ -4,6 +4,8 @@
 
 Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
 
+- Rectangular Tactile Tiles support serial cable grooves on the rear wall as well as the front wall. Build checks the actual material surrounding the groove before preparation.
+
 - Native serial wiring can reverse pixel order, fitting directions, pinned openings and tail limits together. Build rejects an unsafe reordering before saving.
 
 - Rotating a shaped fitting on an enabled cable route checks the resulting geometry before saving.

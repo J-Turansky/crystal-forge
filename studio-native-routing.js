@@ -157,24 +157,28 @@ function waveRouteSurface(recipe,holes){
 function frontRouteFace(recipe,holes){
  const front=recipe.serialSupport?.front;
  if(!front||!holes.length)return null;
- return holes.every(hole=>{
-  const normal=hole.surface?.normal;
-  return hole.socketProfile&&normal&&Number.isFinite(hole.surface.y)&&Math.abs(hole.z-front.z)<.01&&
-   Math.hypot(normal[0],normal[1],normal[2]-1)<.00001;
- })?front:null;
+ for(const sign of [1,-1]){
+  const z=front.z*sign;
+  if(holes.every(hole=>{
+   const normal=hole.surface?.normal;
+   return hole.socketProfile&&normal&&Number.isFinite(hole.surface.y)&&Math.abs(hole.z-z)<.01&&
+    Math.hypot(normal[0],normal[1],normal[2]-sign)<.00001;
+  }))return {...front,z,sign};
+ }
+ return null;
 }
 
 // Route X/Z is along the face, and +Y is into the material.
 function frontRouteExtrude(part,front){
  const [x,y,z]=part.position??[0,0,0];
- return {...part,rotation:[-Math.PI/2,0,0],position:[x,z,front.z-y]};
+ return {...part,rotation:[-Math.PI/2,front.sign<0?Math.PI:0,0],position:[front.sign*x,z,front.z-front.sign*y]};
 }
 
 export function nativeRouteEligibility(recipe,build){
  const holes=build.pixelHoles||[];
  const topY=topRouteHeight(recipe,holes),front=frontRouteFace(recipe,holes),wave=waveRouteSurface(recipe,holes);
  if(holes.some(hole=>hole.socketProfile&&hole.surface)&&topY===null&&!front&&!wave)
-  return 'Physical grooves require a shared flat underside or an eligible planar top, front or gentle Wave surface. Move the sockets to the same supported face.';
+  return 'Physical grooves require a shared flat underside or an eligible planar top, Tile wall or gentle Wave surface. Move the sockets to the same supported face.';
  if(wave&&build.serialRouting?.vaulted)
   return 'Wave surface grooves open upward. Turn off the vaulted option for a Wave route.';
  if(front&&build.serialRouting?.vaulted)
@@ -222,9 +226,9 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
  }
  const topY=topRouteHeight(recipe,holes),front=frontRouteFace(recipe,holes),wave=waveRouteSurface(recipe,holes);
  if(topY!==null){plan.face='top';plan.surfaceY=topY;}
- if(front){plan.face='front';plan.front=front;}
+ if(front){plan.face=front.sign>0?'front':'rear';plan.front=front;}
  if(wave)plan.face='wave';
- const pixels=holes.map(p=>({...p,z:front?p.surface.y:p.z,
+ const pixels=holes.map(p=>({...p,x:front?front.sign*p.x:p.x,z:front?p.surface.y:p.z,
   radius:(p.diameter+p.clearance)/2,wireAngle:topY===null&&!wave?(p.rotation??0):180-(p.rotation??0)}));
  const upperOutline=topY!==null||wave?recipe.serialSupport.topOutline:null;
  const supportOutline=front?.outline??upperOutline??recipe.serialSupport.outline;
@@ -243,10 +247,11 @@ export function planNativePixelString(recipe,build,{guide=false}={}){
   const clearance=Math.max(mount.radius,mount.topRadius??0)+radius+routeSideStock;
   if(front){
    // A through-hole spans all vertical positions on the front routing plane.
-   if(z+mount.radius<front.z-depth-roof)return false;
+   if(front.sign*z+Math.max(mount.radius,mount.topRadius??0)<Math.abs(front.z)-depth-roof)return false;
+   const localX=front.sign*x;
    return path.slice(1).some((point,i)=>{
     const a=path[i];
-    return x>=Math.min(a.x,point.x)-clearance&&x<=Math.max(a.x,point.x)+clearance;
+    return localX>=Math.min(a.x,point.x)-clearance&&localX<=Math.max(a.x,point.x)+clearance;
    });
   }
   return path.slice(1).some((point,i)=>distance({x,z},path[i],point)<clearance);

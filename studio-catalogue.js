@@ -507,7 +507,7 @@ function addBackingTabs(recipe,build,routing){
   if(stockHoles.some(h=>Math.hypot(h.x-tab.x,h.z-tab.z)<tab.radius+h.radius+2))
    throw Error('Tab '+(tab.index+1)+' intersects a fitting or mounting hole. Move it along the backing edge.');
   // Front routes with backing are already checked above the entire tab height.
-  if(routing.enabled&&routing.face!=='front'&&routing.links.some(link=>link.path.some(p=>Math.hypot(p.x-tab.x,p.z-tab.z)<tab.radius+6)))
+  if(routing.enabled&&!routing.front&&routing.links.some(link=>link.path.some(p=>Math.hypot(p.x-tab.x,p.z-tab.z)<tab.radius+6)))
    throw Error('Tab '+(tab.index+1)+' is too close to a cut cable route. Move the tab away from the cable exit.');
   recipe.positive.push(cylinder(tab.radius,tab.thickness,[tab.x,tab.thickness/2,tab.z]));
  }
@@ -603,8 +603,8 @@ export function applyBuildModules(recipe,build={},capabilities={}, {preview=fals
   r.negative.push(...routing.cutters);
   r.warnings.push(routing.face==='wave'
    ?'Serial grooves follow the Wave surface. Check cable seating and floor layers in Cura and on a physical print.'
-   :routing.face==='front'
-   ?'Serial grooves open on the front edge. Check cable seating and print orientation in Cura and on a physical print.'
+   :routing.front
+   ?'Serial grooves open on the '+routing.face+' wall. Check cable seating and print orientation in Cura and on a physical print.'
    :routing.face==='top'
    ?'Serial grooves open upward. Check cable seating and floor layers in Cura and on a physical print.'
    :'Serial grooves are underside-open. Check cable seating and roof layers in Cura and on a physical print.');
