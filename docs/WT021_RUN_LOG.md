@@ -256,3 +256,7 @@
 ### 2026-11-20 - edited manufacturing bounds across all families
 
 - Browser tab removal in all six native families blocks the stale STL, 3MF and ZIP. The fresh files match the reduced displayed extents and manifest. Separate Crystal dimension and invalidation evidence covers the remaining family. DIM-02 is verified.
+
+### 2026-11-20 - edited tab recesses and stock
+
+- All six native families passed Manifold and both export decoders for tab counterbore and countersink diameter, through pilot, depth and retained material. Chromium verified edits and stale job handling on Character, Light Pod and Rotary Cap.

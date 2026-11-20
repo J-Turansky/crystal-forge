@@ -10,9 +10,9 @@
 
 ## Next executable step
 
-- **Target:** DIM-05, measure edited mounting stock and fixing dimensions on additional family fixtures.
+- **Target:** DIM-05 and PAR-01, add real blind magnet pockets and threaded insert pilots to native mounts.
 - **Checkpoint:** all seven browser fixtures have local Design-to-download evidence. Crystal supports manual through-holes with edge tabs. Rotary Caps explicitly distinguish moving from stationary. The Features and What’s New catalogue passed local navigation, state, layout and keyboard tests.
-- **Next test:** DIM-02 has Crystal and six native-family export evidence. Next compare fastening width, recess depth and residual stock after backing or tab edits on representative non-Gear builds.
+- **Next test:** All six native tab recess fixtures passed paired section tests. Next add blind mounting profiles with editable depth and diameter, preserving material behind the cut. Verify an unsafe edit leaves the prepared revision intact.
 - **Then:** verify the remaining linked/copy project cases and dimensional and clearance rows, the current GitHub workflows and physical validation boundary under #10.
 
 ## Resume instruction

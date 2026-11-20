@@ -493,6 +493,7 @@ const shortConeProfile={...measuredProfile,bodyDiameter:5,bodyHeight:4,capHeight
 const conicalCoupon=makeRoutedSocketSpecimen(measuredProfile,{clearance:.3,retentionLip:.4,conical:true});
 assert.equal(conicalCoupon.nativeRouting.links.length,3);
 const familyConeFixtures=new Map();
+const familyTabFixtures=new Map();
 for(const [family,parameters] of [
  [gearGenerator,{mode:'Decorative',wheelStyle:'Rounded lobes',webStyle:'Solid',diameter:80,bore:0,reliefStyle:'None'}],
  [tileGenerator,{pattern:'terraces',width:80,depth:80,thickness:14}],
@@ -513,6 +514,11 @@ for(const [family,parameters] of [
   assert(exposed.volume()<.02,family.typeId+' conical cutter encloses the full measured housing');
  }finally{exposed.delete();negative.delete();positive.delete();}
  familyConeFixtures.set(fixture,family.typeId);
+ for(const profile of ['Counterbore','Countersink']){
+  const tabFixture=applyBuildModules(source,{pixelBacking:true,pixelBackingThickness:8,
+   backingTabs:[{u:.125,profile,recessDepth:3}]},family.capabilities);
+  familyTabFixtures.set(tabFixture,{family:family.typeId,profile});
+ }
 }
 const wideVault=calibratedCut({channelWidthMm:6,vaulted:true});
 const measuredReplica=makePixelReplicaRecipe(measuredProfile);
@@ -554,7 +560,7 @@ for(const [fixture] of fixingFixtures){
  const interrupted={...fixture,negative:[...fixture.negative,{kind:'box',size:[1,2,2],position:[18.5,1,0]}]};
  assert.throws(()=>prepareRecipe(THREE,wasm,interrupted),/too close to another cut/);
 }
-for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),conicalRecipe,conicalCoupon,tabRecessRecipe,topRecessRecipe,wideVault,vaultedStock,pinnedVault,topRouted,sideRouted,rearRouted,...perpendicularRoutes,curvedSeatOnly,curvedWaveRoute,biaxialRoute,biaxialPinned,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
+for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),conicalRecipe,conicalCoupon,...familyTabFixtures.keys(),tabRecessRecipe,topRecessRecipe,wideVault,vaultedStock,pinnedVault,topRouted,sideRouted,rearRouted,...perpendicularRoutes,curvedSeatOnly,curvedWaveRoute,biaxialRoute,biaxialPinned,safelyMountedRoute,measuredReplica,...dimensionFixtures.keys()]){
  const vaultedNativeFiles=exportMaterialBodies(prepareRecipe(THREE,wasm,fixture));
  const stl=Uint8Array.from(vaultedNativeFiles.stls[0].bytes);
  const stlGeometry=new STLLoader().parse(stl.buffer);
@@ -647,6 +653,22 @@ for(const fixture of [...fixingFixtures.keys(),...familyConeFixtures.keys(),coni
     const left=hit([-15,0,height],[0,-1,0]),right=hit([-15,0,height],[0,1,0]);
     assert(left&&right&&Math.abs(left.distanceTo(right)-diameter)<.015,format+' conical seat at '+height+' mm');
    }
+  }else if(familyTabFixtures.has(fixture)){
+   const {family,profile}=familyTabFixtures.get(fixture);
+   const [x,,z]=fixture.negative.find(cut=>cut.fixingRecess).position;
+   const span=height=>{
+    const left=hit([x,-z,height],[-1,0,0]),right=hit([x,-z,height],[1,0,0]);
+    assert(left&&right,format+' '+family+' '+profile+' wall exists');
+    return left.distanceTo(right);
+   };
+   const taper=profile==='Countersink';
+   for(const [height,width] of [[.6,taper?4.76:5.1],[2.4,taper?3.74:5.1],[4,3.4]])
+    assert(Math.abs(span(height)-width)<.02,format+' '+family+' '+profile+' diameter at '+height);
+   const probeX=x+2;
+   const floor=hit([probeX,-z,-1],[0,0,1]),top=hit([probeX,-z,9],[0,0,-1]);
+   const expectedDepth=taper?3*(2.55-2)/.85:3;
+   assert(floor&&top&&Math.abs(floor.z-expectedDepth)<.02&&Math.abs(top.z-8)<.01,
+    format+' '+family+' '+profile+' depth and residual material');
   }else if(fixture===tabRecessRecipe){
    for(const [height,diameter] of [[1,5.1],[4,3.4]]){
     const left=hit([tabX,-tabZ,height],[-1,0,0]),right=hit([tabX,-tabZ,height],[1,0,0]);

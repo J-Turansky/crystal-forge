@@ -2147,6 +2147,34 @@ try{
    material.dispose();geometry.dispose();
   }
   await verifyTabRemovalBounds(name,palette);
+  const tabJob=page.locator('#smsJobs article').filter({hasText:name});
+  const tabProfile=type==='light-pods'?'Countersink':'Counterbore';
+  await page.locator('.sms-workspace-nav [data-tab=build]').click();
+  await palette.locator('[data-tab-profile="0"]').selectOption(tabProfile);
+  await page.waitForFunction(profile=>window.__sensoryStudio.currentModel.build.backingTabs[0].profile===profile,tabProfile);
+  const recess=palette.locator('[data-tab-recess=recessDepth]');
+  await recess.fill('3');await recess.press('Tab');
+  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.backingTabs[0].recessDepth===3);
+  await page.locator('.sms-workspace-nav [data-tab=print]').click();
+  await tabJob.getByText('Stale',{exact:true}).waitFor();
+  assert(await tabJob.locator('[data-job-stl]').isDisabled());
+  assert(await tabJob.locator('[data-job-3mf]').isDisabled());
+  await tabJob.locator('[data-job-prepare]').click();
+  await tabJob.getByText('Prepared',{exact:true}).waitFor({timeout:120000});
+  const tabSTL=await useDownload(tabJob.locator('[data-job-stl]'));
+  const tabMF=await useDownload(tabJob.locator('[data-job-3mf]'));
+  for(const geometry of [new STLLoader().parse(Uint8Array.from(tabSTL.bytes).buffer),
+   read3MFGeometry(zipEntries(tabMF.bytes).get('3D/3dmodel.model').toString())]){
+   const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),mesh=new THREE.Mesh(geometry,material);
+   const hit=(origin,direction)=>new THREE.Raycaster(new THREE.Vector3(...origin),new THREE.Vector3(...direction)).intersectObject(mesh)[0]?.point;
+   const span=height=>hit([tabX,tabY,height],[-1,0,0]).distanceTo(hit([tabX,tabY,height],[1,0,0]));
+   assert(Math.abs(span(.6)-(tabProfile==='Countersink'?4.76:5.1))<.02);
+   assert(Math.abs(span(4)-3.4)<.02);
+   const floor=hit([tabX+2,tabY,-1],[0,0,1]),top=hit([tabX+2,tabY,11],[0,0,-1]);
+   assert(floor&&Math.abs(floor.z-(tabProfile==='Countersink'?3*(2.55-2)/.85:3))<.02);
+   assert(top&&Math.abs(top.z-10)<.01,name+' keeps the measured stock behind the recess');
+   geometry.dispose();material.dispose();
+  }
   console.log(name+' manufacturing journey verified');
  }
  // FIT-02: actual Gear and Tile profile/cutter overlay UI parity.
