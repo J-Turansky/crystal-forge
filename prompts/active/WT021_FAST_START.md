@@ -23,6 +23,12 @@
 
 Browser tests need a local host (`python3 -m http.server 4321`) and Chromium/Chrome. Use `CRYSTAL_FORGE_BROWSER_EXECUTABLE` if needed; see [testing guide](../../docs/TESTING.md). These targeted tests speed *iteration*; **none replaces the independent browser+manufacturing acceptance for all seven builders**.
 
+## One-pass changelog and morning reporting
+
+- Add one short [CHANGELOG.md](../../CHANGELOG.md) entry for each **actually tested user-visible** milestone within the same source/test/register/log commit. The in-app catalogue UX-01 must keep release/version and What's New aligned; [acceptance brief](../../docs/WT021_FEATURE_CATALOGUE_BRIEF.md).
+- Update the concise [morning report](../../docs/WT021_OVERNIGHT_SUMMARY.md) during each substantial checkpoint; before quota cutoff push it and post a **single PR #102 report link/comment**, plus a Codex chat recap when possible.
+- Distinct outputs: **changelog = user-visible change; morning report = owner's outcome; NOW = next command; run log = proof**. Keep each short and avoid redundant pushes.
+
 ## Preserve tokens and expensive GitHub Actions minutes
 
 - The three CI workflows use **`concurrency.cancel-in-progress: true`** for the same PR. A push can cancel expensive in-flight browser and fabrication jobs. **Make frequent local commits, but batch related tested edits + register/NOW/log into one remote push per coherent milestone.** Push earlier when a real quota/interruption risk demands a recovery point.

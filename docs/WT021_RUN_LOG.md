@@ -15,6 +15,12 @@
 - **Exact next step for Codex:** Confirm branch tip and CI, inspect `docs/WT021_COMPLETION_REGISTER.md`, then extend the FIT-02 collision tester to include already-routed cuts and neighbouring socket negatives, create failing Manifold and Chromium fixtures, and implement the production collision check. If CI is red first, diagnose/fix that before new work.
 - **Changes pushed in this checkpoint:** documentation organisation and prompt archiving were committed in PR #102. Do not infer any subsequent Codex implementation from this note.
 
+## Additional owner instructions — 20 November 2026 (planning, not implementation)
+
+- Owner added **UX-01 P1**: implement an illustrated, categorised, searchable, accessible, click-through Features & What's New page inside the existing web-app popup. 23 original requirements remain; new UX-01 is **MISSING**, 24 tracked items total. Full original physical parity specification is unchanged.
+- **CHANGELOG.md** must receive a concise *Unreleased* user-facing entry after each independently tested feature, in the same coherent commit as implementation/test evidence. Sync What's New and app version history through UX-01; never present draft PR changes as deployed.
+- Maintain the concise owner report at `docs/WT021_OVERNIGHT_SUMMARY.md` **during milestones** and before quota cutoff, with exact SHA, evidence, remaining work and next action. A PR #102 comment and Codex chat recap are requested at normal end; this run log remains the detailed technical history.
+
 ## Checkpoint template — append for every coherent work increment
 
 ### YYYY-MM-DD HH:MM (local/UTC) — [WT-021 row and precise outcome]

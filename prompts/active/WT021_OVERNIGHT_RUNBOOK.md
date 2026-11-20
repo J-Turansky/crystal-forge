@@ -37,7 +37,7 @@ If the same failure produces no new evidence after a focused reproduction and co
 
 For each coherent milestone:
 
-1. Capture **baseline exact SHA**, select the next P0/P1 item from the 23-row register, identify an objective failing/absent test and implement the **actual** shared app/Manifold change.
+1. Capture **baseline exact SHA**, select the next P0/P1 item from the 24-row register (23 original + UX-01 P1), identify an objective failing/absent test and implement the **actual** shared app/Manifold change.
 2. Run targeted test(s), independent exported STL/3MF measurement and real Chromium interaction checks. Test valid+invalid paths, saved state and cross-family regressions. Never change tests merely to hide a real geometry mismatch.
 3. **Commit and push to the existing PR #102 branch** with a descriptive message, then record the exact head in the checkpoint log. Preserve each already tested milestone and avoid large uncommitted edits.
 4. Let relevant exact-head CI complete, inspect failures and fix them while staying in #102. Continue separate non-overlapping work while CI runs **only if** doing so does not invalidate/cancel the verification run or hide its result. Re-run and report checks on the final intended commit.
@@ -46,6 +46,14 @@ For each coherent milestone:
 7. Pick the next unverified work item **immediately**. No routine user confirmation required between items.
 
 **Checkpoint cadence (critical for limited 5-hour/variable token usage):** Write and push the log at the start, **after each meaningful tested milestone**, after any significant failure/blocked branch, and again **before context compaction, token-budget warnings, planned handover or session exit**. Prefer small commit sets so progress is recoverable even if the environment terminates unexpectedly. Do not assume you can predict the exact quota deadline.
+
+## Changelog, in-app catalogue and owner morning report — required work
+
+- Every **meaningful, tested user-facing change** receives a concise entry in the **Unreleased — WT-021 draft** section of [CHANGELOG.md](../../CHANGELOG.md) with real user impact, relevant families, limits and proof. Batch it in the same push as source/tests/register/NOW/log; **do not push a separate change-log-only commit that cancels expensive CI**. Never claim unreleased draft features are deployed.
+- Deliver **UX-01 P1** per [feature catalogue brief](../../docs/WT021_FEATURE_CATALOGUE_BRIEF.md): extend the app's existing Help/Changelog popup and What's New control; visual category cards, accurate working/partial status, representative local graphics, real click-through to tools, proper accessibility and one maintainable feature/release source so the in-app release text doesn't drift from `CHANGELOG.md`. P0 manufacturing gates remain the higher priority; use only independent UI time before those are met.
+- Maintain [docs/WT021_OVERNIGHT_SUMMARY.md](../../docs/WT021_OVERNIGHT_SUMMARY.md) as a **short owner-facing rolling morning digest**. Update it with actual progress, tests, exact pushed SHA, limitations and single next action **after each meaningful tested milestone**, plus before expected quota/context cutoff. It must already be useful if Codex is suddenly interrupted. Keep it separate from detailed technical RUN_LOG and user-facing CHANGELOG.
+- **Before normal finish or predictable cutoff**, push the current report, **post one concise PR #102 comment with report link and latest exact-head CI**, and write a matching summary in Codex chat if possible. No routine owner permission needed. A hard unexpected quota stop may prevent the final comment, so the committed summary is primary.
+- **Purpose separation:** CHANGELOG = user-visible release history; NOW = one next task; RUN_LOG = chronological engineering proof; OVERNIGHT_SUMMARY = what the owner needs to read in the morning. Avoid duplicated long prose and redundant pushes.
 
 ## Stage 2 — When the session is interrupted or quota is nearly exhausted
 

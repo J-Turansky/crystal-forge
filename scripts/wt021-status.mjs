@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = name => { try { return readFileSync(resolve(root, name), 'utf8'); } catch { return ''; } };
 const git = (...args) => { try { return execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','ignore'],timeout:3000}).trim(); } catch { return 'unavailable'; } };
-const rows = read('docs/WT021_COMPLETION_REGISTER.md').split('\n').filter(x=>/^\| (?:DIM|FAB|FIT|CAL|PAR|E2E)-[A-Z\d]+ P[01] \|/.test(x));
+const rows = read('docs/WT021_COMPLETION_REGISTER.md').split('\n').filter(x=>/^\| (?:DIM|FAB|FIT|CAL|PAR|E2E|UX)-[A-Z\d]+ P[01] \|/.test(x));
 const items = rows.map(x=>({id:x.split('|')[1].trim().split(' ')[0], status:(x.split('|').at(-2)||'').trim().split(';')[0].trim()}));
 const counts = items.reduce((a,x)=>(a[x.status]=(a[x.status]||0)+1,a),{});
 const now = read('docs/WT021_NOW.md');
@@ -22,5 +22,5 @@ else {
  console.log('NEXT:\n'+data.next);
  console.log('CI: gh pr checks 102 --repo connorturansky-svg/crystal-forge (if gh is available)');
  if(data.branch!=='wt021/integrated-release')console.log('WARNING: wrong branch; do not push or merge.');
- if(data.items!==23)console.log('WARNING: unexpected register count; inspect source.');
+ if(data.items<24)console.log('WARNING: unexpected register count; inspect source.');
 }

@@ -1,5 +1,17 @@
 # Crystal Forge — Changelog
 
+## Unreleased — WT-021 draft PR #102 (not deployed)
+
+Only in the draft integration branch; **not a production release**. Owner approval is still required for merge/deployment.
+
+- Introduced physical positive profile and real negative Manifold cutter previews in Crystal and targeted Gear-top / Tile-underside workflows, with exact cutter-envelope tests. **Other families, routed-cut collision and arbitrary-face routing remain incomplete.**
+- Rebuilt the socket cutter as a connected profile after finding a measured 0.62463 mm³ positive-envelope mismatch; added stricter fail-closed export mesh checks.
+- Improved route-roof and independent physical-wire-width versus bore-fit acceptance tests.
+- Archived original Codex briefs and added a token-efficient overnight execution protocol, acceptance register, progress log and recovery pointer in PR #102.
+- **Approved but not yet implemented:** UX-01 visual, categorised, clickable in-app Features & What's New catalogue (see [brief](docs/WT021_FEATURE_CATALOGUE_BRIEF.md)); an updated [owner morning summary](docs/WT021_OVERNIGHT_SUMMARY.md) is required.
+
+**Codex rule:** after each independently tested *user-visible* milestone, update this draft section with concise impact and limitations in the same batched source/test commit. Synchronise in-app What's New/version data through UX-01. Never mislabel a draft-only change as shipped.
+
 ## v0.16.0-dev.35.12 — Integrate Crystal tips and vaulted wire tracks
 
 - Choose global Crystal tip shapes and optionally vault native underside wire tracks while preserving their usable dimensions.

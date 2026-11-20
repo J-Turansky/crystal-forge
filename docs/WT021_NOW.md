@@ -4,7 +4,7 @@
 
 - **Only authorised destination:** `wt021/integrated-release`, existing open draft [PR #102](https://github.com/connorturansky-svg/crystal-forge/pull/102); never open a new PR, merge, deploy or modify `main`.
 - **Last confirmed all-three-workflow-green checkpoint:** `38b58e5001023f89689c8dc810aa3fedb8bd5071` (static, Chromium, Manifold). **Historic only**; run `npm run wt021:status` and inspect latest actual head.
-- **Acceptance:** 23 required rows PARTIAL; zero complete VERIFIED. Crystal underside, Gear top and Tile underside have tested physical positive/negative previews; the remaining families and complete E2E are not accepted.
+- **Acceptance:** 23 original rows PARTIAL, new UX-01 P1 MISSING; 24 tracked total, zero VERIFIED. Crystal underside, Gear top and Tile underside have tested physical positive/negative previews; the remaining families and complete E2E are not accepted.
 - **Authoritative documents:** [completion register](WT021_COMPLETION_REGISTER.md), [approved full WT-021 brief](../prompts/021-complete-seven-builder-manufacturing-parity.md) and [engineering handover](WT021_CODEX_HANDOFF.md).
 - **Owner constraints:** owner controls final merge/deploy, not routine commits; GitHub development branch is not review-protected. Real Cura and physical proof are tracked under #10, software parity under #79.
 
@@ -16,6 +16,8 @@
 - **Run after adding fixture:** `node tests/studio-catalogue.test.mjs` (red first), then focused native Chromium test with local server; later full exact-head CI.
 - **Acceptance:** actual production cutter/positive pose, routed + adjacent collision, visible invalid feedback, retained state and dimensional export parity—not a stock-only visual warning.
 - **Then:** Wave/Cap/Character/Pod positive+cutter acceptance, arbitrary-face drag, side/curved continuous physical wiring, seven independent browser-to-STL/3MF journeys as listed in register.
+- **Additional owner-approved P1:** UX-01 visual Features & What's New catalogue, graphics, category descriptions and safe click-through per [brief](WT021_FEATURE_CATALOGUE_BRIEF.md); finish P0 first.
+- **Reporting:** update [morning summary](WT021_OVERNIGHT_SUMMARY.md) and `CHANGELOG.md` during tested milestones; push and PR-comment the summary before cutoff.
 - **Unblockers:** Codex checks *its own* repository push/Node/Manifold/Chromium access at session start. No known owner review gate to ongoing development; original Cura discrepancy needs separate owner evidence but does not block digital work.
 
 ## Resume instruction

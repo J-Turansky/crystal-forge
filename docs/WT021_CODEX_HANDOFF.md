@@ -32,7 +32,13 @@ Read [`prompts/active/WT021_OVERNIGHT_RUNBOOK.md`](../prompts/active/WT021_OVERN
 | Export integrity | Repaired Crystal degeneracy failures. Preparation checks STL-precision triangles, attempts bounded Manifold/zero-area cleanup and must reconstruct a valid closed, volume-stable solid or refuse the job. Existing Manifold and Chromium Print Centre exports pass at b132359. | Do not replace fail-closed behavior with `Infinity` clearance, silently omit triangles, or change nominal dimensions. |
 | No-mutation browser regression | Added Gear and Tile toggles verifying the model JSON remains identical before/after physical preview, at 042ef97. | Await exact-head CI. Does not replace invalid drag/saved reload/undo tests. |
 
-All **23 completion-register items remain PARTIAL**; none has been independently accepted through every gate. This is not a statement that the implementation is empty; it distinguishes *substantial tested partials* from an integrated, independently verified release.
+The **23 original completion-register items remain PARTIAL**; new owner-approved UX-01 P1 is MISSING, making **24 tracked items**. None is independently accepted through every gate. This is not a statement that the implementation is empty; it distinguishes *substantial tested partials* from an integrated, independently verified release.
+
+## Newly approved owner requirements — 20 November 2026
+
+- **UX-01 P1:** [Features & What's New experience](WT021_FEATURE_CATALOGUE_BRIEF.md) inside the web app's existing Help/Changelog popup, with categorised, illustrated feature cards, honest support labels and safe click-through navigation. Reconcile `CHANGELOG.md`, in-app What's New and release/version metadata. Finish P0 manufacturing first or use independent UI time.
+- **Morning digest:** maintain [WT021_OVERNIGHT_SUMMARY.md](WT021_OVERNIGHT_SUMMARY.md) throughout the overnight run with actual tested progress and next action. Push it before quota cutoff, post one PR #102 comment linking the report and provide a Codex chat summary where possible; this is distinct from detailed `WT021_RUN_LOG.md`.
+- Add short `CHANGELOG.md` entries at each meaningfully tested user-visible milestone, batched with code, tests, NOW and register, not separate pushes that cancel expensive CI.
 
 ## Priority implementation sequence for Codex
 
@@ -55,7 +61,7 @@ All **23 completion-register items remain PARTIAL**; none has been independently
 - `tests/unified-studio-browser.test.mjs`: Gear/Tile interactions, Print Centre downloads, preview no-mutation.
 - `tests/fabrication.test.mjs`: independent Crystal STL/3MF sampled cavity dimensions, precision regression and coupons.
 - `tests/wt021-crystal-dimensions-browser.test.mjs`: independent downloaded Crystal bounds.
-- `docs/WT021_COMPLETION_REGISTER.md`: **authoritative** 23 acceptance requirements; no VERIFIED rows currently.
+- `docs/WT021_COMPLETION_REGISTER.md`: **authoritative** 24 acceptance requirements (23 original plus UX-01); no VERIFIED rows currently.
 
 ## Copyable first Codex instruction
 

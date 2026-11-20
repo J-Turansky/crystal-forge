@@ -9,9 +9,10 @@
 1. [Fast start, targeted test matrix and CI batching](active/WT021_FAST_START.md), then the [single live next action](../docs/WT021_NOW.md). Run `npm run wt021:status`.
 2. [Active implementation instruction](active/WT021_EXECUTION.md) and [overnight runbook](active/WT021_OVERNIGHT_RUNBOOK.md), including one-time access checks and recovery.
 3. [Original full WT-021 approved specification](021-complete-seven-builder-manufacturing-parity.md) — initially read in full; subsequently consult only relevant sections without replacing requirements with a summary.
-4. [23-row acceptance register](../docs/WT021_COMPLETION_REGISTER.md), [engineering handover](../docs/WT021_CODEX_HANDOFF.md) and [independent source audit](../docs/WT021_INDEPENDENT_AUDIT.md).
-5. [AGENTS.md](../AGENTS.md) and [testing guide](../docs/TESTING.md) for standing guardrails. Read the **latest relevant** [durable log](../docs/WT021_RUN_LOG.md) checkpoint rather than replaying its entire history.
-6. Confirm exact current head and checks, then implement the next unverified P0/P1 acceptance task without routine approval requests.
+4. [24-row acceptance register (23 original + UX-01)](../docs/WT021_COMPLETION_REGISTER.md), [engineering handover](../docs/WT021_CODEX_HANDOFF.md) and [independent source audit](../docs/WT021_INDEPENDENT_AUDIT.md).
+5. [UX-01 catalogue acceptance](../docs/WT021_FEATURE_CATALOGUE_BRIEF.md) and [owner overnight summary](../docs/WT021_OVERNIGHT_SUMMARY.md) — additional owner-approved P1/reporting requirements.
+6. [AGENTS.md](../AGENTS.md) and [testing guide](../docs/TESTING.md) for standing guardrails. Read the **latest relevant** [durable log](../docs/WT021_RUN_LOG.md) checkpoint rather than replaying its entire history.
+7. Confirm exact current head and checks, then implement the next unverified P0/P1 acceptance task without routine approval requests.
 
 **Boundaries:** No new PR, no merge, no deployment, no changes to `main`, no work on #90, no unsupported physical-fit claims. Keep unfinished software under [#79](https://github.com/connorturansky-svg/crystal-forge/issues/79) and original STL/Cura/printed verification under [#10](https://github.com/connorturansky-svg/crystal-forge/issues/10). A green existing test suite does not mean the missing seven independent user journeys exist.
 
