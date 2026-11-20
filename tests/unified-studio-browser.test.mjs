@@ -1199,6 +1199,8 @@ try{
    assert(socket.socketProfile.bodyHeight>0);
    assert(socket.surface.normal[1]>.999);
    assert.equal(socket.entryFace,'top');
+   // FIT-02: enabling a diagnostic overlay must never change saved model data.
+   const gearStateBefore=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
    const nativeToggle=page.getByRole('checkbox',{name:'Show physical pixels and socket cutters'});
    await nativeToggle.check();
    const nativePreview=page.locator('[data-native-fit-preview-status]');
@@ -1210,6 +1212,8 @@ try{
    assert.match(await nativePreview.innerText(),/stock interference/);
    await nativeToggle.uncheck();
    assert.equal(await nativePreview.innerText(),'');
+   assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),gearStateBefore,
+    'Toggling Gear physical overlays must not mutate fittings, dimensions or saved model revision');
   }else{
    await page.locator('[data-pixel-status]').filter({hasText:/continuous stock/}).waitFor();
    assert.equal(await page.evaluate(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length??0),0);
@@ -1228,6 +1232,7 @@ try{
  assert(tilePoint,'Tile fitting needs a physical underside');
  await page.mouse.click(tilePoint.x,tilePoint.y);
  await page.waitForFunction(()=>window.__sensoryStudio.currentModel.build.pixelHoles?.length===1,{timeout:120000});
+ const tileStateBefore=await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel));
  const tileToggle=page.getByRole('checkbox',{name:'Show physical pixels and socket cutters'});
  await tileToggle.check();
  const tilePreview=page.locator('[data-native-fit-preview-status]');
@@ -1237,6 +1242,8 @@ try{
   'Tile preview: '+await tilePreview.innerText());
  assert.match(await tilePreview.innerText(),/stock interference/);
  await tileToggle.uncheck();
+ assert.equal(await page.evaluate(()=>JSON.stringify(window.__sensoryStudio.currentModel)),tileStateBefore,
+  'Toggling Tile physical overlays must not mutate fittings, dimensions or saved model revision');
  await page.keyboard.press('Escape');
  assert.deepEqual(errors,[]);
  console.log('Unified Home, Design, Build, Library and Quick Print screenshots captured.');
